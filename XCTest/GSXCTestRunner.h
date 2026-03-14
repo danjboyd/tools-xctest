@@ -34,6 +34,9 @@
 
 - (BOOL)runAll;
 - (BOOL)runTestsNamed:(NSArray *)testNames; // nil for all tests
+- (BOOL)runTestsForTargetName:(NSString *)targetName
+          onlyTestIdentifiers:(NSArray *)onlyTestIdentifiers
+          skipTestIdentifiers:(NSArray *)skipTestIdentifiers;
 
 - (void)waitForCompletion;
 

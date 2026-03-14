@@ -11,6 +11,8 @@ endif
 dependencies_to_link = []
 # Common Objective-C flags
 objc_flags = []
+gnustep_runtime_lib_dirs = []
+gnustep_makefiles = ''
 
 # Use GNUstep on non-Darwin platforms
 if host_machine.system() != 'darwin'
@@ -22,11 +24,18 @@ if host_machine.system() != 'darwin'
 
     gnustep_flags = run_command(gnustep_config, '--objc-flags', check: true).stdout().strip().split()
     gnustep_base_libs = run_command(gnustep_config, '--base-libs', check: true).stdout().strip().split()
+    gnustep_makefiles = run_command(gnustep_config, '--variable=GNUSTEP_MAKEFILES', check: true).stdout().strip()
 
     # Filter out flags that are handled by Meson's built-in options
     foreach flag : gnustep_flags
     if flag != '-Wall' and flag != '-g' and flag != '-O2' and flag != '-MMD'
         objc_flags += flag
+    endif
+    endforeach
+
+    foreach flag : gnustep_base_libs
+    if flag.startswith('-L')
+        gnustep_runtime_lib_dirs += flag.substring(2)
     endif
     endforeach
 
@@ -82,4 +91,20 @@ pkg.generate(libraries : xctest_lib,
 )
 
 # Build XCTest tool
-executable('xctest', 'main.m', link_with: xctest_lib, install: true)
+xctest_tool = executable('xctest', 'main.m', link_with: xctest_lib, install: true)
+
+if host_machine.system() != 'darwin'
+  cli_filter_tests = find_program('Tests/run-cli-filter-tests.sh')
+  cli_filter_test_env = environment()
+  cli_filter_test_env.set('GNUSTEP_MAKEFILES', gnustep_makefiles)
+  test('cli-filters',
+       cli_filter_tests,
+       args: [
+         join_paths(meson.current_build_dir(), 'xctest'),
+         meson.current_build_dir(),
+         meson.current_source_dir(),
+         ':'.join(gnustep_runtime_lib_dirs),
+       ],
+       env: cli_filter_test_env,
+       depends: [xctest_tool, xctest_lib])
+endif
