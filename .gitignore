@@ -4,3 +4,5 @@ Tests/FilterFixture/FilterFixture.bundle
 Tests/FilterFixture/obj
 Tests/LifecycleFixture/LifecycleFixture.bundle
 Tests/LifecycleFixture/obj
+Tests/AssertionFixture/AssertionFixture.bundle
+Tests/AssertionFixture/obj
