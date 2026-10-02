@@ -1,2 +1,4 @@
 obj
 XCTest/obj
+Tests/FilterFixture/FilterFixture.bundle
+Tests/FilterFixture/obj

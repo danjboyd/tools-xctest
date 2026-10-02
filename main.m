@@ -18,22 +18,115 @@
  Boston, MA 02110-1301, USA.
 */
 
+#include <stdio.h>
+
 #import <Foundation/Foundation.h>
 #import <XCTest/GSXCTestRunner.h>
 
+static void PrintUsage(FILE *stream)
+{
+    fprintf(stream, "Usage: xctest [options] <test bundle path>\n");
+    fprintf(stream, "\n");
+    fprintf(stream, "Options:\n");
+    fprintf(stream, "  -only-testing:<identifier>  Run only tests matching TestTarget[/TestClass[/TestMethod]]\n");
+    fprintf(stream, "  -skip-testing:<identifier>  Skip tests matching TestTarget[/TestClass[/TestMethod]]\n");
+    fprintf(stream, "  -h, --help                  Show this help message\n");
+}
+
+static NSString *TargetNameForBundlePath(NSString *testBundlePath)
+{
+    NSString *bundleName = [[testBundlePath lastPathComponent] stringByDeletingPathExtension];
+    return [bundleName length] > 0 ? bundleName : nil;
+}
+
 int main(int argc, char *argv[]) {
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
+    int exitCode = 1;
+    NSMutableArray *onlyTestIdentifiers = [NSMutableArray array];
+    NSMutableArray *skipTestIdentifiers = [NSMutableArray array];
+    NSString *testBundlePath = nil;
+
     if (argc == 1) {
-        NSLog(@"Usage: xctest [test bundle path]");
-        return 1;
+        PrintUsage(stderr);
+        goto cleanup;
     }
-    
-    NSString *testBundlePath = [NSString stringWithUTF8String: argv[1]];
+
+    for (int i = 1; i < argc; i++) {
+        NSString *argument = [NSString stringWithUTF8String:argv[i]];
+
+        if ([argument isEqualToString:@"-h"] ||
+            [argument isEqualToString:@"--help"] ||
+            [argument isEqualToString:@"-help"])
+        {
+            PrintUsage(stdout);
+            exitCode = 0;
+            goto cleanup;
+        }
+
+        if ([argument hasPrefix:@"-only-testing:"]) {
+            NSString *identifier = [argument substringFromIndex:[@"-only-testing:" length]];
+            if ([identifier length] == 0) {
+                fprintf(stderr, "xctest: missing value for -only-testing\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+
+            [onlyTestIdentifiers addObject:identifier];
+            continue;
+        }
+
+        if ([argument hasPrefix:@"-skip-testing:"]) {
+            NSString *identifier = [argument substringFromIndex:[@"-skip-testing:" length]];
+            if ([identifier length] == 0) {
+                fprintf(stderr, "xctest: missing value for -skip-testing\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+
+            [skipTestIdentifiers addObject:identifier];
+            continue;
+        }
+
+        if ([argument hasPrefix:@"-"]) {
+            fprintf(stderr, "xctest: unknown option '%s'\n", argv[i]);
+            PrintUsage(stderr);
+            goto cleanup;
+        }
+
+        if (testBundlePath != nil) {
+            fprintf(stderr, "xctest: only one test bundle path may be provided\n");
+            PrintUsage(stderr);
+            goto cleanup;
+        }
+
+        testBundlePath = argument;
+    }
+
+    if (testBundlePath == nil) {
+        fprintf(stderr, "xctest: missing test bundle path\n");
+        PrintUsage(stderr);
+        goto cleanup;
+    }
+
     NSURL *testBundleUrl = [NSURL fileURLWithPath: testBundlePath];
     NSBundle *testBundle = [NSBundle bundleWithURL: testBundleUrl];
-    [testBundle load];
+    if (testBundle == nil) {
+        fprintf(stderr, "xctest: could not create bundle for path '%s'\n", [testBundlePath UTF8String]);
+        goto cleanup;
+    }
 
-    BOOL result = [[GSXCTestRunner sharedRunner] runAll];
+    if (![testBundle load]) {
+        fprintf(stderr, "xctest: failed to load bundle '%s'\n", [testBundlePath UTF8String]);
+        goto cleanup;
+    }
+
+    NSString *targetName = TargetNameForBundlePath(testBundlePath);
+    BOOL result = [[GSXCTestRunner sharedRunner] runTestsForTargetName:targetName
+                                                   onlyTestIdentifiers:onlyTestIdentifiers
+                                                   skipTestIdentifiers:skipTestIdentifiers];
+    exitCode = result == YES ? 0 : 1;
+
+cleanup:
     [pool release];
-    return result == YES ? 0 : 1;
+    return exitCode;
 }

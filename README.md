@@ -48,6 +48,17 @@ Tests can be run using the command line tool provided by `tools-xctest`. This ca
 xctest [path to your test case bundle]
 ```
 
+The CLI also supports Apple's `xcodebuild` filter syntax for selecting or excluding tests:
+
+```bash
+xctest MyTests.bundle -only-testing:MyTests/FooTests/testBar
+xctest MyTests.bundle -skip-testing:MyTests/SlowTests
+```
+
+Test identifiers use the form `TestTarget[/TestClass[/TestMethod]]`, where `TestTarget` is the bundle name without the `.bundle` extension.
+
+Automated CLI regression tests can be run with `make check` or `meson test -C build`.
+
 ## License
 `tools-xctest` is licensed under LGPL-2.1. Please refer to the COPYING.LIB file for detailed information. For files not explicitly licensed, they fall under the same LGPL.
 

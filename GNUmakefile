@@ -20,3 +20,6 @@ include $(GNUSTEP_MAKEFILES)/aggregate.make
 include $(GNUSTEP_MAKEFILES)/tool.make
 
 -include GNUmakefile.postamble
+
+after-check:: all
+	./Tests/run-cli-filter-tests.sh "$(CURDIR)/obj/xctest" "$(CURDIR)/XCTest/obj" "$(CURDIR)" "$(dir $(GNUSTEP_MAKEFILES))Libraries"
