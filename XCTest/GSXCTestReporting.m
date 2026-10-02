@@ -921,6 +921,11 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
     @synchronized (self) {
         GSXCTestSuiteResult *suite = nil;
 
+        // Suites run by the running test itself aren't reported.
+        if (_currentTestCase != nil) {
+            return;
+        }
+
         if (testSuite == _topSuite) {
             [_run setStartDate:[[testSuite testRun] startDate]];
             GS_REPORT(runDidStart:_run)
@@ -949,6 +954,10 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
 {
     // Events can come from other threads (late failures).
     @synchronized (self) {
+        if (_currentTestCase != nil) {
+            return;
+        }
+
         if (testSuite == _topSuite) {
             [_run setDuration:[[testSuite testRun] totalDuration]];
             GS_REPORT(runDidFinish:_run)
@@ -1066,7 +1075,8 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
 {
     // Events can come from other threads (late failures).
     @synchronized (self) {
-        if (_currentSuite == nil || ![[testSuite name] isEqualToString:[_currentSuite name]]) {
+        if (_currentTestCase != nil || _currentSuite == nil
+            || ![[testSuite name] isEqualToString:[_currentSuite name]]) {
             return;
         }
 

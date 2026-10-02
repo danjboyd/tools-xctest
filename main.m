@@ -232,9 +232,10 @@ static BOOL ListTests(GSXCTestRunner *runner, NSString *testBundlePath, NSString
             nil]];
     }
 
+    // targetName can be nil; it must not end the argument list early.
     NSDictionary *listing = [NSDictionary dictionaryWithObjectsAndKeys:
         [testBundlePath lastPathComponent], @"bundle",
-        targetName, @"target",
+        (targetName ? targetName : @""), @"target",
         tests, @"tests",
         nil];
     NSError *error = nil;

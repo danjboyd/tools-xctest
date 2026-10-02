@@ -53,6 +53,13 @@ NSString *_GSXCTDescribeException(NSException *exception);
 - (void) _gsSetTestRun: (XCTestRun *)run;
 @end
 
+@interface XCTestSuite (GSPrivate)
+// Records every test case in the suite (recursively) as failed with
+// \a cause, or as skipped, without running them.
+- (void) _gsFailWithoutRunning: (GSXCTestIssue *)cause;
+- (void) _gsSkipWithoutRunning: (GSXCTestIssue *)skip;
+@end
+
 @interface XCTestRun (GSPrivate)
 // Counts the issue and tells observers about it.
 - (void) _gsRecordIssue: (GSXCTestIssue *)issue;
