@@ -35,6 +35,9 @@ assert_contains '(([self boom]) does not throw) failed: threw "boom"'
 assert_contains '(([self boom]) does not throw <NSException>) failed: threw <NSException> "boom"'
 assert_contains '(([self boom]) does not throw <NSException, "NSInternalInconsistencyException">) failed: threw <NSException, "NSInternalInconsistencyException"> "boom"'
 assert_not_contains 'assertion failed'
-assert_contains 'AssertionMessageTests: 23/23 tests FAILED'
+assert_contains '"a") is not identical to ("a")'
+assert_contains '((object) not identical to (object)) failed: ("<NSObject: '
+assert_contains 'AssertionMessageTests: 25/25 tests FAILED'
+assert_contains 'PassingIdentityTests: 1 tests PASSED'
 
 echo "Assertion message tests passed."

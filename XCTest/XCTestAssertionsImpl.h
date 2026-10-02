@@ -72,6 +72,8 @@ typedef enum _XCTAssertionType : NSUInteger {
     _XCTAssertion_NoThrow,
     _XCTAssertion_NoThrowSpecific,
     _XCTAssertion_NoThrowSpecificNamed,
+    _XCTAssertion_Identical,
+    _XCTAssertion_NotIdentical,
 } _XCTAssertionType;
 
 NSString * _XCTFailureFormat (_XCTAssertionType assertionType, NSUInteger formatIndex);
@@ -156,6 +158,24 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     } \
     @catch (...) { \
         _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_False, 2, expressionStr), __VA_ARGS__); \
+    } \
+})
+
+#define _XCTPrimitiveAssertIdentical(test, expression1, expressionStr1, expression2, expressionStr2, isIdentical, ...) \
+({ \
+    @try { \
+        id expressionValue1 = (expression1); \
+        id expressionValue2 = (expression2); \
+        if ((expressionValue1 == expressionValue2) != (isIdentical)) { \
+            _XCTRegisterFailure(test, _XCTFailureDescription((isIdentical) ? _XCTAssertion_Identical : _XCTAssertion_NotIdentical, 0, expressionStr1, expressionStr2, expressionValue1, expressionValue2), __VA_ARGS__); \
+        } \
+    } \
+    @catch (_XCTestCaseInterruptionException *interruption) { [interruption raise]; } \
+    @catch (NSException *exception) { \
+        _XCTRegisterFailure(test, _XCTFailureDescription((isIdentical) ? _XCTAssertion_Identical : _XCTAssertion_NotIdentical, 1, expressionStr1, expressionStr2, [exception reason]), __VA_ARGS__); \
+    } \
+    @catch (...) { \
+        _XCTRegisterFailure(test, _XCTFailureDescription((isIdentical) ? _XCTAssertion_Identical : _XCTAssertion_NotIdentical, 2, expressionStr1, expressionStr2), __VA_ARGS__); \
     } \
 })
 
