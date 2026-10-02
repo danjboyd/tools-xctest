@@ -49,6 +49,10 @@ assert_matches "^	 Executed 1 test, with 2 failures \(2 unexpected\) in "
 assert_matches "^Test Suite 'Selected tests' failed at "
 assert_matches "^	 Executed 7 tests, with 2 tests skipped and 4 failures \(3 unexpected\) in "
 
+assert_contains "Failing tests:"
+assert_contains "$(printf '\t')-[TestThrowsTests testThrows]: threw exception: "
+assert_contains "$(printf '\t')-[StopAfterFailureTests testStops]: LifecycleFixture.m:146: ((NO) is true) failed: fixture stop"
+
 # Per-test durations are measured.
 run_fixture_stdout AsyncFixture -output-format apple -only-testing:AsyncFixture/AsyncPassingTests/testInvertedWaitsFullTimeout
 assert_status 0
