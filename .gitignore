@@ -2,3 +2,5 @@ obj
 XCTest/obj
 Tests/FilterFixture/FilterFixture.bundle
 Tests/FilterFixture/obj
+Tests/LifecycleFixture/LifecycleFixture.bundle
+Tests/LifecycleFixture/obj

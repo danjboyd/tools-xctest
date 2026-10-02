@@ -95,8 +95,9 @@ xctest_tool = executable('xctest', 'main.m', link_with: xctest_lib, install: tru
 
 if host_machine.system() != 'darwin'
   cli_filter_tests = find_program('Tests/run-cli-filter-tests.sh')
-  cli_filter_test_env = environment()
-  cli_filter_test_env.set('GNUSTEP_MAKEFILES', gnustep_makefiles)
+  lifecycle_tests = find_program('Tests/run-lifecycle-tests.sh')
+  xctest_test_env = environment()
+  xctest_test_env.set('GNUSTEP_MAKEFILES', gnustep_makefiles)
   test('cli-filters',
        cli_filter_tests,
        args: [
@@ -105,6 +106,16 @@ if host_machine.system() != 'darwin'
          meson.current_source_dir(),
          ':'.join(gnustep_runtime_lib_dirs),
        ],
-       env: cli_filter_test_env,
+       env: xctest_test_env,
+       depends: [xctest_tool, xctest_lib])
+  test('lifecycle',
+       lifecycle_tests,
+       args: [
+         join_paths(meson.current_build_dir(), 'xctest'),
+         meson.current_build_dir(),
+         meson.current_source_dir(),
+         ':'.join(gnustep_runtime_lib_dirs),
+       ],
+       env: xctest_test_env,
        depends: [xctest_tool, xctest_lib])
 endif

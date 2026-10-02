@@ -39,6 +39,14 @@ To use `tools-xctest`, include the header files in your test classes and link ag
 @end
 ```
 
+Test classes support the same lifecycle as Apple's XCTest:
+
+- `+setUp` and `+tearDown` run once per class, around all of its tests.
+- Each test gets a fresh instance and runs `-setUpWithError:`, `-setUp`, the test method, any blocks registered with `-addTeardownBlock:` (last added first), `-tearDown`, then `-tearDownWithError:`.
+- Teardown always runs, even when set up or the test fails or throws.
+- Set `continueAfterFailure = NO` to stop a test at its first failed assertion.
+- Test methods inherited from a superclass are run for each subclass, and tests run in alphabetical order.
+
 You will need to compile the test cases into one or more bundles, as `xctest` expects `.bundle`'s. 
 
 ## Running Tests
