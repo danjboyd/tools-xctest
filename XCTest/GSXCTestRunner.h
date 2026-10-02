@@ -29,6 +29,7 @@
 
 @interface GSXCTestRunner : NSObject {
     NSUInteger assertionFailureCount;
+    NSString *skipReason;
     NSLock *runLock;
 }
 

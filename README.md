@@ -46,6 +46,7 @@ Test classes support the same lifecycle as Apple's XCTest:
 - Teardown always runs, even when set up or the test fails or throws.
 - Set `continueAfterFailure = NO` to stop a test at its first failed assertion.
 - Test methods inherited from a superclass are run for each subclass, and tests run in alphabetical order.
+- Call `XCTSkip(...)`, `XCTSkipIf(condition, ...)` or `XCTSkipUnless(condition, ...)` to skip the rest of a test, for example when it needs a display or a platform feature that isn't available. Skipped tests are reported separately and don't fail the run; teardown still runs.
 
 You will need to compile the test cases into one or more bundles, as `xctest` expects `.bundle`'s. 
 
