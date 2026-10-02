@@ -21,6 +21,8 @@
 #import <XCTest/XCTestRun.h>
 #import <XCTest/XCTestPrivate.h>
 
+#import <objc/objc-arc.h>
+
 NSString *_GSXCTDescribeException(NSException *exception)
 {
     return [NSString stringWithFormat:@"\"%@\", \"%@\"", [exception name], [exception reason]];
@@ -28,7 +30,6 @@ NSString *_GSXCTDescribeException(NSException *exception)
 
 @implementation XCTestRun
 
-@synthesize test = _test;
 
 + (id) testRunWithTest: (XCTest *)test
 {
@@ -39,7 +40,9 @@ NSString *_GSXCTDescribeException(NSException *exception)
 {
     self = [super init];
     if (self) {
-        _test = [test retain];
+        // A zeroing weak reference: tests own their runs, so a strong one
+        // would be a cycle that leaks every test and run.
+        objc_storeWeak(&_test, test);
     }
 
     return self;
@@ -47,10 +50,15 @@ NSString *_GSXCTDescribeException(NSException *exception)
 
 - (void) dealloc
 {
-    [_test release];
+    objc_storeWeak(&_test, nil);
     [_startDate release];
     [_stopDate release];
     [super dealloc];
+}
+
+- (XCTest *) test
+{
+    return objc_loadWeak(&_test);
 }
 
 - (void) start
@@ -93,7 +101,7 @@ NSString *_GSXCTDescribeException(NSException *exception)
 
 - (NSUInteger) testCaseCount
 {
-    return [_test testCaseCount];
+    return [[self test] testCaseCount];
 }
 
 - (NSUInteger) executionCount
@@ -160,6 +168,12 @@ NSString *_GSXCTDescribeException(NSException *exception)
 @end
 
 @implementation XCTestCaseRun
+
+- (NSUInteger) testCaseCount
+{
+    // Constant, so it's still right after the test case has gone.
+    return 1;
+}
 
 - (void) start
 {

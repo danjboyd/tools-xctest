@@ -63,3 +63,19 @@ static int classSetUps = 0;
 }
 
 @end
+
+// Logs when test cases are freed, to catch leaks.
+@interface DeallocTests : XCTestCase
+@end
+
+@implementation DeallocTests
+
+- (void)dealloc
+{
+    NSLog(@"fixture: DeallocTests dealloc");
+    [super dealloc];
+}
+
+- (void)testSomething { }
+
+@end

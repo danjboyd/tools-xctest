@@ -64,6 +64,15 @@ assert_status 0
 [ "$(count_lines "Test Case '-\[CountingTests testCounts\]' passed (")" -eq 2 ] || fail "expected 2 Apple-format runs"
 assert_contains "Executed 2 tests, with 0 failures"
 
+# Test cases are freed: repeated attempts as soon as they finish, the
+# rest when the run is over. (They used to leak through a retain cycle
+# with their runs.)
+run_fixture RepetitionFixture -test-iterations 3 -only-testing:RepetitionFixture/DeallocTests
+assert_status 0
+[ "$(count_lines 'fixture: DeallocTests dealloc')" -eq 3 ] || fail "expected all 3 test cases to be freed"
+before_summary=$(printf '%s\n' "$output" | sed '/XCTest: 1 tests PASSED/q' | grep -c 'fixture: DeallocTests dealloc' || true)
+[ "$before_summary" -ge 2 ] || fail "expected repeated attempts to be freed during the run"
+
 run_fixture RepetitionFixture -run-tests-until-failure -retry-tests-on-failure
 assert_status 1
 assert_contains "can't be combined"

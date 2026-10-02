@@ -38,7 +38,9 @@
 + (id) testRunWithTest: (XCTest *)test;
 - (id) initWithTest: (XCTest *)test;
 
-@property (readonly, retain) XCTest *test;
+/*! The test this run belongs to. Not retained (the test owns its run);
+ * nil once the test has been deallocated. */
+@property (readonly, assign) XCTest *test;
 
 - (void) start;
 - (void) stop;
