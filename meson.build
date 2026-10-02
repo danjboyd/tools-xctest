@@ -65,6 +65,7 @@ source = [
 	'XCTest/XCTestObservationCenter.m',
 	'XCTest/XCTIssue.m',
 	'XCTest/XCTExpectedFailure.m',
+	'XCTest/XCTestCase+Performance.m',
 ]
 
 headers = [
@@ -135,6 +136,7 @@ if host_machine.system() != 'darwin'
   object_model_tests = find_program('Tests/run-object-model-tests.sh')
   hosted_tests = find_program('Tests/run-hosted-tests.sh')
   expected_failure_tests = find_program('Tests/run-expected-failure-tests.sh')
+  performance_tests = find_program('Tests/run-performance-tests.sh')
   xctest_test_env = environment()
   xctest_test_env.set('GNUSTEP_MAKEFILES', gnustep_makefiles)
   test('cli-filters',
@@ -235,6 +237,18 @@ if host_machine.system() != 'darwin'
        is_parallel: false)
   test('expected-failures',
        expected_failure_tests,
+       args: [
+         join_paths(meson.current_build_dir(), 'xctest'),
+         meson.current_build_dir(),
+         meson.current_source_dir(),
+         ':'.join(gnustep_runtime_lib_dirs),
+       ],
+       env: xctest_test_env,
+       depends: [xctest_tool, xctest_lib],
+       # The scripts rebuild shared fixture bundles in the source tree.
+       is_parallel: false)
+  test('performance',
+       performance_tests,
        args: [
          join_paths(meson.current_build_dir(), 'xctest'),
          meson.current_build_dir(),

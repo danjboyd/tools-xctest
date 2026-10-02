@@ -129,6 +129,8 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 @synthesize bundleName;
 @synthesize junitReportPath;
 @synthesize testBundle;
+@synthesize performanceBaselinesPath;
+@synthesize updatePerformanceBaselines;
 
 - (id)init
 {
@@ -145,6 +147,8 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     [runLock release];
     [testBundle release];
     [principalObject release];
+    [performanceBaselinesPath release];
+    [performanceBaselines release];
     [bundleName release];
     [junitReportPath release];
     [super dealloc];
@@ -350,6 +354,11 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 
     [runLock lock];
 
+    if (![self _gsLoadPerformanceBaselines]) {
+        [runLock unlock];
+        return NO;
+    }
+
     NSString *runBundleName = bundleName ? bundleName
         : (testBundle ? [[testBundle bundlePath] lastPathComponent] : (targetName ? targetName : @"XCTest"));
     XCTestSuite *topSuite = [XCTestSuite testSuiteWithName:(filtersActive ? @"Selected tests" : @"All tests")];
@@ -396,9 +405,95 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 
     [center removeTestObserver:(id<XCTestObservation>)reportingObserver];
 
+    BOOL savedBaselines = [self _gsSavePerformanceBaselines];
+
     [runLock unlock];
 
-    return [[topSuite testRun] hasSucceeded] && (junitReporter == nil || [junitReporter wroteReport]);
+    return [[topSuite testRun] hasSucceeded] && savedBaselines
+        && (junitReporter == nil || [junitReporter wroteReport]);
+}
+
+// Reads performanceBaselinesPath. A missing file is fine when updating
+// (it will be created); otherwise, or if it isn't valid, the run fails.
+- (BOOL)_gsLoadPerformanceBaselines
+{
+    NSData *data = nil;
+    id baselines = nil;
+
+    [performanceBaselines release];
+    performanceBaselines = [[NSMutableDictionary alloc] init];
+
+    if (performanceBaselinesPath == nil) {
+        return YES;
+    }
+
+    data = [NSData dataWithContentsOfFile:performanceBaselinesPath];
+    if (data == nil) {
+        if (updatePerformanceBaselines) {
+            return YES;
+        }
+        NSLog(@"XCTest: Could not read performance baselines from '%@'.", performanceBaselinesPath);
+        return NO;
+    }
+
+    baselines = [NSJSONSerialization JSONObjectWithData:data options:0 error:NULL];
+    if (![baselines isKindOfClass:[NSDictionary class]]) {
+        NSLog(@"XCTest: Performance baselines in '%@' are not a JSON object.", performanceBaselinesPath);
+        return NO;
+    }
+
+    for (NSString *identifier in baselines) {
+        id baseline = [baselines objectForKey:identifier];
+        if ([baseline isKindOfClass:[NSDictionary class]]) {
+            [performanceBaselines setObject:[[baseline mutableCopy] autorelease] forKey:identifier];
+        }
+    }
+
+    return YES;
+}
+
+- (BOOL)_gsSavePerformanceBaselines
+{
+    NSData *data = nil;
+
+    if (!updatePerformanceBaselines || performanceBaselinesPath == nil) {
+        return YES;
+    }
+
+    data = [NSJSONSerialization dataWithJSONObject:performanceBaselines
+                                           options:NSJSONWritingPrettyPrinted
+                                             error:NULL];
+    if (data == nil || ![data writeToFile:performanceBaselinesPath atomically:YES]) {
+        NSLog(@"XCTest: Could not write performance baselines to '%@'.", performanceBaselinesPath);
+        return NO;
+    }
+
+    return YES;
+}
+
+- (NSDictionary *)_gsPerformanceBaselineForTest:(NSString *)identifier
+{
+    // When recording new baselines, don't judge against the old ones.
+    if (updatePerformanceBaselines) {
+        return nil;
+    }
+
+    return [performanceBaselines objectForKey:identifier];
+}
+
+- (void)_gsRecordPerformanceAverage:(double)average forTest:(NSString *)identifier
+{
+    NSMutableDictionary *baseline = [performanceBaselines objectForKey:identifier];
+
+    if (!updatePerformanceBaselines) {
+        return;
+    }
+
+    if (baseline == nil) {
+        baseline = [NSMutableDictionary dictionary];
+        [performanceBaselines setObject:baseline forKey:identifier];
+    }
+    [baseline setObject:[NSNumber numberWithDouble:average] forKey:@"average"];
 }
 
 // Creates the test bundle's principal class (NSPrincipalClass in its

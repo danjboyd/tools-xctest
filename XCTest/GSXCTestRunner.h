@@ -38,6 +38,9 @@ typedef enum {
     NSLock *runLock;
     NSBundle *testBundle;
     id principalObject;
+    NSString *performanceBaselinesPath;
+    BOOL updatePerformanceBaselines;
+    NSMutableDictionary *performanceBaselines;
     GSXCTestOutputFormat outputFormat;
     NSString *bundleName;
     NSString *junitReportPath;
@@ -58,6 +61,18 @@ typedef enum {
  * instantiated before the first run so it can register observers.
  */
 @property (retain) NSBundle *testBundle;
+
+/*!
+ * A JSON file of performance baselines: {"TestClass/testMethod":
+ * {"average": seconds, "maxPercentRegression": percent}}. A measured test
+ * fails if its average is worse than its baseline by more than
+ * maxPercentRegression (default 10).
+ */
+@property (copy) NSString *performanceBaselinesPath;
+
+/*! If YES, measured averages are written back to performanceBaselinesPath
+ * after the run (keeping each entry's maxPercentRegression). */
+@property BOOL updatePerformanceBaselines;
 
 - (BOOL)runAll;
 - (BOOL)runTestsNamed:(NSArray *)testNames; // nil for all tests

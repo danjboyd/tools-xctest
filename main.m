@@ -38,6 +38,8 @@ static void PrintUsage(FILE *stream)
     fprintf(stream, "  -list-tests                 List the selected tests, one identifier per line, without running them\n");
     fprintf(stream, "  -list-tests-json            List the selected tests as JSON, without running them\n");
     fprintf(stream, "  -host <app>                 Run the tests inside a running application (.app or executable)\n");
+    fprintf(stream, "  -performance-baselines <path>  Fail measured tests that regress against these baselines (JSON)\n");
+    fprintf(stream, "  -update-performance-baselines  Record measured averages into the -performance-baselines file\n");
     fprintf(stream, "  -h, --help                  Show this help message\n");
 }
 
@@ -70,7 +72,8 @@ static NSString *HostLibraryPath(void)
 // code for xctest.
 static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString *targetName,
                           NSArray *onlyTestIdentifiers, NSArray *skipTestIdentifiers,
-                          GSXCTestOutputFormat outputFormat, NSString *junitReportPath)
+                          GSXCTestOutputFormat outputFormat, NSString *junitReportPath,
+                          NSString *performanceBaselinesPath, BOOL updatePerformanceBaselines)
 {
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSString *executable = hostPath;
@@ -103,6 +106,12 @@ static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString
     [config setObject:skipTestIdentifiers forKey:@"skip"];
     [config setObject:(outputFormat == GSXCTestOutputFormatApple ? @"apple" : @"classic") forKey:@"outputFormat"];
     [config setObject:statusFile forKey:@"statusFile"];
+    if (performanceBaselinesPath != nil) {
+        [config setObject:([performanceBaselinesPath isAbsolutePath] ? performanceBaselinesPath
+                           : [[fileManager currentDirectoryPath] stringByAppendingPathComponent:performanceBaselinesPath])
+                   forKey:@"performanceBaselines"];
+        [config setObject:[NSNumber numberWithBool:updatePerformanceBaselines] forKey:@"updatePerformanceBaselines"];
+    }
     if (junitReportPath != nil) {
         NSString *absoluteReport = [junitReportPath isAbsolutePath] ? junitReportPath
             : [[fileManager currentDirectoryPath] stringByAppendingPathComponent:junitReportPath];
@@ -204,6 +213,8 @@ int main(int argc, char *argv[]) {
     BOOL listTests = NO;
     BOOL listTestsAsJSON = NO;
     NSString *hostPath = nil;
+    NSString *performanceBaselinesPath = nil;
+    BOOL updatePerformanceBaselines = NO;
 
     if (argc == 1) {
         PrintUsage(stderr);
@@ -271,6 +282,21 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        if ([argument isEqualToString:@"-performance-baselines"]) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "xctest: missing path for -performance-baselines\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            performanceBaselinesPath = [NSString stringWithUTF8String:argv[++i]];
+            continue;
+        }
+
+        if ([argument isEqualToString:@"-update-performance-baselines"]) {
+            updatePerformanceBaselines = YES;
+            continue;
+        }
+
         if ([argument isEqualToString:@"-host"]) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "xctest: missing application for -host\n");
@@ -306,6 +332,11 @@ int main(int argc, char *argv[]) {
         testBundlePath = argument;
     }
 
+    if (updatePerformanceBaselines && performanceBaselinesPath == nil) {
+        fprintf(stderr, "xctest: -update-performance-baselines needs -performance-baselines <path>\n");
+        goto cleanup;
+    }
+
     if (testBundlePath == nil) {
         fprintf(stderr, "xctest: missing test bundle path\n");
         PrintUsage(stderr);
@@ -315,7 +346,8 @@ int main(int argc, char *argv[]) {
     // In a host application the bundle is loaded there, not here.
     if (hostPath != nil && !listTests) {
         exitCode = RunTestsInHost(hostPath, testBundlePath, TargetNameForBundlePath(testBundlePath),
-                                  onlyTestIdentifiers, skipTestIdentifiers, outputFormat, junitReportPath);
+                                  onlyTestIdentifiers, skipTestIdentifiers, outputFormat, junitReportPath,
+                                  performanceBaselinesPath, updatePerformanceBaselines);
         goto cleanup;
     }
 
@@ -343,6 +375,8 @@ int main(int argc, char *argv[]) {
     [runner setOutputFormat:outputFormat];
     [runner setBundleName:[testBundlePath lastPathComponent]];
     [runner setTestBundle:testBundle];
+    [runner setPerformanceBaselinesPath:performanceBaselinesPath];
+    [runner setUpdatePerformanceBaselines:updatePerformanceBaselines];
     [runner setJunitReportPath:junitReportPath];
     BOOL result = [runner runTestsForTargetName:targetName
                             onlyTestIdentifiers:onlyTestIdentifiers

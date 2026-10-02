@@ -51,12 +51,32 @@ typedef enum {
 @property (copy) NSString *context;
 @end
 
+/*! One performance measurement: the values of each run of the block. */
+@interface GSXCTMeasurement : NSObject {
+    NSString *_metricIdentifier;
+    NSArray *_values;
+    NSNumber *_baselineAverage;
+    double _maxPercentRegression;
+}
+@property (copy) NSString *metricIdentifier;
+@property (copy) NSArray *values;
+/*! nil when the test has no baseline. */
+@property (retain) NSNumber *baselineAverage;
+@property double maxPercentRegression;
+- (double) average;
+/*! Sample standard deviation as a percentage of the average. */
+- (double) relativeStandardDeviation;
+/*! "[0.001000, 0.001100, ...]" */
+- (NSString *) valuesDescription;
+@end
+
 @interface GSXCTestCaseResult : NSObject {
     NSString *_className;
     NSString *_methodName;
     GSXCTestStatus _status;
     NSMutableArray *_failures;
     NSMutableArray *_expectedFailures;
+    NSMutableArray *_measurements;
     GSXCTestIssue *_skip;
     NSDate *_startDate;
     NSTimeInterval _duration;
@@ -68,6 +88,7 @@ typedef enum {
 @property (readonly) NSMutableArray *failures;
 /*! Failures absorbed by XCTExpectFailure; each issue's context is the reason. */
 @property (readonly) NSMutableArray *expectedFailures;
+@property (readonly) NSMutableArray *measurements;
 @property (retain) GSXCTestIssue *skip;
 @property (retain) NSDate *startDate;
 @property NSTimeInterval duration;
@@ -130,6 +151,7 @@ typedef enum {
 - (void) testDidStart: (GSXCTestCaseResult *)test;
 - (void) test: (GSXCTestCaseResult *)test didRecordFailure: (GSXCTestIssue *)failure;
 - (void) test: (GSXCTestCaseResult *)test didRecordExpectedFailure: (GSXCTestIssue *)failure;
+- (void) test: (GSXCTestCaseResult *)test didMeasure: (GSXCTMeasurement *)measurement;
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure;
 - (void) testDidFinish: (GSXCTestCaseResult *)test;
 - (void) suiteDidFinish: (GSXCTestSuiteResult *)suite;

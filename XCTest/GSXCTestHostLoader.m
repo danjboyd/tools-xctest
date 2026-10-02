@@ -31,7 +31,8 @@
 #include <stdlib.h>
 
 // Settings from xctest, as JSON: bundlePath, targetName, bundleName, only,
-// skip, outputFormat, junitReport, statusFile.
+// skip, outputFormat, junitReport, performanceBaselines,
+// updatePerformanceBaselines, statusFile.
 static NSDictionary *GSHostConfig = nil;
 
 @interface GSXCTestHostLoader : NSObject
@@ -103,6 +104,10 @@ static NSDictionary *GSHostConfig = nil;
                 ? GSXCTestOutputFormatApple : GSXCTestOutputFormatClassic];
             if ([junitReport isKindOfClass:[NSString class]]) {
                 [runner setJunitReportPath:junitReport];
+            }
+            if ([[GSHostConfig objectForKey:@"performanceBaselines"] isKindOfClass:[NSString class]]) {
+                [runner setPerformanceBaselinesPath:[GSHostConfig objectForKey:@"performanceBaselines"]];
+                [runner setUpdatePerformanceBaselines:[[GSHostConfig objectForKey:@"updatePerformanceBaselines"] boolValue]];
             }
 
             exitCode = [runner runTestsForTargetName:[GSHostConfig objectForKey:@"targetName"]

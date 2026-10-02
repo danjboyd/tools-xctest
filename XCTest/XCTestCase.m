@@ -152,6 +152,7 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     [_teardownBlocks release];
     [_invocation release];
     [_expectedFailureScopes release];
+    [_gsPerformance release];
     [super dealloc];
 }
 
