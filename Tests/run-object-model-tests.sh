@@ -59,4 +59,9 @@ run_fixture ObjectModelFixture -list-tests -only-testing:ObjectModelFixture/Cust
 [ "$output" = $'ObjectModelFixture/CustomInvocationTests/testEnabled\nObjectModelFixture/CustomInvocationTests/verifyExtra' ] \
   || fail "expected -list-tests to follow +testInvocations"
 
+# Getters and other non-void methods named test... aren't tests.
+run_fixture ObjectModelFixture -list-tests -only-testing:ObjectModelFixture/GetterTests
+[ "$output" = $'ObjectModelFixture/GetterTests/testOnewayVoid\nObjectModelFixture/GetterTests/testReal' ] \
+  || fail "expected only void test methods to be listed, got: $output"
+
 echo "Object model tests passed."

@@ -61,6 +61,40 @@
 - (void)testThrowsSpecificNamed { XCTAssertThrowsSpecificNamed([self boom], NSException, @"OtherName"); }
 - (void)testNoThrow { XCTAssertNoThrow([self boom]); }
 - (void)testNoThrowSpecific { XCTAssertNoThrowSpecific([self boom], NSException); }
+- (void)testMessageArgumentNamedException
+{
+    NSString *exception = @"caller's context";
+    XCTAssertNoThrow([self boom], @"%@", exception);
+}
 - (void)testNoThrowSpecificNamed { XCTAssertNoThrowSpecificNamed([self boom], NSException, NSInternalInconsistencyException); }
+
+@end
+
+// Caller variables named like the macros' internals must not be shadowed.
+@interface MacroHygieneTests : XCTestCase
+@end
+
+@implementation MacroHygieneTests
+
+- (void)testSkipIfReadsCallersVariable
+{
+    BOOL shouldSkip = YES;
+    XCTSkipIf(shouldSkip);
+    XCTFail(@"XCTSkipIf ignored the caller's shouldSkip");
+}
+
+- (void)testAssertionsReadCallersVariables
+{
+    id expressionValue = nil;
+    id expressionValue1 = @"same";
+    id expressionValue2 = @"same";
+    double accuracyValue = 0.5;
+    int interruption = 4;
+
+    XCTAssertNil(expressionValue);
+    XCTAssertEqualObjects(expressionValue1, expressionValue2);
+    XCTAssertEqualWithAccuracy(1.0, 1.25, accuracyValue);
+    XCTAssertEqual(interruption, 4);
+}
 
 @end
