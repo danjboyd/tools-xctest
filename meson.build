@@ -107,6 +107,16 @@ pkg.generate(libraries : xctest_lib,
              description : 'Reimplementation of XCTest for GNUstep',
 )
 
+# Preloaded into host applications by `xctest -host`
+xctest_host_lib = library(
+  'XCTestHost',
+  'XCTest/GSXCTestHostLoader.m',
+  dependencies: dependencies_to_link,
+  include_directories: include_dirs,
+  link_with: xctest_lib,
+  install: true,
+)
+
 # Build XCTest tool
 xctest_tool = executable('xctest', 'main.m', link_with: xctest_lib, install: true)
 
@@ -119,6 +129,7 @@ if host_machine.system() != 'darwin'
   junit_tests = find_program('Tests/run-junit-tests.sh')
   list_tests = find_program('Tests/run-list-tests.sh')
   object_model_tests = find_program('Tests/run-object-model-tests.sh')
+  hosted_tests = find_program('Tests/run-hosted-tests.sh')
   xctest_test_env = environment()
   xctest_test_env.set('GNUSTEP_MAKEFILES', gnustep_makefiles)
   test('cli-filters',
@@ -215,6 +226,18 @@ if host_machine.system() != 'darwin'
        ],
        env: xctest_test_env,
        depends: [xctest_tool, xctest_lib],
+       # The scripts rebuild shared fixture bundles in the source tree.
+       is_parallel: false)
+  test('hosted',
+       hosted_tests,
+       args: [
+         join_paths(meson.current_build_dir(), 'xctest'),
+         meson.current_build_dir(),
+         meson.current_source_dir(),
+         ':'.join(gnustep_runtime_lib_dirs),
+       ],
+       env: xctest_test_env,
+       depends: [xctest_tool, xctest_lib, xctest_host_lib],
        # The scripts rebuild shared fixture bundles in the source tree.
        is_parallel: false)
 endif

@@ -1,0 +1,73 @@
+#import <AppKit/AppKit.h>
+#import <XCTest/XCTest.h>
+
+// Tests meant to run inside HostApp via `xctest -host`. Without a host
+// application there is no NSApp, so they skip.
+@interface HostedTests : XCTestCase
+@end
+
+@implementation HostedTests
+
+- (void)setUp
+{
+    XCTSkipUnless(NSApp != nil, @"needs a host application");
+}
+
+- (void)testRunsInsideTheLaunchedApplication
+{
+    XCTAssertTrue([NSThread isMainThread]);
+    XCTAssertEqualObjects(NSStringFromClass([[NSApp delegate] class]), @"HostAppDelegate");
+    // The app's own applicationDidFinishLaunching: has already run.
+    XCTAssertEqualObjects([(NSObject *)[NSApp delegate] valueForKey:@"launched"], [NSNumber numberWithBool:YES]);
+}
+
+- (void)testCanSeeTheApplicationsWindows
+{
+    BOOL found = NO;
+
+    for (NSWindow *window in [NSApp windows]) {
+        if ([[window title] isEqualToString:@"HostAppWindow"]) {
+            found = YES;
+        }
+    }
+    XCTAssertTrue(found);
+}
+
+- (void)testAsyncWorkRunsOnTheApplicationsRunLoop
+{
+    XCTestExpectation *expectation = [self expectationWithDescription:@"delayed"];
+
+    [expectation performSelector:@selector(fulfill) withObject:nil afterDelay:0.05];
+    [self waitForExpectationsWithTimeout:5 handler:nil];
+}
+
+- (void)testChildProcessesDoNotRunTheTestsAgain
+{
+    NSTask *task = [[[NSTask alloc] init] autorelease];
+    NSPipe *pipe = [NSPipe pipe];
+
+    [task setLaunchPath:@"/usr/bin/env"];
+    [task setStandardOutput:pipe];
+    [task launch];
+    NSData *data = [[pipe fileHandleForReading] readDataToEndOfFile];
+    [task waitUntilExit];
+
+    NSString *environment = [[[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding] autorelease];
+    XCTAssertTrue([environment rangeOfString:@"XCTEST_HOST_CONFIG"].location == NSNotFound);
+    XCTAssertTrue([environment rangeOfString:@"libXCTestHost"].location == NSNotFound);
+}
+
+@end
+
+@interface HostedFailureTests : XCTestCase
+@end
+
+@implementation HostedFailureTests
+
+- (void)testFailsInHost
+{
+    XCTSkipUnless(NSApp != nil);
+    XCTFail(@"hosted failure");
+}
+
+@end

@@ -74,6 +74,16 @@ Tests are run through Apple's object model. Each test is an `XCTestCase` instanc
 - Build and run suites yourself, and check the run's counts (`failureCount`, `skipCount`, `hasSucceeded`, ...).
 - Register an `XCTestObservation` observer with `XCTestObservationCenter` to follow progress. To register one before any test runs, do it in the `-init` of the bundle's principal class (with gnustep-make, `MyTests_PRINCIPAL_CLASS = MyObserverRegistrar`); `xctest` creates it before running tests.
 
+### Hosted tests (running inside your application)
+
+To test code that needs a running `NSApplication` (controllers, windows, nib/gorm loading, the responder chain), run the bundle inside your app:
+
+```bash
+xctest -host MyApp.app MyAppTests.bundle
+```
+
+`xctest` launches the app with `libXCTestHost` preloaded. Once the app has finished launching (after its own `applicationDidFinishLaunching:`), the test bundle is loaded and its tests run on the main thread inside the app, which then exits with the result. The app needs no changes. Filters, `-output-format` and `-junit-report` work as usual. On a headless machine, run it under `xvfb-run -a`. Tests that also run without a host can skip themselves with `XCTSkipUnless(NSApp != nil)`.
+
 You will need to compile the test cases into one or more bundles, as `xctest` expects `.bundle`'s. 
 
 ## Running Tests
