@@ -71,3 +71,17 @@
 }
 
 @end
+
+// Takes longer than the launch timeout used by the regressions.
+@interface HostedSlowTests : XCTestCase
+@end
+
+@implementation HostedSlowTests
+
+- (void)testSlow
+{
+    XCTSkipUnless(NSApp != nil);
+    [NSThread sleepForTimeInterval:3];
+}
+
+@end

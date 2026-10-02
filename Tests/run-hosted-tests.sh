@@ -61,6 +61,34 @@ HOSTAPP_EXIT_EARLY=1 run_hosted
 assert_status 1
 assert_contains "host application exited (status 0) before running the tests"
 
+# An app that never finishes launching is stopped after the launch timeout.
+start=$(date +%s)
+HOSTAPP_HANG=1 run_hosted -host-launch-timeout 2
+elapsed=$(( $(date +%s) - start ))
+assert_status 1
+assert_contains "host application didn't start the tests within 2 seconds"
+[ "$elapsed" -lt 15 ] || fail "expected the hung app to be stopped promptly (took ${elapsed}s)"
+
+# The timeout only covers launching, not the tests themselves.
+run_hosted -host-launch-timeout 2 -only-testing:HostedFixture/HostedSlowTests
+assert_status 0
+assert_contains "HostedSlowTests: 1 tests PASSED"
+
+run_hosted -host-launch-timeout soon
+assert_status 1
+assert_contains "-host-launch-timeout needs a number of seconds"
+
+# A relative -host path works too.
+set +e
+output=$(cd "$source_root/Tests" && LD_LIBRARY_PATH="$xctest_lib_dir${runtime_lib_dirs:+:$runtime_lib_dirs}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+  "${display_wrapper[@]}" "$xctest_bin" -host HostApp/HostApp.app \
+  HostedFixture/HostedFixture.bundle -only-testing:HostedFixture/HostedTests 2>&1)
+status=$?
+set -e
+assert_status 0
+assert_not_contains "requires absolute path"
+assert_contains "HostedTests: 4 tests PASSED"
+
 run_hosted_missing() {
   set +e
   output=$(LD_LIBRARY_PATH="$xctest_lib_dir${runtime_lib_dirs:+:$runtime_lib_dirs}" \
