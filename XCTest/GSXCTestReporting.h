@@ -157,6 +157,9 @@ typedef enum {
 - (void) suiteDidStart: (GSXCTestSuiteResult *)suite;
 - (void) testDidStart: (GSXCTestCaseResult *)test;
 - (void) test: (GSXCTestCaseResult *)test didRecordFailure: (GSXCTestIssue *)failure;
+/*! A failure recorded after the test finished, e.g. from a callback; the
+ * test is now marked failed. May arrive on another thread. */
+- (void) test: (GSXCTestCaseResult *)test didRecordFailureAfterFinishing: (GSXCTestIssue *)failure;
 - (void) test: (GSXCTestCaseResult *)test didRecordExpectedFailure: (GSXCTestIssue *)failure;
 - (void) test: (GSXCTestCaseResult *)test didMeasure: (GSXCTMeasurement *)measurement;
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure;

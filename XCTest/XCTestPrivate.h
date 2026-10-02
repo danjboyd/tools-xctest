@@ -99,6 +99,8 @@ NSString *_GSXCTDescribeException(NSException *exception);
 // A failure absorbed by XCTExpectFailure; its context is the reason.
 - (void) _gsTestCase: (XCTestCase *)testCase didRecordExpectedFailure: (GSXCTestIssue *)issue;
 - (void) _gsTestCase: (XCTestCase *)testCase didMeasure: (GSXCTMeasurement *)measurement;
+// A failure recorded after the test's run stopped (e.g. from a callback).
+- (void) _gsTestCase: (XCTestCase *)testCase didRecordIssueAfterFinishing: (GSXCTestIssue *)issue;
 // A failed attempt that will be retried, and so no longer counts.
 - (void) _gsTestCaseAttemptWasDiscarded: (XCTestCase *)testCase;
 @end
@@ -111,6 +113,8 @@ NSString *_GSXCTDescribeException(NSException *exception);
 @end
 
 @interface XCTestObservationCenter (GSPrivate)
+// Adds an observer ahead of all others, so it sees each event first.
+- (void) _gsAddTestObserverFirst: (id<XCTestObservation>)testObserver;
 // Calls \a block with each observer, in the order they were added.
 - (void) _gsNotifyObservers: (void (^)(id observer))block;
 @end
@@ -126,6 +130,10 @@ NSString *_GSXCTDescribeException(NSException *exception);
 - (NSUInteger) _gsIteration;
 - (NSUInteger) _gsIterationCount;
 - (void) _gsSetIteration: (NSUInteger)iteration of: (NSUInteger)iterationCount;
+// The reporters' result for this test, kept so failures recorded after the
+// test finished can still be reported against it.
+- (GSXCTestCaseResult *) _gsReportResult;
+- (void) _gsSetReportResult: (GSXCTestCaseResult *)result;
 // Records the test as started and failed with \a cause, without running it.
 - (void) _gsFailWithoutRunning: (GSXCTestIssue *)cause;
 // Records the test as started and skipped, without running it.
@@ -156,6 +164,9 @@ NSString *_GSXCTDescribeException(NSException *exception);
 @end
 
 @interface XCTestExpectation (GSPrivate)
+// The test that created the expectation (retained); over-fulfillment is
+// blamed on it rather than on whichever test is running.
+- (void) _gsSetOwner: (XCTestCase *)owner;
 - (BOOL) _gsIsFulfilled;
 // Increases each time any expectation becomes fulfilled; 0 if unfulfilled.
 - (NSUInteger) _gsFulfillmentToken;

@@ -202,6 +202,8 @@ NSString *_GSXCTDescribeException(NSException *exception)
 - (void) _gsRecordIssue: (GSXCTestIssue *)issue
 {
     XCTestCase *testCase = (XCTestCase *)[self test];
+    // Still counted (so the run fails), but reported as a late failure.
+    BOOL afterFinishing = _stopDate != nil;
 
     [super _gsRecordIssue:issue];
     [[XCTestObservationCenter sharedTestObservationCenter] _gsNotifyObservers:^(id observer) {
@@ -209,7 +211,11 @@ NSString *_GSXCTDescribeException(NSException *exception)
             [observer testCase:testCase didFailWithDescription:[issue message]
                         inFile:[issue filePath] atLine:[issue lineNumber]];
         }
-        if ([observer respondsToSelector:@selector(_gsTestCase:didRecordIssue:)]) {
+        if (afterFinishing) {
+            if ([observer respondsToSelector:@selector(_gsTestCase:didRecordIssueAfterFinishing:)]) {
+                [observer _gsTestCase:testCase didRecordIssueAfterFinishing:issue];
+            }
+        } else if ([observer respondsToSelector:@selector(_gsTestCase:didRecordIssue:)]) {
             [observer _gsTestCase:testCase didRecordIssue:issue];
         }
     }];

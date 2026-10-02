@@ -386,7 +386,8 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 
     [GSXCTestCaseSuite _gsSetRepetitionMode:repetitionMode iterations:testIterations];
     [self _gsCreatePrincipalObject];
-    [center addTestObserver:(id<XCTestObservation>)reportingObserver];
+    // First, so its results exist before other observers' callbacks run.
+    [center _gsAddTestObserverFirst:(id<XCTestObservation>)reportingObserver];
 
     if (testBundle != nil) {
         [center _gsNotifyObservers:^(id observer) {
