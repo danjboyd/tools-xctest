@@ -23,6 +23,7 @@
 @interface XCTestCase : NSObject {
     BOOL _continueAfterFailure;
     NSMutableArray *_teardownBlocks;
+    NSMutableArray *_expectations;
 }
 
 /*!

@@ -21,3 +21,7 @@
 
 #import <XCTest/XCTestCase.h>
 #import <XCTest/XCTestAssertions.h>
+#import <XCTest/XCTestExpectation.h>
+#import <XCTest/XCTWaiter.h>
+#import <XCTest/XCTestErrors.h>
+#import <XCTest/XCTestCase+AsynchronousTesting.h>

@@ -6,3 +6,5 @@ Tests/LifecycleFixture/LifecycleFixture.bundle
 Tests/LifecycleFixture/obj
 Tests/AssertionFixture/AssertionFixture.bundle
 Tests/AssertionFixture/obj
+Tests/AsyncFixture/AsyncFixture.bundle
+Tests/AsyncFixture/obj

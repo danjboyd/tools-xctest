@@ -29,12 +29,9 @@
 #import <XCTest/GSXCTestRunner.h>
 #import <XCTest/XCTestCase.h>
 #import <XCTest/XCTestAssertionsImpl.h>
+#import <XCTest/XCTestPrivate.h>
 
 #import <objc/runtime.h>
-
-@interface XCTestCase (GSXCTestRunnerPrivate)
-- (void (^)(void))_gsPopTeardownBlock;
-@end
 
 typedef enum {
     GSXCTestResultPassed,
@@ -487,6 +484,7 @@ static NSString *GSSkippedSummary(NSUInteger skipCount)
         assertionFailureCount = 0;
         [skipReason release];
         skipReason = nil;
+        [XCTestCase _gsSetCurrentTestCase:testCase];
 
         BOOL setUpSucceeded = [self runPhase:@"setUpWithError:" ofTest:methodName block:^BOOL(NSError **error) {
             return [testCase setUpWithError:error];
@@ -500,10 +498,18 @@ static NSString *GSSkippedSummary(NSUInteger skipCount)
         }
 
         if (setUpSucceeded) {
-            [self runPhase:nil ofTest:methodName block:^BOOL(NSError **error) {
+            BOOL testCompleted = [self runPhase:nil ofTest:methodName block:^BOOL(NSError **error) {
                 ((void (*)(id, SEL))[testCase methodForSelector:selector])(testCase, selector);
                 return YES;
             }];
+
+            // Only a test that ran to the end could have waited on everything.
+            if (testCompleted) {
+                [self runPhase:nil ofTest:methodName block:^BOOL(NSError **error) {
+                    [testCase _gsRecordUnwaitedExpectations];
+                    return YES;
+                }];
+            }
         }
 
         // Teardown always runs, whether or not set up or the test failed.
@@ -522,6 +528,9 @@ static NSString *GSSkippedSummary(NSUInteger skipCount)
         [self runPhase:@"tearDownWithError:" ofTest:methodName block:^BOOL(NSError **error) {
             return [testCase tearDownWithError:error];
         }];
+
+        [testCase _gsInvalidateExpectations];
+        [XCTestCase _gsSetCurrentTestCase:nil];
 
         // A failure outranks a skip, as in Apple's XCTest.
         if (assertionFailureCount > 0) {

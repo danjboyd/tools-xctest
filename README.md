@@ -48,6 +48,23 @@ Test classes support the same lifecycle as Apple's XCTest:
 - Test methods inherited from a superclass are run for each subclass, and tests run in alphabetical order.
 - Call `XCTSkip(...)`, `XCTSkipIf(condition, ...)` or `XCTSkipUnless(condition, ...)` to skip the rest of a test, for example when it needs a display or a platform feature that isn't available. Skipped tests are reported separately and don't fail the run; teardown still runs.
 
+### Asynchronous tests
+
+Code driven by the run loop (timers, notifications, `NSURLConnection`, `NSTask`, `performSelector:afterDelay:`) can be tested with expectations. Waiting runs the current run loop until the expectations are fulfilled or the timeout passes; a timeout is a test failure.
+
+```objc
+- (void)testDownload {
+    XCTestExpectation *done = [self expectationWithDescription:@"download finished"];
+    [downloader fetchWithCompletion:^(NSData *data) {
+        XCTAssertNotNil(data);
+        [done fulfill];
+    }];
+    [self waitForExpectationsWithTimeout:5 handler:nil];
+}
+```
+
+Also available: `waitForExpectations:timeout:enforceOrder:`, inverted expectations and `expectedFulfillmentCount`, `expectationForNotification:object:handler:`, `keyValueObservingExpectationForObject:keyPath:expectedValue:`, `expectationForPredicate:evaluatedWithObject:handler:`, and `XCTWaiter` for waiting without failing the test. `-fulfill` may be called from any thread.
+
 You will need to compile the test cases into one or more bundles, as `xctest` expects `.bundle`'s. 
 
 ## Running Tests

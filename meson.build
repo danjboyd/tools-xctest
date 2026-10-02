@@ -55,6 +55,9 @@ source = [
 	'XCTest/XCTestAssertions.m',
 	'XCTest/XCTestCase.m',
 	'XCTest/GSXCTestRunner.m',
+	'XCTest/XCTestExpectation.m',
+	'XCTest/XCTWaiter.m',
+	'XCTest/XCTestCase+AsynchronousTesting.m',
 ]
 
 headers = [
@@ -63,6 +66,10 @@ headers = [
 	'XCTest/XCTestAssertionsImpl.h',
 	'XCTest/XCTestCase.h',
 	'XCTest/GSXCTestRunner.h',
+	'XCTest/XCTestExpectation.h',
+	'XCTest/XCTWaiter.h',
+	'XCTest/XCTestErrors.h',
+	'XCTest/XCTestCase+AsynchronousTesting.h',
 ]
 
 include_dirs = include_directories(
@@ -97,6 +104,7 @@ if host_machine.system() != 'darwin'
   cli_filter_tests = find_program('Tests/run-cli-filter-tests.sh')
   lifecycle_tests = find_program('Tests/run-lifecycle-tests.sh')
   assertion_tests = find_program('Tests/run-assertion-tests.sh')
+  async_tests = find_program('Tests/run-async-tests.sh')
   xctest_test_env = environment()
   xctest_test_env.set('GNUSTEP_MAKEFILES', gnustep_makefiles)
   test('cli-filters',
@@ -121,6 +129,16 @@ if host_machine.system() != 'darwin'
        depends: [xctest_tool, xctest_lib])
   test('assertions',
        assertion_tests,
+       args: [
+         join_paths(meson.current_build_dir(), 'xctest'),
+         meson.current_build_dir(),
+         meson.current_source_dir(),
+         ':'.join(gnustep_runtime_lib_dirs),
+       ],
+       env: xctest_test_env,
+       depends: [xctest_tool, xctest_lib])
+  test('async',
+       async_tests,
        args: [
          join_paths(meson.current_build_dir(), 'xctest'),
          meson.current_build_dir(),
