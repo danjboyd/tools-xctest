@@ -65,6 +65,15 @@ Code driven by the run loop (timers, notifications, `NSURLConnection`, `NSTask`,
 
 Also available: `waitForExpectations:timeout:enforceOrder:`, inverted expectations and `expectedFulfillmentCount`, `expectationForNotification:object:handler:`, `keyValueObservingExpectationForObject:keyPath:expectedValue:`, `expectationForPredicate:evaluatedWithObject:handler:`, and `XCTWaiter` for waiting without failing the test. `-fulfill` may be called from any thread.
 
+### Test suites, runs and observers
+
+Tests are run through Apple's object model. Each test is an `XCTestCase` instance bound to one test method, grouped in `XCTestSuite`s, and its results are kept in an `XCTestRun` (`XCTestCaseRun`, `XCTestSuiteRun`). This means you can:
+
+- Override `+defaultTestSuite` or `+testInvocations` to change which tests a class has. For example, an abstract base class can return an empty suite so its tests only run in subclasses.
+- Override `-invokeTest` to wrap each test, or `-recordFailureWithDescription:inFile:atLine:expected:` to see or filter failures.
+- Build and run suites yourself, and check the run's counts (`failureCount`, `skipCount`, `hasSucceeded`, ...).
+- Register an `XCTestObservation` observer with `XCTestObservationCenter` to follow progress. To register one before any test runs, do it in the `-init` of the bundle's principal class (with gnustep-make, `MyTests_PRINCIPAL_CLASS = MyObserverRegistrar`); `xctest` creates it before running tests.
+
 You will need to compile the test cases into one or more bundles, as `xctest` expects `.bundle`'s. 
 
 ## Running Tests

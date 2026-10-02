@@ -36,10 +36,8 @@ typedef enum {
 
 @interface GSXCTestRunner : NSObject {
     NSLock *runLock;
-    NSArray *reporters;
-    id currentTestResult;
-    id currentSuiteResult;
-    NSString *currentClassContext;
+    NSBundle *testBundle;
+    id principalObject;
     GSXCTestOutputFormat outputFormat;
     NSString *bundleName;
     NSString *junitReportPath;
@@ -53,6 +51,13 @@ typedef enum {
 /*! If set, a JUnit XML report is written here after each run. A run that
  * cannot write its report counts as failed. */
 @property (copy) NSString *junitReportPath;
+
+/*!
+ * The loaded test bundle. If set, observers get testBundleWillStart: and
+ * testBundleDidFinish:, and the bundle's NSPrincipalClass (if any) is
+ * instantiated before the first run so it can register observers.
+ */
+@property (retain) NSBundle *testBundle;
 
 - (BOOL)runAll;
 - (BOOL)runTestsNamed:(NSArray *)testNames; // nil for all tests

@@ -19,8 +19,9 @@
 */
 
 #import <XCTest/XCTestAssertions.h>
-#import <GSXCTestRunner.h>
 #import <XCTest/XCTestPrivate.h>
+
+#import <objc/runtime.h>
 
 @implementation _XCTestCaseInterruptionException
 @end
@@ -29,17 +30,46 @@
 @end
 
 
-// Stops the test when continueAfterFailure is NO. Only possible on the main
-// thread, where tests run; a failure on another thread is just recorded.
-static void _XCTInterruptIfNeeded(XCTestCase *test)
+// YES for an XCTestCase instance; NO for nil or a class (assertions in
+// +setUp/+tearDown pass the class as the test).
+static BOOL _XCTIsTestCase(id test)
+{
+    return test != nil
+        && !class_isMetaClass(object_getClass(test))
+        && [test isKindOfClass:[XCTestCase class]];
+}
+
+void _XCTInterruptIfNeeded(XCTestCase *test)
 {
     if ([NSThread isMainThread]
-        && [test isKindOfClass:[XCTestCase class]]
+        && _XCTIsTestCase(test)
         && ![test continueAfterFailure]) {
         [[_XCTestCaseInterruptionException exceptionWithName:@"_XCTestCaseInterruptionException"
                                                       reason:@"Test stopped after failure (continueAfterFailure is NO)"
                                                     userInfo:nil] raise];
     }
+}
+
+// Sends a failure to the test (which may stop it), to the running class
+// suite when called from +setUp/+tearDown, or to the running test.
+static void _XCTRecordFailureAt(id test, NSString *description, NSString *filePath, NSUInteger lineNumber, BOOL expected)
+{
+    if (!_XCTIsTestCase(test)) {
+        GSXCTestCaseSuite *classSuite = [GSXCTestCaseSuite _gsCurrentClassSuite];
+
+        if (classSuite != nil && [XCTestCase _gsCurrentTestCase] == nil) {
+            [classSuite _gsRecordClassFailure:description inFile:filePath atLine:lineNumber expected:expected];
+            return;
+        }
+        test = [XCTestCase _gsCurrentTestCase];
+    }
+
+    if (test == nil) {
+        NSLog(@"XCTest: Failure outside of a test: %@", description);
+        return;
+    }
+
+    [test recordFailureWithDescription:description inFile:filePath atLine:lineNumber expected:expected];
 }
 
 void _XCTFailureHandler(XCTestCase *test, BOOL expected, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...)
@@ -62,20 +92,12 @@ void _XCTPreformattedFailureHandler(XCTestCase *test, BOOL expected, NSString *f
         ? [NSString stringWithFormat:@"%@: %@", condition, message]
         : condition;
 
-    [[GSXCTestRunner sharedRunner] recordFailureWithMessage:description
-                                                   filePath:filePath
-                                                 lineNumber:lineNumber
-                                                 unexpected:!expected];
-    _XCTInterruptIfNeeded(test);
+    _XCTRecordFailureAt(test, description, filePath, lineNumber, expected);
 }
 
 void _XCTRecordFailure(XCTestCase *test, NSString *description)
 {
-    [[GSXCTestRunner sharedRunner] recordFailureWithMessage:description
-                                                   filePath:nil
-                                                 lineNumber:0
-                                                 unexpected:NO];
-    _XCTInterruptIfNeeded(test);
+    _XCTRecordFailureAt(test, description, nil, 0, YES);
 }
 
 void _XCTSkipHandler(XCTestCase *test, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...)

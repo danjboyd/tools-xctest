@@ -19,7 +19,12 @@
  Boston, MA 02110-1301, USA.
 */
 
+#import <XCTest/XCAbstractTest.h>
 #import <XCTest/XCTestCase.h>
+#import <XCTest/XCTestSuite.h>
+#import <XCTest/XCTestRun.h>
+#import <XCTest/XCTestObservation.h>
+#import <XCTest/XCTestObservationCenter.h>
 #import <XCTest/XCTestAssertions.h>
 #import <XCTest/XCTestExpectation.h>
 #import <XCTest/XCTWaiter.h>
