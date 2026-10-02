@@ -83,6 +83,14 @@ xctest MyTests.bundle -skip-testing:MyTests/SlowTests
 
 Test identifiers use the form `TestTarget[/TestClass[/TestMethod]]`, where `TestTarget` is the bundle name without the `.bundle` extension.
 
+By default results are logged as `XCTest: ...` lines. Pass `-output-format apple` to print them on stdout in the same format as Apple's `xctest`, including per-test timings, so tools that parse Apple's output (xcpretty, xcbeautify, editor integrations) work too:
+
+```
+Test Case '-[FooTests testBar]' started.
+FooTests.m:12: error: -[FooTests testBar] : ((1 + 1) equal to (3)) failed: ("2") is not equal to ("3")
+Test Case '-[FooTests testBar]' failed (0.001 seconds).
+```
+
 Automated CLI regression tests can be run with `make check` or `meson test -C build`.
 
 ## License

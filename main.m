@@ -30,6 +30,7 @@ static void PrintUsage(FILE *stream)
     fprintf(stream, "Options:\n");
     fprintf(stream, "  -only-testing:<identifier>  Run only tests matching TestTarget[/TestClass[/TestMethod]]\n");
     fprintf(stream, "  -skip-testing:<identifier>  Skip tests matching TestTarget[/TestClass[/TestMethod]]\n");
+    fprintf(stream, "  -output-format <format>     Console output: 'classic' (default) or 'apple'\n");
     fprintf(stream, "  -h, --help                  Show this help message\n");
 }
 
@@ -45,6 +46,7 @@ int main(int argc, char *argv[]) {
     NSMutableArray *onlyTestIdentifiers = [NSMutableArray array];
     NSMutableArray *skipTestIdentifiers = [NSMutableArray array];
     NSString *testBundlePath = nil;
+    GSXCTestOutputFormat outputFormat = GSXCTestOutputFormatClassic;
 
     if (argc == 1) {
         PrintUsage(stderr);
@@ -87,6 +89,20 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        if ([argument isEqualToString:@"-output-format"]) {
+            NSString *format = (i + 1 < argc) ? [NSString stringWithUTF8String:argv[++i]] : nil;
+            if ([format isEqualToString:@"apple"]) {
+                outputFormat = GSXCTestOutputFormatApple;
+            } else if ([format isEqualToString:@"classic"]) {
+                outputFormat = GSXCTestOutputFormatClassic;
+            } else {
+                fprintf(stderr, "xctest: -output-format must be 'classic' or 'apple'\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            continue;
+        }
+
         if ([argument hasPrefix:@"-"]) {
             fprintf(stderr, "xctest: unknown option '%s'\n", argv[i]);
             PrintUsage(stderr);
@@ -121,9 +137,12 @@ int main(int argc, char *argv[]) {
     }
 
     NSString *targetName = TargetNameForBundlePath(testBundlePath);
-    BOOL result = [[GSXCTestRunner sharedRunner] runTestsForTargetName:targetName
-                                                   onlyTestIdentifiers:onlyTestIdentifiers
-                                                   skipTestIdentifiers:skipTestIdentifiers];
+    GSXCTestRunner *runner = [GSXCTestRunner sharedRunner];
+    [runner setOutputFormat:outputFormat];
+    [runner setBundleName:[testBundlePath lastPathComponent]];
+    BOOL result = [runner runTestsForTargetName:targetName
+                            onlyTestIdentifiers:onlyTestIdentifiers
+                            skipTestIdentifiers:skipTestIdentifiers];
     exitCode = result == YES ? 0 : 1;
 
 cleanup:
