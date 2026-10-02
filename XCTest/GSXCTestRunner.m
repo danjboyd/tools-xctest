@@ -369,6 +369,33 @@ static NSString *GSDescribeException(NSException *exception)
     return plan;
 }
 
+- (NSArray *)testIdentifiersForTargetName:(NSString *)targetName
+                      onlyTestIdentifiers:(NSArray *)onlyTestIdentifiers
+                      skipTestIdentifiers:(NSArray *)skipTestIdentifiers
+{
+    NSArray *plan = [self testPlanForTargetName:targetName
+                            onlyTestIdentifiers:onlyTestIdentifiers
+                            skipTestIdentifiers:skipTestIdentifiers
+                                legacyTestNames:nil
+                                  filtersActive:NULL];
+    NSMutableArray *identifiers = [NSMutableArray array];
+
+    if (plan == nil) {
+        return nil;
+    }
+
+    for (NSArray *entry in plan) {
+        NSString *className = NSStringFromClass([entry objectAtIndex:0]);
+
+        for (NSString *methodName in [entry objectAtIndex:1]) {
+            [identifiers addObject:[NSString stringWithFormat:@"%@/%@/%@",
+                targetName ? targetName : @"", className, methodName]];
+        }
+    }
+
+    return identifiers;
+}
+
 - (BOOL)runTestsForTargetName:(NSString *)targetName
           onlyTestIdentifiers:(NSArray *)onlyTestIdentifiers
           skipTestIdentifiers:(NSArray *)skipTestIdentifiers

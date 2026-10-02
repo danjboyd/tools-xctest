@@ -60,6 +60,15 @@ typedef enum {
           onlyTestIdentifiers:(NSArray *)onlyTestIdentifiers
           skipTestIdentifiers:(NSArray *)skipTestIdentifiers;
 
+/*!
+ * The tests that -runTestsForTargetName:... would run, as
+ * TestTarget/TestClass/testMethod identifiers in run order, without running
+ * them. Returns nil if a filter identifier is invalid.
+ */
+- (NSArray *)testIdentifiersForTargetName:(NSString *)targetName
+                      onlyTestIdentifiers:(NSArray *)onlyTestIdentifiers
+                      skipTestIdentifiers:(NSArray *)skipTestIdentifiers;
+
 - (void)waitForCompletion;
 
 + (GSXCTestRunner *)sharedRunner;

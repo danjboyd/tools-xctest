@@ -32,6 +32,8 @@ static void PrintUsage(FILE *stream)
     fprintf(stream, "  -skip-testing:<identifier>  Skip tests matching TestTarget[/TestClass[/TestMethod]]\n");
     fprintf(stream, "  -output-format <format>     Console output: 'classic' (default) or 'apple'\n");
     fprintf(stream, "  -junit-report <path>        Also write results to <path> as JUnit XML\n");
+    fprintf(stream, "  -list-tests                 List the selected tests, one identifier per line, without running them\n");
+    fprintf(stream, "  -list-tests-json            List the selected tests as JSON, without running them\n");
     fprintf(stream, "  -h, --help                  Show this help message\n");
 }
 
@@ -39,6 +41,55 @@ static NSString *TargetNameForBundlePath(NSString *testBundlePath)
 {
     NSString *bundleName = [[testBundlePath lastPathComponent] stringByDeletingPathExtension];
     return [bundleName length] > 0 ? bundleName : nil;
+}
+
+// Prints the tests a run would select. Returns NO if a filter is invalid.
+static BOOL ListTests(GSXCTestRunner *runner, NSString *testBundlePath, NSString *targetName,
+                      NSArray *onlyTestIdentifiers, NSArray *skipTestIdentifiers, BOOL asJSON)
+{
+    NSArray *identifiers = [runner testIdentifiersForTargetName:targetName
+                                            onlyTestIdentifiers:onlyTestIdentifiers
+                                            skipTestIdentifiers:skipTestIdentifiers];
+
+    if (identifiers == nil) {
+        return NO;
+    }
+
+    if (!asJSON) {
+        for (NSString *identifier in identifiers) {
+            printf("%s\n", [identifier UTF8String]);
+        }
+        return YES;
+    }
+
+    NSMutableArray *tests = [NSMutableArray arrayWithCapacity:[identifiers count]];
+    for (NSString *identifier in identifiers) {
+        NSArray *components = [identifier componentsSeparatedByString:@"/"];
+        [tests addObject:[NSDictionary dictionaryWithObjectsAndKeys:
+            identifier, @"identifier",
+            [components objectAtIndex:1], @"class",
+            [components objectAtIndex:2], @"method",
+            nil]];
+    }
+
+    NSDictionary *listing = [NSDictionary dictionaryWithObjectsAndKeys:
+        [testBundlePath lastPathComponent], @"bundle",
+        targetName, @"target",
+        tests, @"tests",
+        nil];
+    NSError *error = nil;
+    NSData *json = [NSJSONSerialization dataWithJSONObject:listing
+                                                   options:NSJSONWritingPrettyPrinted
+                                                     error:&error];
+    if (json == nil) {
+        fprintf(stderr, "xctest: could not encode test list as JSON: %s\n",
+            [[error localizedDescription] UTF8String]);
+        return NO;
+    }
+
+    fwrite([json bytes], 1, [json length], stdout);
+    printf("\n");
+    return YES;
 }
 
 int main(int argc, char *argv[]) {
@@ -49,6 +100,8 @@ int main(int argc, char *argv[]) {
     NSString *testBundlePath = nil;
     GSXCTestOutputFormat outputFormat = GSXCTestOutputFormatClassic;
     NSString *junitReportPath = nil;
+    BOOL listTests = NO;
+    BOOL listTestsAsJSON = NO;
 
     if (argc == 1) {
         PrintUsage(stderr);
@@ -105,6 +158,17 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        if ([argument isEqualToString:@"-list-tests"]) {
+            listTests = YES;
+            continue;
+        }
+
+        if ([argument isEqualToString:@"-list-tests-json"]) {
+            listTests = YES;
+            listTestsAsJSON = YES;
+            continue;
+        }
+
         if ([argument isEqualToString:@"-junit-report"]) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "xctest: missing path for -junit-report\n");
@@ -150,6 +214,13 @@ int main(int argc, char *argv[]) {
 
     NSString *targetName = TargetNameForBundlePath(testBundlePath);
     GSXCTestRunner *runner = [GSXCTestRunner sharedRunner];
+
+    if (listTests) {
+        exitCode = ListTests(runner, testBundlePath, targetName,
+                             onlyTestIdentifiers, skipTestIdentifiers, listTestsAsJSON) ? 0 : 1;
+        goto cleanup;
+    }
+
     [runner setOutputFormat:outputFormat];
     [runner setBundleName:[testBundlePath lastPathComponent]];
     [runner setJunitReportPath:junitReportPath];

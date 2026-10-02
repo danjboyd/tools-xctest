@@ -93,6 +93,12 @@ Test Case '-[FooTests testBar]' failed (0.001 seconds).
 
 For CI, `-junit-report <path>` also writes the results as JUnit XML (one `<testsuite>` per test class; assertion failures as `<failure>`, uncaught exceptions as `<error>`, skips as `<skipped>`), which GitHub Actions, GitLab CI and Jenkins can display.
 
+To see which tests a run would select without running them, add `-list-tests` (one `TestTarget/TestClass/testMethod` identifier per line) or `-list-tests-json`. Filters apply, so this is a quick way to check an `-only-testing`/`-skip-testing` combination:
+
+```bash
+xctest MyTests.bundle -list-tests -only-testing:MyTests/FooTests
+```
+
 Automated CLI regression tests can be run with `make check` or `meson test -C build`.
 
 ## License

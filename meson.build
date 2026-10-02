@@ -108,6 +108,7 @@ if host_machine.system() != 'darwin'
   async_tests = find_program('Tests/run-async-tests.sh')
   output_tests = find_program('Tests/run-output-tests.sh')
   junit_tests = find_program('Tests/run-junit-tests.sh')
+  list_tests = find_program('Tests/run-list-tests.sh')
   xctest_test_env = environment()
   xctest_test_env.set('GNUSTEP_MAKEFILES', gnustep_makefiles)
   test('cli-filters',
@@ -119,7 +120,9 @@ if host_machine.system() != 'darwin'
          ':'.join(gnustep_runtime_lib_dirs),
        ],
        env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib])
+       depends: [xctest_tool, xctest_lib],
+       # The scripts rebuild shared fixture bundles in the source tree.
+       is_parallel: false)
   test('lifecycle',
        lifecycle_tests,
        args: [
@@ -129,7 +132,9 @@ if host_machine.system() != 'darwin'
          ':'.join(gnustep_runtime_lib_dirs),
        ],
        env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib])
+       depends: [xctest_tool, xctest_lib],
+       # The scripts rebuild shared fixture bundles in the source tree.
+       is_parallel: false)
   test('assertions',
        assertion_tests,
        args: [
@@ -139,7 +144,9 @@ if host_machine.system() != 'darwin'
          ':'.join(gnustep_runtime_lib_dirs),
        ],
        env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib])
+       depends: [xctest_tool, xctest_lib],
+       # The scripts rebuild shared fixture bundles in the source tree.
+       is_parallel: false)
   test('async',
        async_tests,
        args: [
@@ -149,7 +156,9 @@ if host_machine.system() != 'darwin'
          ':'.join(gnustep_runtime_lib_dirs),
        ],
        env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib])
+       depends: [xctest_tool, xctest_lib],
+       # The scripts rebuild shared fixture bundles in the source tree.
+       is_parallel: false)
   test('output',
        output_tests,
        args: [
@@ -159,7 +168,9 @@ if host_machine.system() != 'darwin'
          ':'.join(gnustep_runtime_lib_dirs),
        ],
        env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib])
+       depends: [xctest_tool, xctest_lib],
+       # The scripts rebuild shared fixture bundles in the source tree.
+       is_parallel: false)
   test('junit',
        junit_tests,
        args: [
@@ -169,5 +180,19 @@ if host_machine.system() != 'darwin'
          ':'.join(gnustep_runtime_lib_dirs),
        ],
        env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib])
+       depends: [xctest_tool, xctest_lib],
+       # The scripts rebuild shared fixture bundles in the source tree.
+       is_parallel: false)
+  test('list-tests',
+       list_tests,
+       args: [
+         join_paths(meson.current_build_dir(), 'xctest'),
+         meson.current_build_dir(),
+         meson.current_source_dir(),
+         ':'.join(gnustep_runtime_lib_dirs),
+       ],
+       env: xctest_test_env,
+       depends: [xctest_tool, xctest_lib],
+       # The scripts rebuild shared fixture bundles in the source tree.
+       is_parallel: false)
 endif
