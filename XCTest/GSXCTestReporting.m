@@ -262,6 +262,35 @@
 
 @end
 
+// One line per failed test (and failed class +tearDown), with its first
+// failure, in run order. Empty if nothing failed.
+static NSArray *GSFailedTestLines(GSXCTestRunResult *run, NSString *(^testName)(NSString *className, NSString *name))
+{
+    NSMutableArray *lines = [NSMutableArray array];
+
+    for (GSXCTestSuiteResult *suite in [run suiteResults]) {
+        for (GSXCTestCaseResult *test in [suite testResults]) {
+            if ([test status] == GSXCTestStatusFailed) {
+                GSXCTestIssue *first = [[test failures] objectAtIndex:0];
+                NSString *location = [first filePath]
+                    ? [NSString stringWithFormat:@"%@:%lu: ", [first filePath], (unsigned long)[first lineNumber]]
+                    : @"";
+                [lines addObject:[NSString stringWithFormat:@"%@: %@%@",
+                    testName([test className], [test methodName]), location, [first message]]];
+            }
+        }
+        for (GSXCTestIssue *failure in [suite classFailures]) {
+            if ([[failure context] isEqualToString:@"+tearDown"]) {
+                [lines addObject:[NSString stringWithFormat:@"%@: %@",
+                    testName([suite name], @"+tearDown"), [failure message]]];
+                break;
+            }
+        }
+    }
+
+    return lines;
+}
+
 #pragma mark - Classic reporter
 
 static NSString *GSSkippedSummary(NSUInteger skipCount)
@@ -358,6 +387,16 @@ static NSString *GSSkippedSummary(NSUInteger skipCount)
 
     for (GSXCTestSuiteResult *suite in [run suiteResults]) {
         failedSuites += [suite hasFailed] ? 1 : 0;
+    }
+
+    NSArray *failedLines = GSFailedTestLines(run, ^NSString *(NSString *className, NSString *name) {
+        return [NSString stringWithFormat:@"%@.%@", className, name];
+    });
+    if ([failedLines count] > 0) {
+        NSLog(@"XCTest: Failed tests:");
+        for (NSString *line in failedLines) {
+            NSLog(@"XCTest:   %@", line);
+        }
     }
 
     if (suiteCount == 0) {
@@ -510,6 +549,20 @@ static NSString *GSAppleLocation(GSXCTestIssue *issue)
     GSPrintLine(summary);
     GSPrintLine([NSString stringWithFormat:@"Test Suite '%@' %@ at %@.", [run name], status, timestamp]);
     GSPrintLine(summary);
+
+    // Like xcodebuild's closing "Failing tests:" list.
+    NSArray *failedLines = GSFailedTestLines(run, ^NSString *(NSString *className, NSString *name) {
+        return [name hasPrefix:@"+"]
+            ? [NSString stringWithFormat:@"+[%@ %@]", className, [name substringFromIndex:1]]
+            : [NSString stringWithFormat:@"-[%@ %@]", className, name];
+    });
+    if ([failedLines count] > 0) {
+        GSPrintLine(@"");
+        GSPrintLine(@"Failing tests:");
+        for (NSString *line in failedLines) {
+            GSPrintLine([@"\t" stringByAppendingString:line]);
+        }
+    }
 }
 
 @end

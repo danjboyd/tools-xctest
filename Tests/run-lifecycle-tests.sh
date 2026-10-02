@@ -2,6 +2,8 @@
 
 set -euo pipefail
 
+. "$(dirname "$0")/test-helpers.sh"
+
 if [ "$#" -lt 3 ] || [ "$#" -gt 4 ]; then
   echo "usage: $0 <xctest-bin> <xctest-lib-dir> <source-root> [runtime-lib-dirs]" >&2
   exit 2
@@ -163,5 +165,19 @@ status=$?
 set -e
 [ "$status" -eq 0 ] || fail "expected a run with only passed and skipped tests to succeed"
 assert_contains "2 tests PASSED (3 tests skipped)"
+
+# The run ends with a list of the failed tests and their first failure.
+run_fixture LifecycleFixture
+assert_contains "XCTest: Failed tests:"
+assert_contains "XCTest:   TestThrowsTests.testThrows: threw exception: \"NSInternalInconsistencyException\", \"fixture exception\""
+assert_contains "XCTest:   TearDownFailsTests.testPasses: LifecycleFixture.m:118: failed: fixture tearDown failure"
+assert_contains "XCTest:   ClassTearDownThrowsTests.+tearDown: threw exception: "
+assert_not_contains "XCTest:   OrderTests."
+# The list comes just before the final summary line.
+summary_tail=$(printf '%s\n' "$output" | sed 's/^.*XCTest: //' | grep -A1000 '^Failed tests:' | tail -1)
+[[ "$summary_tail" == *"test cases FAILED"* ]] || fail "expected the failed-test list before the final summary"
+
+run_fixture LifecycleFixture -only-testing:LifecycleFixture/OrderTests
+assert_not_contains "Failed tests:"
 
 echo "Lifecycle tests passed."
