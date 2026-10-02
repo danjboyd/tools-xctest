@@ -20,7 +20,42 @@
 
 #import <XCTest/XCTestCase.h>
 
+@interface XCTestCase (GSXCTestRunnerPrivate)
+- (void (^)(void)) _gsPopTeardownBlock;
+@end
+
 @implementation XCTestCase
+
+@synthesize continueAfterFailure = _continueAfterFailure;
+
++ (void) setUp
+{
+}
+
++ (void) tearDown
+{
+}
+
+- (id) init
+{
+    self = [super init];
+    if (self) {
+        _continueAfterFailure = YES;
+    }
+
+    return self;
+}
+
+- (void) dealloc
+{
+    [_teardownBlocks release];
+    [super dealloc];
+}
+
+- (BOOL) setUpWithError: (NSError **)error
+{
+    return YES;
+}
 
 - (void) setUp
 {
@@ -30,6 +65,45 @@
 - (void) tearDown
 {
     
+}
+
+- (BOOL) tearDownWithError: (NSError **)error
+{
+    return YES;
+}
+
+- (void) addTeardownBlock: (void (^)(void))block
+{
+    if (block == nil) {
+        return;
+    }
+
+    @synchronized (self) {
+        if (_teardownBlocks == nil) {
+            _teardownBlocks = [[NSMutableArray alloc] init];
+        }
+        void (^copiedBlock)(void) = [block copy];
+        [_teardownBlocks addObject:copiedBlock];
+        [copiedBlock release];
+    }
+}
+
+@end
+
+@implementation XCTestCase (GSXCTestRunnerPrivate)
+
+- (void (^)(void)) _gsPopTeardownBlock
+{
+    void (^block)(void) = nil;
+
+    @synchronized (self) {
+        block = [[[_teardownBlocks lastObject] retain] autorelease];
+        if (block != nil) {
+            [_teardownBlocks removeLastObject];
+        }
+    }
+
+    return block;
 }
 
 @end

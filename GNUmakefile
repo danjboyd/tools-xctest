@@ -23,3 +23,4 @@ include $(GNUSTEP_MAKEFILES)/tool.make
 
 after-check:: all
 	./Tests/run-cli-filter-tests.sh "$(CURDIR)/obj/xctest" "$(CURDIR)/XCTest/obj" "$(CURDIR)" "$(dir $(GNUSTEP_MAKEFILES))Libraries"
+	./Tests/run-lifecycle-tests.sh "$(CURDIR)/obj/xctest" "$(CURDIR)/XCTest/obj" "$(CURDIR)" "$(dir $(GNUSTEP_MAKEFILES))Libraries"

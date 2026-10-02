@@ -28,14 +28,25 @@
 
 #import <XCTest/GSXCTestRunner.h>
 #import <XCTest/XCTestCase.h>
+#import <XCTest/XCTestAssertionsImpl.h>
 
 #import <objc/runtime.h>
+
+@interface XCTestCase (GSXCTestRunnerPrivate)
+- (void (^)(void))_gsPopTeardownBlock;
+@end
 
 @interface GSXCTestRunner ()
 - (BOOL)runTestsForTargetName:(NSString *)targetName
           onlyTestIdentifiers:(NSArray *)onlyTestIdentifiers
           skipTestIdentifiers:(NSArray *)skipTestIdentifiers
               legacyTestNames:(NSArray *)legacyTestNames;
+- (BOOL)runClassMethod:(SEL)selector ofClass:(Class)testCaseClass;
+- (BOOL)runTestMethod:(NSString *)methodName ofClass:(Class)testCaseClass;
+- (BOOL)runPhase:(NSString *)phaseName
+          ofTest:(NSString *)methodName
+           block:(BOOL (^)(NSError **error))block;
+- (void)registerAssertionFailed;
 @end
 
 static NSArray *GSParseAppleTestIdentifier(NSString *identifier)
@@ -132,6 +143,37 @@ NSArray *ClassGetSubclasses(Class parentClass)
     free(classes);
     
     return result;
+}
+
+// Test methods of a class, including those inherited from superclasses
+// below XCTestCase, sorted by name to match Apple's run order.
+static NSArray *GSTestMethodNames(Class testCaseClass)
+{
+    NSMutableSet *names = [NSMutableSet set];
+
+    for (Class cls = testCaseClass;
+         cls != Nil && cls != [XCTestCase class];
+         cls = class_getSuperclass(cls))
+    {
+        unsigned int methodCount = 0;
+        Method *methods = class_copyMethodList(cls, &methodCount);
+
+        for (unsigned int i = 0; i < methodCount; i++)
+        {
+            Method method = methods[i];
+            NSString *methodName = [NSString stringWithUTF8String:sel_getName(method_getName(method))];
+
+            if ([methodName hasPrefix:@"test"]
+                && method_getNumberOfArguments(method) == 2)
+            {
+                [names addObject:methodName];
+            }
+        }
+
+        free(methods);
+    }
+
+    return [[names allObjects] sortedArrayUsingSelector:@selector(compare:)];
 }
 
 @implementation GSXCTestRunner
@@ -239,24 +281,21 @@ NSArray *ClassGetSubclasses(Class parentClass)
     NSUInteger testCaseSuccessCount = 0;
     NSUInteger selectedTestCount = 0;
     
-    NSArray *testCaseClasses = ClassGetSubclasses([XCTestCase class]);
+    NSArray *testCaseClasses = [ClassGetSubclasses([XCTestCase class])
+        sortedArrayUsingComparator:^NSComparisonResult(id a, id b) {
+            return [NSStringFromClass(a) compare:NSStringFromClass(b)];
+        }];
     for (Class testCaseClass in testCaseClasses)
     {
         @autoreleasepool {
-            BOOL classNamePrinted = NO;
             NSString *className = NSStringFromClass(testCaseClass);
-            
-            unsigned int methodCount = 0;
             NSUInteger methodFailureCount = 0;
             NSUInteger methodSuccessCount = 0;
-            Method *methods = class_copyMethodList(testCaseClass, &methodCount);
-        
-            for (unsigned int i = 0; i < methodCount; i++) {
-                Method method = methods[i];
-        
-                SEL selector = method_getName(method);
-                NSString *methodName = [NSString stringWithUTF8String:sel_getName(selector)];
-                
+            BOOL classTearDownFailed = NO;
+            NSMutableArray *selectedMethodNames = [NSMutableArray array];
+
+            for (NSString *methodName in GSTestMethodNames(testCaseClass))
+            {
                 BOOL testIsEnabled = YES;
                 if (usingAppleStyleFilters)
                 {
@@ -303,51 +342,45 @@ NSArray *ClassGetSubclasses(Class parentClass)
                         }
                     }
                 }
-                
-                if ([methodName hasPrefix:@"test"]
-                    && method_getNumberOfArguments(method) == 2
-                    && testIsEnabled)
+
+                if (testIsEnabled)
                 {
-                    selectedTestCount++;
-                    IMP testFunction = method_getImplementation(method);
-                    if (testFunction) {
-                        BOOL testSucceeded = YES;
-                        
-                        if (!classNamePrinted) {
-                            NSLog(@"XCTest:   Running %@", className);
-                            classNamePrinted = YES;
-                        }
-                        
-                        NSLog(@"XCTest:     %@...", methodName);
-                        
-                        NS_DURING {
-                            @autoreleasepool {
-                                XCTestCase *testCase = [[[testCaseClass alloc] init] autorelease];
-                                assertionFailureCount = 0;
-                                [testCase setUp];
-                                testFunction(testCase, selector);
-                                [testCase tearDown];
-                                if (assertionFailureCount > 0) {
-                                    testSucceeded = NO;
-                                    NSLog(@"XCTest:     %@ FAILED", methodName);
-                                }
-                            }
-                        }
-                        NS_HANDLER {
-                            testSucceeded = NO;
-                            NSLog(@"XCTest:     %@ FAILED, threw exception: %@", methodName, localException);
-                        }
-                        NS_ENDHANDLER
-                        
-                        if (testSucceeded)
-                            methodSuccessCount++;
-                        else
-                            methodFailureCount++;
-                    }
+                    [selectedMethodNames addObject:methodName];
                 }
             }
-        
-            free(methods);
+
+            selectedTestCount += [selectedMethodNames count];
+
+            if ([selectedMethodNames count] > 0)
+            {
+                NSLog(@"XCTest:   Running %@", className);
+
+                BOOL classSetUpSucceeded = [self runClassMethod:@selector(setUp)
+                                                        ofClass:testCaseClass];
+
+                for (NSString *methodName in selectedMethodNames)
+                {
+                    if (!classSetUpSucceeded)
+                    {
+                        NSLog(@"XCTest:     %@ FAILED, +setUp failed", methodName);
+                        methodFailureCount++;
+                    }
+                    else if ([self runTestMethod:methodName ofClass:testCaseClass])
+                    {
+                        methodSuccessCount++;
+                    }
+                    else
+                    {
+                        methodFailureCount++;
+                    }
+                }
+
+                if (classSetUpSucceeded
+                    && ![self runClassMethod:@selector(tearDown) ofClass:testCaseClass])
+                {
+                    classTearDownFailed = YES;
+                }
+            }
             
             if (methodFailureCount == 0 && methodSuccessCount == 0) {
                 NSLog(@"XCTest:   %@ SKIPPED", className);
@@ -355,11 +388,13 @@ NSArray *ClassGetSubclasses(Class parentClass)
             else if (methodFailureCount > 0) {
                 testCaseFailureCount++;
                 NSLog(@"XCTest:   %@: %lu/%lu tests FAILED", className, methodFailureCount, methodFailureCount + methodSuccessCount);
+            }
+            else if (classTearDownFailed) {
+                testCaseFailureCount++;
+                NSLog(@"XCTest:   %@: %lu tests passed, +tearDown FAILED", className, methodSuccessCount);
             } else {
                 testCaseSuccessCount++;
-                if (methodSuccessCount > 0) {
-                    NSLog(@"XCTest:   %@: %lu tests PASSED", className, methodSuccessCount);
-                }
+                NSLog(@"XCTest:   %@: %lu tests PASSED", className, methodSuccessCount);
             }
         } // @autoreleasepool
     }
@@ -380,6 +415,116 @@ NSArray *ClassGetSubclasses(Class parentClass)
     [runLock unlock];
     
     return testCaseFailureCount == 0;
+}
+
+- (BOOL)runClassMethod:(SEL)selector ofClass:(Class)testCaseClass
+{
+    BOOL succeeded = YES;
+
+    assertionFailureCount = 0;
+    @try {
+        [testCaseClass performSelector:selector];
+    }
+    @catch (NSException *exception) {
+        NSLog(@"XCTest:   %@ +%@ threw exception: %@",
+            NSStringFromClass(testCaseClass), NSStringFromSelector(selector), exception);
+        succeeded = NO;
+    }
+
+    if (assertionFailureCount > 0) {
+        succeeded = NO;
+    }
+
+    if (!succeeded) {
+        NSLog(@"XCTest:   %@ +%@ FAILED", NSStringFromClass(testCaseClass), NSStringFromSelector(selector));
+    }
+
+    return succeeded;
+}
+
+- (BOOL)runTestMethod:(NSString *)methodName ofClass:(Class)testCaseClass
+{
+    BOOL testSucceeded = NO;
+
+    NSLog(@"XCTest:     %@...", methodName);
+
+    @autoreleasepool {
+        SEL selector = NSSelectorFromString(methodName);
+        XCTestCase *testCase = [[[testCaseClass alloc] init] autorelease];
+        void (^teardownBlock)(void) = nil;
+
+        assertionFailureCount = 0;
+
+        BOOL setUpSucceeded = [self runPhase:@"setUpWithError:" ofTest:methodName block:^BOOL(NSError **error) {
+            return [testCase setUpWithError:error];
+        }];
+
+        if (setUpSucceeded) {
+            setUpSucceeded = [self runPhase:@"setUp" ofTest:methodName block:^BOOL(NSError **error) {
+                [testCase setUp];
+                return YES;
+            }];
+        }
+
+        if (setUpSucceeded) {
+            [self runPhase:nil ofTest:methodName block:^BOOL(NSError **error) {
+                ((void (*)(id, SEL))[testCase methodForSelector:selector])(testCase, selector);
+                return YES;
+            }];
+        }
+
+        // Teardown always runs, whether or not set up or the test failed.
+        while ((teardownBlock = [testCase _gsPopTeardownBlock]) != nil) {
+            [self runPhase:@"a teardown block" ofTest:methodName block:^BOOL(NSError **error) {
+                teardownBlock();
+                return YES;
+            }];
+        }
+
+        [self runPhase:@"tearDown" ofTest:methodName block:^BOOL(NSError **error) {
+            [testCase tearDown];
+            return YES;
+        }];
+
+        [self runPhase:@"tearDownWithError:" ofTest:methodName block:^BOOL(NSError **error) {
+            return [testCase tearDownWithError:error];
+        }];
+
+        testSucceeded = (assertionFailureCount == 0);
+    }
+
+    if (!testSucceeded) {
+        NSLog(@"XCTest:     %@ FAILED", methodName);
+    }
+
+    return testSucceeded;
+}
+
+- (BOOL)runPhase:(NSString *)phaseName
+          ofTest:(NSString *)methodName
+           block:(BOOL (^)(NSError **error))block
+{
+    NSString *where = phaseName ? [NSString stringWithFormat:@" in %@", phaseName] : @"";
+    NSError *error = nil;
+    BOOL succeeded = NO;
+
+    @try {
+        succeeded = block(&error);
+        if (!succeeded) {
+            NSLog(@"XCTest:     %@ failed%@ - %@", methodName, where,
+                error ? [error localizedDescription] : @"returned NO without an error");
+            [self registerAssertionFailed];
+        }
+    }
+    @catch (_XCTestCaseInterruptionException *interruption) {
+        // continueAfterFailure is NO; the failure has already been reported.
+    }
+    @catch (NSException *exception) {
+        NSLog(@"XCTest:     %@ threw exception%@: %@", methodName, where, exception);
+        [self registerAssertionFailed];
+    }
+
+    return succeeded;
 }
 
 - (void)waitForCompletion

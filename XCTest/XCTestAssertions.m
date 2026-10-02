@@ -51,6 +51,12 @@ void _XCTPreformattedFailureHandler(XCTestCase *test, BOOL expected, NSString *f
         ([message length] > 0 ? [NSString stringWithFormat:@": %@", message] : @""));
     
     [[GSXCTestRunner sharedRunner] registerAssertionFailed];
+
+    if ([test isKindOfClass:[XCTestCase class]] && ![test continueAfterFailure]) {
+        [[_XCTestCaseInterruptionException exceptionWithName:@"_XCTestCaseInterruptionException"
+                                                      reason:@"Test stopped after failure (continueAfterFailure is NO)"
+                                                    userInfo:nil] raise];
+    }
 }
 
 NSString * _XCTFailureFormat (_XCTAssertionType assertionType, NSUInteger formatIndex)
