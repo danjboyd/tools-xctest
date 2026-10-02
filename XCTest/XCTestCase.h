@@ -35,6 +35,7 @@
     NSInvocation *_invocation;
     NSMutableArray *_expectedFailureScopes;
     BOOL _gsRecordingUnmatched;
+    id _gsPerformance;
 }
 
 + (id) testCaseWithInvocation: (NSInvocation *)invocation;
@@ -75,6 +76,7 @@
                                atLine: (NSUInteger)lineNumber
                              expected: (BOOL)expected;
 
+
 /*!
  * Whether a test keeps running after an assertion fails. Defaults to YES.
  * When NO, the first failure stops the current test; teardown still runs.
@@ -100,5 +102,38 @@
  * Registers a block to run after the current test method, before tearDown.
  */
 - (void) addTeardownBlock: (void (^)(void))block;
+
+@end
+
+typedef NSString *XCTPerformanceMetric;
+
+/*! Wall-clock time, in seconds. The only metric currently supported. */
+extern XCTPerformanceMetric const XCTPerformanceMetric_WallClockTime;
+
+@interface XCTestCase (XCTPerformanceMeasurement)
+
+/*! The metrics -measureBlock: records: wall-clock time. */
++ (NSArray *) defaultPerformanceMetrics;
+
+/*!
+ * Runs \a block 10 times and reports the average and relative standard
+ * deviation of its wall-clock time. Call at most once per test. If a
+ * baseline is set for the test (xctest -performance-baselines), an
+ * average more than its maxPercentRegression (default 10%) worse fails
+ * the test.
+ */
+- (void) measureBlock: (void (^)(void))block;
+
+/*!
+ * As -measureBlock:, but if \a automaticallyStartMeasuring is NO, each
+ * run of the block must call -startMeasuring and -stopMeasuring once, and
+ * only the time between them counts.
+ */
+- (void) measureMetrics: (NSArray *)metrics
+automaticallyStartMeasuring: (BOOL)automaticallyStartMeasuring
+               forBlock: (void (^)(void))block;
+
+- (void) startMeasuring;
+- (void) stopMeasuring;
 
 @end

@@ -29,6 +29,7 @@
 #import <XCTest/XCTestExpectation.h>
 #import <XCTest/XCTWaiter.h>
 #import <XCTest/GSXCTestReporting.h>
+#import <XCTest/GSXCTestRunner.h>
 
 // Records a failure that has no source location (e.g. a failed wait)
 // against a test, or the running test if \a test is nil.
@@ -95,6 +96,14 @@ NSString *_GSXCTDescribeException(NSException *exception);
 - (void) _gsTestCase: (XCTestCase *)testCase didSkipWithIssue: (GSXCTestIssue *)issue;
 // A failure absorbed by XCTExpectFailure; its context is the reason.
 - (void) _gsTestCase: (XCTestCase *)testCase didRecordExpectedFailure: (GSXCTestIssue *)issue;
+- (void) _gsTestCase: (XCTestCase *)testCase didMeasure: (GSXCTMeasurement *)measurement;
+@end
+
+@interface GSXCTestRunner (GSPerformancePrivate)
+// The baseline for "Class/testMethod" ({average, maxPercentRegression}), or nil.
+- (NSDictionary *) _gsPerformanceBaselineForTest: (NSString *)identifier;
+// Remembers a measured average, written out with -update-performance-baselines.
+- (void) _gsRecordPerformanceAverage: (double)average forTest: (NSString *)identifier;
 @end
 
 @interface XCTestObservationCenter (GSPrivate)

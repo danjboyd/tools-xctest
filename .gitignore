@@ -16,3 +16,5 @@ Tests/HostApp/HostApp.app
 Tests/HostApp/obj
 Tests/ExpectedFailureFixture/ExpectedFailureFixture.bundle
 Tests/ExpectedFailureFixture/obj
+Tests/PerformanceFixture/PerformanceFixture.bundle
+Tests/PerformanceFixture/obj

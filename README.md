@@ -75,6 +75,18 @@ Tests are run through Apple's object model. Each test is an `XCTestCase` instanc
 - Build and run suites yourself, and check the run's counts (`failureCount`, `skipCount`, `hasSucceeded`, ...).
 - Register an `XCTestObservation` observer with `XCTestObservationCenter` to follow progress. To register one before any test runs, do it in the `-init` of the bundle's principal class (with gnustep-make, `MyTests_PRINCIPAL_CLASS = MyObserverRegistrar`); `xctest` creates it before running tests.
 
+### Performance tests
+
+`measureBlock:` runs a block 10 times and reports the average wall-clock time and relative standard deviation. `measureMetrics:automaticallyStartMeasuring:NO forBlock:` with `startMeasuring`/`stopMeasuring` measures only part of each run.
+
+To catch regressions, keep baselines in a JSON file keyed by `TestClass/testMethod`:
+
+```json
+{ "ParserTests/testParseLargeFile": { "average": 0.120, "maxPercentRegression": 10 } }
+```
+
+`xctest -performance-baselines baselines.json ...` fails a measured test whose average is worse than its baseline by more than `maxPercentRegression` (default 10%). Add `-update-performance-baselines` to record the current averages into the file instead (keeping each entry's settings). Apple keeps baselines in the Xcode project; this file is the GNUstep equivalent.
+
 ### Hosted tests (running inside your application)
 
 To test code that needs a running `NSApplication` (controllers, windows, nib/gorm loading, the responder chain), run the bundle inside your app:

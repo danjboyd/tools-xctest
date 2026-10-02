@@ -62,6 +62,7 @@
 @synthesize status = _status;
 @synthesize failures = _failures;
 @synthesize expectedFailures = _expectedFailures;
+@synthesize measurements = _measurements;
 @synthesize skip = _skip;
 @synthesize startDate = _startDate;
 @synthesize duration = _duration;
@@ -74,6 +75,7 @@
         _methodName = [methodName copy];
         _failures = [[NSMutableArray alloc] init];
         _expectedFailures = [[NSMutableArray alloc] init];
+        _measurements = [[NSMutableArray alloc] init];
     }
 
     return self;
@@ -85,6 +87,7 @@
     [_methodName release];
     [_failures release];
     [_expectedFailures release];
+    [_measurements release];
     [_skip release];
     [_startDate release];
     [super dealloc];
@@ -349,6 +352,18 @@ static NSString *GSSkippedSummary(NSUInteger skipCount)
     }
 }
 
+- (void) test: (GSXCTestCaseResult *)test didMeasure: (GSXCTMeasurement *)measurement
+{
+    NSString *baseline = [measurement baselineAverage]
+        ? [NSString stringWithFormat:@", baseline average: %.6f (max regression %.1f%%)",
+            [[measurement baselineAverage] doubleValue], [measurement maxPercentRegression]]
+        : @"";
+
+    NSLog(@"XCTest:     %@ measured [Time, seconds] average: %.6f, relative standard deviation: %.3f%%%@, values: %@",
+        [test methodName], [measurement average], [measurement relativeStandardDeviation], baseline,
+        [measurement valuesDescription]);
+}
+
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure
 {
     if ([failure filePath] != nil) {
@@ -507,6 +522,18 @@ static NSString *GSAppleLocation(GSXCTestIssue *issue)
 {
     GSPrintLine([NSString stringWithFormat:@"%@: %@ : Expected failure: %@: %@",
         GSAppleLocation(failure), GSAppleTestName(test), [failure context], [failure message]]);
+}
+
+- (void) test: (GSXCTestCaseResult *)test didMeasure: (GSXCTMeasurement *)measurement
+{
+    // The shape of Apple's measurement line.
+    GSPrintLine([NSString stringWithFormat:@"Test Case '%@' measured [Time, seconds] average: %.3f, "
+        @"relative standard deviation: %.3f%%, values: %@, performanceMetricID:%@, baselineName: \"\", "
+        @"baselineAverage: %@, polarity: prefers smaller, maxPercentRegression: %.3f%%",
+        GSAppleTestName(test), [measurement average], [measurement relativeStandardDeviation],
+        [measurement valuesDescription], [measurement metricIdentifier],
+        [measurement baselineAverage] ? [NSString stringWithFormat:@"%.3f", [[measurement baselineAverage] doubleValue]] : @"",
+        [measurement maxPercentRegression]]);
 }
 
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure
@@ -694,6 +721,7 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
 - (void) testDidStart: (GSXCTestCaseResult *)test {}
 - (void) test: (GSXCTestCaseResult *)test didRecordFailure: (GSXCTestIssue *)failure {}
 - (void) test: (GSXCTestCaseResult *)test didRecordExpectedFailure: (GSXCTestIssue *)failure {}
+- (void) test: (GSXCTestCaseResult *)test didMeasure: (GSXCTMeasurement *)measurement {}
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure {}
 - (void) testDidFinish: (GSXCTestCaseResult *)test {}
 - (void) suiteDidFinish: (GSXCTestSuiteResult *)suite {}
@@ -728,18 +756,24 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
                 skipped++;
                 [casesXML appendFormat:@">\n      <skipped message=\"%@\"/>\n    </testcase>\n",
                     GSXMLEscape(GSJUnitIssueLine([test skip]))];
-            } else if ([[test expectedFailures] count] > 0) {
+            } else if ([[test expectedFailures] count] > 0 || [[test measurements] count] > 0) {
                 [casesXML appendString:@">\n"];
             } else {
                 [casesXML appendString:@"/>\n"];
             }
 
-            // Expected failures don't fail the test; list them as output.
-            if ([[test expectedFailures] count] > 0) {
+            // Expected failures and measurements go in the test's output.
+            if ([[test expectedFailures] count] > 0 || [[test measurements] count] > 0) {
                 NSMutableArray *lines = [NSMutableArray array];
                 for (GSXCTestIssue *expected in [test expectedFailures]) {
                     [lines addObject:[NSString stringWithFormat:@"Expected failure (%@): %@",
                         [expected context], GSJUnitIssueLine(expected)]];
+                }
+                for (GSXCTMeasurement *measurement in [test measurements]) {
+                    [lines addObject:[NSString stringWithFormat:
+                        @"measured [Time, seconds] average: %.6f, relative standard deviation: %.3f%%, values: %@",
+                        [measurement average], [measurement relativeStandardDeviation],
+                        [measurement valuesDescription]]];
                 }
                 if ([test status] == GSXCTestStatusPassed) {
                     [casesXML appendFormat:@"      <system-out>%@</system-out>\n    </testcase>\n",
@@ -913,6 +947,16 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
 
     [[_currentTest expectedFailures] addObject:issue];
     GS_REPORT(test:_currentTest didRecordExpectedFailure:issue)
+}
+
+- (void) _gsTestCase: (XCTestCase *)testCase didMeasure: (GSXCTMeasurement *)measurement
+{
+    if (testCase != _currentTestCase || _currentTest == nil) {
+        return;
+    }
+
+    [[_currentTest measurements] addObject:measurement];
+    GS_REPORT(test:_currentTest didMeasure:measurement)
 }
 
 - (void) _gsTestSuite: (XCTestSuite *)testSuite didRecordIssue: (GSXCTestIssue *)issue
