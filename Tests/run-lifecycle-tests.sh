@@ -101,6 +101,16 @@ assert_contains "ClassSetUpThrowsTests: 1/1 tests FAILED"
 # A throwing +tearDown fails the class even though its tests passed.
 assert_contains "ClassTearDownThrowsTests: 1 tests passed, +tearDown FAILED"
 
+# XCTSkip in +setUp skips every test in the class, without running them or +tearDown.
+assert_not_contains "fixture: ClassSkipTests test ran"
+assert_not_contains "fixture: ClassSkipTests +tearDown ran"
+assert_contains "testOne SKIPPED at LifecycleFixture.m:"
+assert_contains ", fixture class skip"
+assert_contains "ClassSkipTests: 0 tests PASSED, 2 skipped"
+# Skip and assertion macros work in +setUp without failing.
+assert_contains "fixture: ClassSkipIfTests test ran"
+assert_contains "ClassSkipIfTests: 1 tests PASSED"
+
 # continueAfterFailure = NO stops the test at the first failure; teardown runs.
 assert_not_contains "fixture: StopAfterFailureTests continued"
 assert_contains "fixture: StopAfterFailureTests tearDown ran"

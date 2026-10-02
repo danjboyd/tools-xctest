@@ -72,7 +72,7 @@ static void _XCTRecordFailureAt(id test, NSString *description, NSString *filePa
     [test recordFailureWithDescription:description inFile:filePath atLine:lineNumber expected:expected];
 }
 
-void _XCTFailureHandler(XCTestCase *test, BOOL expected, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...)
+void _XCTFailureHandler(id test, BOOL expected, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...)
 {
     NSString *message = nil;
     
@@ -86,7 +86,7 @@ void _XCTFailureHandler(XCTestCase *test, BOOL expected, const char *filePath, N
     _XCTPreformattedFailureHandler(test, expected, [NSString stringWithUTF8String:filePath], lineNumber, condition, message);
 }
 
-void _XCTPreformattedFailureHandler(XCTestCase *test, BOOL expected, NSString *filePath, NSUInteger lineNumber, NSString *condition, NSString *message)
+void _XCTPreformattedFailureHandler(id test, BOOL expected, NSString *filePath, NSUInteger lineNumber, NSString *condition, NSString *message)
 {
     NSString *description = [message length] > 0
         ? [NSString stringWithFormat:@"%@: %@", condition, message]
@@ -100,7 +100,7 @@ void _XCTRecordFailure(XCTestCase *test, NSString *description)
     _XCTRecordFailureAt(test, description, nil, 0, YES);
 }
 
-void _XCTSkipHandler(XCTestCase *test, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...)
+void _XCTSkipHandler(id test, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...)
 {
     NSString *message = nil;
     NSString *description = @"";

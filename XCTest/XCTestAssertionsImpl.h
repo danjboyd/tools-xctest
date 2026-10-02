@@ -34,16 +34,19 @@
 @interface _XCTestCaseInterruptionException : NSException
 @end
 
+// The test argument of these handlers is the assertion's self: normally an
+// XCTestCase, but a class in +setUp/+tearDown.
+
 // Raised by XCTSkip and friends. Subclassing the interruption exception
 // means the assertion macros re-raise it rather than recording a failure.
 @interface _XCTSkipFailureException : _XCTestCaseInterruptionException
 @end
 
-void _XCTSkipHandler(XCTestCase *test, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...);
+void _XCTSkipHandler(id test, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...);
 
-void _XCTFailureHandler(XCTestCase *test, BOOL expected, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...);
+void _XCTFailureHandler(id test, BOOL expected, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...);
 
-void _XCTPreformattedFailureHandler(XCTestCase *test, BOOL expected, NSString *filePath, NSUInteger lineNumber, NSString *condition, NSString *message);
+void _XCTPreformattedFailureHandler(id test, BOOL expected, NSString *filePath, NSUInteger lineNumber, NSString *condition, NSString *message);
 
 #define _XCTRegisterFailure(test, condition, ...) \
 ({ \

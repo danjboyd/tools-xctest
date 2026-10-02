@@ -324,3 +324,34 @@
 - (void)testPasses { }
 
 @end
+
+@interface ClassSkipTests : XCTestCase
+@end
+
+@implementation ClassSkipTests
+
++ (void)setUp
+{
+    XCTSkip(@"fixture class skip");
+}
+
++ (void)tearDown { NSLog(@"fixture: ClassSkipTests +tearDown ran"); }
+- (void)testOne { NSLog(@"fixture: ClassSkipTests test ran"); }
+- (void)testTwo { NSLog(@"fixture: ClassSkipTests test ran"); }
+
+@end
+
+@interface ClassSkipIfTests : XCTestCase
+@end
+
+@implementation ClassSkipIfTests
+
++ (void)setUp
+{
+    XCTSkipIf(NO, @"never");
+    XCTAssertTrue(YES);
+}
+
+- (void)testRuns { NSLog(@"fixture: ClassSkipIfTests test ran"); }
+
+@end
