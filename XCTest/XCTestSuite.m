@@ -20,6 +20,7 @@
 
 #import <XCTest/XCTestSuite.h>
 #import <XCTest/XCTestPrivate.h>
+#import <XCTest/XCTestAssertionsImpl.h>
 
 #import <objc/runtime.h>
 
@@ -214,14 +215,20 @@ static GSXCTestCaseSuite *GSCurrentClassSuite = nil;
     [[self testRun] _gsRecordIssue:issue];
 }
 
-// Calls +setUp or +tearDown; returns NO if it recorded any failure.
-- (BOOL) _gsRunClassMethod: (SEL)selector context: (NSString *)context
+// Calls +setUp or +tearDown; returns NO if it recorded any failure. A
+// skip is returned through \a skip (and ignored in +tearDown).
+- (BOOL) _gsRunClassMethod: (SEL)selector context: (NSString *)context skip: (GSXCTestIssue **)skip
 {
     NSUInteger issuesBefore = [[(XCTestSuiteRun *)[self testRun] _gsOwnIssues] count];
 
     _classContext = context;
     @try {
         [_testCaseClass performSelector:selector];
+    }
+    @catch (_XCTSkipFailureException *skipException) {
+        if (skip != NULL) {
+            *skip = _GSXCTIssueForSkip(skipException);
+        }
     }
     @catch (NSException *exception) {
         [self _gsRecordClassFailure:[NSString stringWithFormat:@"threw exception: %@",
@@ -244,23 +251,28 @@ static GSXCTestCaseSuite *GSCurrentClassSuite = nil;
     [run start];
 
     if ([_tests count] > 0) {
-        BOOL classSetUpSucceeded = [self _gsRunClassMethod:@selector(setUp) context:@"+setUp"];
+        GSXCTestIssue *classSkip = nil;
+        BOOL classSetUpSucceeded = [self _gsRunClassMethod:@selector(setUp) context:@"+setUp" skip:&classSkip];
         GSXCTestIssue *cause = classSetUpSucceeded ? nil
             : [[(XCTestSuiteRun *)run _gsOwnIssues] objectAtIndex:0];
+        // A skip in +setUp skips the whole class (unless +setUp also failed).
+        BOOL runTests = classSetUpSucceeded && classSkip == nil;
 
         for (XCTest *test in _tests) {
             @autoreleasepool {
-                if (classSetUpSucceeded || ![test isKindOfClass:[XCTestCase class]]) {
+                if (runTests || ![test isKindOfClass:[XCTestCase class]]) {
                     [test runTest];
-                } else {
+                } else if (!classSetUpSucceeded) {
                     [(XCTestCase *)test _gsFailWithoutRunning:cause];
+                } else {
+                    [(XCTestCase *)test _gsSkipWithoutRunning:classSkip];
                 }
                 [(XCTestSuiteRun *)run addTestRun:[test testRun]];
             }
         }
 
-        if (classSetUpSucceeded) {
-            [self _gsRunClassMethod:@selector(tearDown) context:@"+tearDown"];
+        if (runTests) {
+            [self _gsRunClassMethod:@selector(tearDown) context:@"+tearDown" skip:NULL];
         }
     }
 

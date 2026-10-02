@@ -41,6 +41,10 @@ void _XCTInterruptIfNeeded(XCTestCase *test);
 // Every XCTestCase subclass, sorted by name.
 NSArray *_GSXCTestCaseSubclasses(void);
 
+@class _XCTSkipFailureException;
+// The location and description carried by a skip.
+GSXCTestIssue *_GSXCTIssueForSkip(_XCTSkipFailureException *skip);
+
 // "Name", "reason" -- the way Apple's XCTest describes a caught exception.
 NSString *_GSXCTDescribeException(NSException *exception);
 
@@ -105,6 +109,8 @@ NSString *_GSXCTDescribeException(NSException *exception);
 - (NSString *) _gsMethodName;
 // Records the test as started and failed with \a cause, without running it.
 - (void) _gsFailWithoutRunning: (GSXCTestIssue *)cause;
+// Records the test as started and skipped, without running it.
+- (void) _gsSkipWithoutRunning: (GSXCTestIssue *)skip;
 @end
 
 @interface XCTestCase (GSAsynchronousTestingPrivate)

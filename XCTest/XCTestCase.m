@@ -24,6 +24,16 @@
 
 #import <objc/runtime.h>
 
+GSXCTestIssue *_GSXCTIssueForSkip(_XCTSkipFailureException *skip)
+{
+    NSDictionary *info = [skip userInfo];
+
+    return [GSXCTestIssue issueWithMessage:[info objectForKey:@"message"]
+                                  filePath:[info objectForKey:@"file"]
+                                lineNumber:[[info objectForKey:@"line"] unsignedIntegerValue]
+                                unexpected:NO];
+}
+
 // The test being run. Not retained; cleared after each test.
 static XCTestCase *GSCurrentTestCase = nil;
 
@@ -202,13 +212,7 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
 
 - (void) _gsRecordSkip: (_XCTSkipFailureException *)skip
 {
-    NSDictionary *info = [skip userInfo];
-
-    [(XCTestCaseRun *)[self testRun] _gsRecordSkip:
-        [GSXCTestIssue issueWithMessage:[info objectForKey:@"message"]
-                               filePath:[info objectForKey:@"file"]
-                             lineNumber:[[info objectForKey:@"line"] unsignedIntegerValue]
-                             unexpected:NO]];
+    [(XCTestCaseRun *)[self testRun] _gsRecordSkip:_GSXCTIssueForSkip(skip)];
 }
 
 // Runs one step of a test. A skip, a failure that stops the test, or an
@@ -385,6 +389,17 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
                                inFile:[cause filePath]
                                atLine:[cause lineNumber]
                              expected:![cause unexpected]];
+    [run stop];
+    [run release];
+}
+
+- (void) _gsSkipWithoutRunning: (GSXCTestIssue *)skip
+{
+    XCTestRun *run = [[[self testRunClass] alloc] initWithTest:self];
+
+    [self _gsSetTestRun:run];
+    [run start];
+    [(XCTestCaseRun *)run _gsRecordSkip:skip];
     [run stop];
     [run release];
 }
