@@ -28,9 +28,6 @@
 @implementation _XCTSkipFailureException
 @end
 
-@interface GSXCTestRunner (GSPrivate)
-- (void)registerAssertionFailed;
-@end
 
 // Stops the test when continueAfterFailure is NO. Only possible on the main
 // thread, where tests run; a failure on another thread is just recorded.
@@ -61,28 +58,30 @@ void _XCTFailureHandler(XCTestCase *test, BOOL expected, const char *filePath, N
 
 void _XCTPreformattedFailureHandler(XCTestCase *test, BOOL expected, NSString *filePath, NSUInteger lineNumber, NSString *condition, NSString *message)
 {
-    NSLog(@"XCTest:     Assertion FAILED at %@:%lu, %@%@", 
-        filePath, 
-        (unsigned long)lineNumber, 
-        condition, 
-        ([message length] > 0 ? [NSString stringWithFormat:@": %@", message] : @""));
-    
-    [[GSXCTestRunner sharedRunner] registerAssertionFailed];
+    NSString *description = [message length] > 0
+        ? [NSString stringWithFormat:@"%@: %@", condition, message]
+        : condition;
+
+    [[GSXCTestRunner sharedRunner] recordFailureWithMessage:description
+                                                   filePath:filePath
+                                                 lineNumber:lineNumber
+                                                 unexpected:!expected];
     _XCTInterruptIfNeeded(test);
 }
 
 void _XCTRecordFailure(XCTestCase *test, NSString *description)
 {
-    NSLog(@"XCTest:     FAILED: %@", description);
-
-    [[GSXCTestRunner sharedRunner] registerAssertionFailed];
+    [[GSXCTestRunner sharedRunner] recordFailureWithMessage:description
+                                                   filePath:nil
+                                                 lineNumber:0
+                                                 unexpected:NO];
     _XCTInterruptIfNeeded(test);
 }
 
 void _XCTSkipHandler(XCTestCase *test, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...)
 {
     NSString *message = nil;
-    NSString *reason = nil;
+    NSString *description = @"";
 
     if ([format length] > 0) {
         va_list args;
@@ -91,18 +90,22 @@ void _XCTSkipHandler(XCTestCase *test, const char *filePath, NSUInteger lineNumb
         va_end(args);
     }
 
-    // The runner logs the reason as "SKIPPED <reason>".
-    reason = [NSString stringWithFormat:@"at %s:%lu", filePath, (unsigned long)lineNumber];
-    if ([condition length] > 0) {
-        reason = [reason stringByAppendingFormat:@", %@", condition];
-    }
-    if ([message length] > 0) {
-        reason = [reason stringByAppendingFormat:@": %@", message];
+    if ([condition length] > 0 && [message length] > 0) {
+        description = [NSString stringWithFormat:@"%@: %@", condition, message];
+    } else if ([condition length] > 0) {
+        description = condition;
+    } else if ([message length] > 0) {
+        description = message;
     }
 
+    // The runner reads the location and description from userInfo.
     [[_XCTSkipFailureException exceptionWithName:@"_XCTSkipFailureException"
-                                          reason:reason
-                                        userInfo:nil] raise];
+                                          reason:description
+                                        userInfo:[NSDictionary dictionaryWithObjectsAndKeys:
+                                            [NSString stringWithUTF8String:filePath], @"file",
+                                            [NSNumber numberWithUnsignedInteger:lineNumber], @"line",
+                                            description, @"message",
+                                            nil]] raise];
 }
 
 // Failure messages, indexed by assertion type and the format index passed by

@@ -24,10 +24,20 @@
 #import <XCTest/XCTestCase.h>
 #import <XCTest/XCTestExpectation.h>
 #import <XCTest/XCTWaiter.h>
+#import <XCTest/GSXCTestRunner.h>
 
 // Records a failure that has no source location (e.g. a failed wait),
 // honouring continueAfterFailure like the assertion macros do.
 void _XCTRecordFailure(XCTestCase *test, NSString *description);
+
+@interface GSXCTestRunner (GSPrivate)
+// Records a failure against the running test, or against the running class
+// when called from +setUp/+tearDown.
+- (void) recordFailureWithMessage: (NSString *)message
+                         filePath: (NSString *)filePath
+                       lineNumber: (NSUInteger)lineNumber
+                       unexpected: (BOOL)unexpected;
+@end
 
 @interface XCTestCase (GSXCTestRunnerPrivate)
 // The test case currently being run, or nil.

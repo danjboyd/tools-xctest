@@ -73,7 +73,7 @@ assert_contains "ClassSetUpOnceTests: 2 tests PASSED"
 
 # tearDown runs when the test throws.
 assert_contains "fixture: TestThrowsTests tearDown ran"
-assert_contains "testThrows threw exception: "
+assert_contains "testThrows: threw exception: "
 assert_contains "TestThrowsTests: 1/1 tests FAILED"
 
 # A throwing setUp skips the test but still runs tearDown.

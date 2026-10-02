@@ -27,11 +27,27 @@
 
 #import <Foundation/Foundation.h>
 
+typedef enum {
+    /*! "XCTest: ..." log lines (the default). */
+    GSXCTestOutputFormatClassic,
+    /*! The format of Apple's xctest, with per-test timings, on stdout. */
+    GSXCTestOutputFormatApple,
+} GSXCTestOutputFormat;
+
 @interface GSXCTestRunner : NSObject {
-    NSUInteger assertionFailureCount;
-    NSString *skipReason;
     NSLock *runLock;
+    NSArray *reporters;
+    id currentTestResult;
+    id currentSuiteResult;
+    NSString *currentClassContext;
+    GSXCTestOutputFormat outputFormat;
+    NSString *bundleName;
 }
+
+@property GSXCTestOutputFormat outputFormat;
+
+/*! The test bundle's file name, used to name its suite in reports. */
+@property (copy) NSString *bundleName;
 
 - (BOOL)runAll;
 - (BOOL)runTestsNamed:(NSArray *)testNames; // nil for all tests
