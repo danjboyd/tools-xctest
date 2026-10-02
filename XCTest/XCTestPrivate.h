@@ -81,6 +81,8 @@ NSString *_GSXCTDescribeException(NSException *exception);
 @property (readonly) Class testCaseClass;
 // The class suite whose tests are running, or nil.
 + (GSXCTestCaseSuite *) _gsCurrentClassSuite;
+// How every class suite repeats its tests.
++ (void) _gsSetRepetitionMode: (GSXCTestRepetitionMode)mode iterations: (NSUInteger)iterations;
 // Records a failure from +setUp/+tearDown.
 - (void) _gsRecordClassFailure: (NSString *)description
                         inFile: (NSString *)filePath
@@ -97,6 +99,8 @@ NSString *_GSXCTDescribeException(NSException *exception);
 // A failure absorbed by XCTExpectFailure; its context is the reason.
 - (void) _gsTestCase: (XCTestCase *)testCase didRecordExpectedFailure: (GSXCTestIssue *)issue;
 - (void) _gsTestCase: (XCTestCase *)testCase didMeasure: (GSXCTMeasurement *)measurement;
+// A failed attempt that will be retried, and so no longer counts.
+- (void) _gsTestCaseAttemptWasDiscarded: (XCTestCase *)testCase;
 @end
 
 @interface GSXCTestRunner (GSPerformancePrivate)
@@ -118,6 +122,10 @@ NSString *_GSXCTDescribeException(NSException *exception);
 - (void (^)(void)) _gsPopTeardownBlock;
 // The test method's name, e.g. "testFoo".
 - (NSString *) _gsMethodName;
+// When tests repeat: this run's iteration (from 1) and the maximum; 0 otherwise.
+- (NSUInteger) _gsIteration;
+- (NSUInteger) _gsIterationCount;
+- (void) _gsSetIteration: (NSUInteger)iteration of: (NSUInteger)iterationCount;
 // Records the test as started and failed with \a cause, without running it.
 - (void) _gsFailWithoutRunning: (GSXCTestIssue *)cause;
 // Records the test as started and skipped, without running it.

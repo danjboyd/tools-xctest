@@ -34,6 +34,18 @@ typedef enum {
     GSXCTestOutputFormatApple,
 } GSXCTestOutputFormat;
 
+typedef enum {
+    /*! Each test runs once. */
+    GSXCTestRepetitionNone,
+    /*! Each test runs testIterations times. */
+    GSXCTestRepetitionFixed,
+    /*! Each test repeats until it fails, at most testIterations times. */
+    GSXCTestRepetitionUntilFailure,
+    /*! A failing test is retried until it passes, at most testIterations
+     * times; failed attempts before a pass don't count. */
+    GSXCTestRepetitionRetryOnFailure,
+} GSXCTestRepetitionMode;
+
 @interface GSXCTestRunner : NSObject {
     NSLock *runLock;
     NSBundle *testBundle;
@@ -41,6 +53,8 @@ typedef enum {
     NSString *performanceBaselinesPath;
     BOOL updatePerformanceBaselines;
     NSMutableDictionary *performanceBaselines;
+    GSXCTestRepetitionMode repetitionMode;
+    NSUInteger testIterations;
     GSXCTestOutputFormat outputFormat;
     NSString *bundleName;
     NSString *junitReportPath;
@@ -73,6 +87,11 @@ typedef enum {
 /*! If YES, measured averages are written back to performanceBaselinesPath
  * after the run (keeping each entry's maxPercentRegression). */
 @property BOOL updatePerformanceBaselines;
+
+/*! How tests are repeated; see GSXCTestRepetitionMode. */
+@property GSXCTestRepetitionMode repetitionMode;
+/*! The number of runs (or maximum attempts) per test when repeating. */
+@property NSUInteger testIterations;
 
 - (BOOL)runAll;
 - (BOOL)runTestsNamed:(NSArray *)testNames; // nil for all tests

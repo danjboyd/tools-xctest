@@ -66,6 +66,17 @@
 @synthesize skip = _skip;
 @synthesize startDate = _startDate;
 @synthesize duration = _duration;
+@synthesize iteration = _iteration;
+@synthesize iterationCount = _iterationCount;
+
+- (NSString *) displayName
+{
+    if (_iteration == 0) {
+        return _methodName;
+    }
+
+    return [NSString stringWithFormat:@"%@ (iteration %lu)", _methodName, (unsigned long)_iteration];
+}
 
 - (id) initWithClassName: (NSString *)className methodName: (NSString *)methodName
 {
@@ -283,7 +294,7 @@ static NSArray *GSFailedTestLines(GSXCTestRunResult *run, NSString *(^testName)(
                     ? [NSString stringWithFormat:@"%@:%lu: ", [first filePath], (unsigned long)[first lineNumber]]
                     : @"";
                 [lines addObject:[NSString stringWithFormat:@"%@: %@%@",
-                    testName([test className], [test methodName]), location, [first message]]];
+                    testName([test className], [test displayName]), location, [first message]]];
             }
         }
         for (GSXCTestIssue *failure in [suite classFailures]) {
@@ -329,7 +340,18 @@ static NSString *GSSkippedSummary(NSUInteger skipCount)
 
 - (void) testDidStart: (GSXCTestCaseResult *)test
 {
-    NSLog(@"XCTest:     %@...", [test methodName]);
+    if ([test iteration] > 0) {
+        NSLog(@"XCTest:     %@ (iteration %lu of %lu)...", [test methodName],
+            (unsigned long)[test iteration], (unsigned long)[test iterationCount]);
+    } else {
+        NSLog(@"XCTest:     %@...", [test methodName]);
+    }
+}
+
+- (void) testWillBeRetried: (GSXCTestCaseResult *)test
+{
+    NSLog(@"XCTest:     %@ failed on iteration %lu of %lu; retrying", [test methodName],
+        (unsigned long)[test iteration], (unsigned long)[test iterationCount]);
 }
 
 - (void) test: (GSXCTestCaseResult *)test didRecordFailure: (GSXCTestIssue *)failure
@@ -510,6 +532,10 @@ static NSString *GSAppleLocation(GSXCTestIssue *issue)
 - (void) testDidStart: (GSXCTestCaseResult *)test
 {
     GSPrintLine([NSString stringWithFormat:@"Test Case '%@' started.", GSAppleTestName(test)]);
+}
+
+- (void) testWillBeRetried: (GSXCTestCaseResult *)test
+{
 }
 
 - (void) test: (GSXCTestCaseResult *)test didRecordFailure: (GSXCTestIssue *)failure
@@ -724,6 +750,7 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
 - (void) test: (GSXCTestCaseResult *)test didMeasure: (GSXCTMeasurement *)measurement {}
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure {}
 - (void) testDidFinish: (GSXCTestCaseResult *)test {}
+- (void) testWillBeRetried: (GSXCTestCaseResult *)test {}
 - (void) suiteDidFinish: (GSXCTestSuiteResult *)suite {}
 
 - (void) runDidFinish: (GSXCTestRunResult *)run
@@ -741,7 +768,7 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
         for (GSXCTestCaseResult *test in [suite testResults]) {
             tests++;
             [casesXML appendFormat:@"    <testcase classname=\"%@\" name=\"%@\" time=\"%.3f\"",
-                GSXMLEscape([test className]), GSXMLEscape([test methodName]), [test duration]];
+                GSXMLEscape([test className]), GSXMLEscape([test displayName]), [test duration]];
 
             if ([test status] == GSXCTestStatusFailed) {
                 if (GSIssuesIncludeUnexpected([test failures])) {
@@ -921,6 +948,8 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
                methodName:[testCase _gsMethodName]] autorelease];
 
     [test setStartDate:[[testCase testRun] startDate]];
+    [test setIteration:[testCase _gsIteration]];
+    [test setIterationCount:[testCase _gsIterationCount]];
     [[_currentSuite testResults] addObject:test];
     _currentTestCase = testCase;
     _currentTest = [test retain];
@@ -957,6 +986,19 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
 
     [[_currentTest measurements] addObject:measurement];
     GS_REPORT(test:_currentTest didMeasure:measurement)
+}
+
+- (void) _gsTestCaseAttemptWasDiscarded: (XCTestCase *)testCase
+{
+    GSXCTestCaseResult *attempt = [[[_currentSuite testResults] lastObject] retain];
+
+    if (attempt == nil) {
+        return;
+    }
+
+    [[_currentSuite testResults] removeLastObject];
+    GS_REPORT(testWillBeRetried:attempt)
+    [attempt release];
 }
 
 - (void) _gsTestSuite: (XCTestSuite *)testSuite didRecordIssue: (GSXCTestIssue *)issue

@@ -131,6 +131,8 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 @synthesize testBundle;
 @synthesize performanceBaselinesPath;
 @synthesize updatePerformanceBaselines;
+@synthesize repetitionMode;
+@synthesize testIterations;
 
 - (id)init
 {
@@ -382,6 +384,7 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     [topSuite addTest:bundleSuite];
     [run setFiltersActive:filtersActive];
 
+    [GSXCTestCaseSuite _gsSetRepetitionMode:repetitionMode iterations:testIterations];
     [self _gsCreatePrincipalObject];
     [center addTestObserver:(id<XCTestObservation>)reportingObserver];
 

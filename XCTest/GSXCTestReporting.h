@@ -80,8 +80,15 @@ typedef enum {
     GSXCTestIssue *_skip;
     NSDate *_startDate;
     NSTimeInterval _duration;
+    NSUInteger _iteration;
+    NSUInteger _iterationCount;
 }
 - (id) initWithClassName: (NSString *)className methodName: (NSString *)methodName;
+/*! When tests repeat: this run's iteration (from 1) and the maximum; else 0. */
+@property NSUInteger iteration;
+@property NSUInteger iterationCount;
+/*! The method name, plus " (iteration N)" when tests repeat. */
+- (NSString *) displayName;
 @property (readonly, copy) NSString *className;
 @property (readonly, copy) NSString *methodName;
 @property GSXCTestStatus status;
@@ -154,6 +161,8 @@ typedef enum {
 - (void) test: (GSXCTestCaseResult *)test didMeasure: (GSXCTMeasurement *)measurement;
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure;
 - (void) testDidFinish: (GSXCTestCaseResult *)test;
+/*! A failed attempt that will be retried; it has been removed from its suite. */
+- (void) testWillBeRetried: (GSXCTestCaseResult *)test;
 - (void) suiteDidFinish: (GSXCTestSuiteResult *)suite;
 - (void) runDidFinish: (GSXCTestRunResult *)run;
 @end
