@@ -20,6 +20,7 @@
 
 #define _GNU_SOURCE
 #include <dlfcn.h>
+#include <signal.h>
 #include <stdio.h>
 
 #import <Foundation/Foundation.h>
@@ -38,6 +39,8 @@ static void PrintUsage(FILE *stream)
     fprintf(stream, "  -list-tests                 List the selected tests, one identifier per line, without running them\n");
     fprintf(stream, "  -list-tests-json            List the selected tests as JSON, without running them\n");
     fprintf(stream, "  -host <app>                 Run the tests inside a running application (.app or executable)\n");
+    fprintf(stream, "  -host-launch-timeout <s>    Give up if the host hasn't started the tests after <s> seconds\n");
+    fprintf(stream, "                              (default 60; 0 waits forever; test time doesn't count)\n");
     fprintf(stream, "  -performance-baselines <path>  Fail measured tests that regress against these baselines (JSON)\n");
     fprintf(stream, "  -update-performance-baselines  Record measured averages into the -performance-baselines file\n");
     fprintf(stream, "  -test-iterations <n>        Run each test n times (the maximum, with the two options below)\n");
@@ -77,7 +80,8 @@ static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString
                           NSArray *onlyTestIdentifiers, NSArray *skipTestIdentifiers,
                           GSXCTestOutputFormat outputFormat, NSString *junitReportPath,
                           NSString *performanceBaselinesPath, BOOL updatePerformanceBaselines,
-                          GSXCTestRepetitionMode repetitionMode, NSInteger testIterations)
+                          GSXCTestRepetitionMode repetitionMode, NSInteger testIterations,
+                          NSTimeInterval launchTimeout)
 {
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSString *executable = hostPath;
@@ -85,6 +89,13 @@ static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString
     NSString *statusFile = [NSTemporaryDirectory() stringByAppendingPathComponent:
         [NSString stringWithFormat:@"xctest-host-%d-%@", getpid(), [[NSProcessInfo processInfo] globallyUniqueString]]];
     BOOL isDirectory = NO;
+
+    // NSBundle needs an absolute path.
+    if (![hostPath isAbsolutePath]) {
+        hostPath = [[fileManager currentDirectoryPath] stringByAppendingPathComponent:hostPath];
+    }
+    hostPath = [hostPath stringByStandardizingPath];
+    executable = hostPath;
 
     if (![fileManager fileExistsAtPath:hostPath isDirectory:&isDirectory]) {
         fprintf(stderr, "xctest: could not find host application '%s'\n", [hostPath UTF8String]);
@@ -140,11 +151,44 @@ static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString
     [task setLaunchPath:executable];
     [task setArguments:[NSArray array]];
     [task setEnvironment:environment];
+    NSString *startedFile = [statusFile stringByAppendingString:@".started"];
+    NSDate *launchDeadline = [NSDate dateWithTimeIntervalSinceNow:launchTimeout];
+    BOOL testsStarted = NO;
+    BOOL timedOut = NO;
+
     [task launch];
+
+    // Until the tests start, the app only gets launchTimeout seconds; after
+    // that it can take as long as the tests need.
+    while ([task isRunning]) {
+        [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+        if (!testsStarted) {
+            testsStarted = [fileManager fileExistsAtPath:startedFile];
+        }
+        if (!testsStarted && launchTimeout > 0 && [launchDeadline timeIntervalSinceNow] <= 0 && [task isRunning]) {
+            timedOut = YES;
+            [task terminate];
+            NSDate *killDeadline = [NSDate dateWithTimeIntervalSinceNow:5];
+            while ([task isRunning] && [killDeadline timeIntervalSinceNow] > 0) {
+                [[NSRunLoop currentRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.1]];
+            }
+            if ([task isRunning]) {
+                kill([task processIdentifier], SIGKILL);
+            }
+            break;
+        }
+    }
     [task waitUntilExit];
 
     BOOL testsRan = [fileManager fileExistsAtPath:statusFile];
     [fileManager removeItemAtPath:statusFile error:NULL];
+    [fileManager removeItemAtPath:startedFile error:NULL];
+
+    if (timedOut) {
+        fprintf(stderr, "xctest: host application didn't start the tests within %g seconds "
+                "(see -host-launch-timeout); stopped it\n", launchTimeout);
+        return 1;
+    }
 
     if ([task terminationReason] == NSTaskTerminationReasonUncaughtSignal) {
         fprintf(stderr, "xctest: host application crashed (signal %d)\n", [task terminationStatus]);
@@ -219,6 +263,7 @@ int main(int argc, char *argv[]) {
     BOOL listTests = NO;
     BOOL listTestsAsJSON = NO;
     NSString *hostPath = nil;
+    NSTimeInterval hostLaunchTimeout = 60;
     NSString *performanceBaselinesPath = nil;
     BOOL updatePerformanceBaselines = NO;
     NSInteger testIterations = 0;
@@ -327,6 +372,17 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        if ([argument isEqualToString:@"-host-launch-timeout"]) {
+            char *end = NULL;
+            hostLaunchTimeout = (i + 1 < argc) ? strtod(argv[++i], &end) : -1;
+            if (end == NULL || *end != '\0' || hostLaunchTimeout < 0) {
+                fprintf(stderr, "xctest: -host-launch-timeout needs a number of seconds (0 for none)\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            continue;
+        }
+
         if ([argument isEqualToString:@"-host"]) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "xctest: missing application for -host\n");
@@ -392,7 +448,7 @@ int main(int argc, char *argv[]) {
         exitCode = RunTestsInHost(hostPath, testBundlePath, TargetNameForBundlePath(testBundlePath),
                                   onlyTestIdentifiers, skipTestIdentifiers, outputFormat, junitReportPath,
                                   performanceBaselinesPath, updatePerformanceBaselines,
-                                  repetitionMode, testIterations);
+                                  repetitionMode, testIterations, hostLaunchTimeout);
         goto cleanup;
     }
 

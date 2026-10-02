@@ -1,6 +1,7 @@
 #import <AppKit/AppKit.h>
 
 #include <stdlib.h>
+#include <unistd.h>
 
 @interface HostAppDelegate : NSObject {
     NSWindow *_window;
@@ -34,6 +35,13 @@ int main(int argc, const char *argv[])
     // Lets the regressions check what happens when an app quits early.
     if (getenv("HOSTAPP_EXIT_EARLY") != NULL) {
         return 0;
+    }
+
+    // ... or never finishes launching.
+    if (getenv("HOSTAPP_HANG") != NULL) {
+        for (;;) {
+            sleep(1);
+        }
     }
 
     @autoreleasepool {

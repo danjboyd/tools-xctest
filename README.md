@@ -95,7 +95,7 @@ To test code that needs a running `NSApplication` (controllers, windows, nib/gor
 xctest -host MyApp.app MyAppTests.bundle
 ```
 
-`xctest` launches the app with `libXCTestHost` preloaded. Once the app has finished launching (after its own `applicationDidFinishLaunching:`), the test bundle is loaded and its tests run on the main thread inside the app, which then exits with the result. The app needs no changes. Filters, `-output-format` and `-junit-report` work as usual. On a headless machine, run it under `xvfb-run -a`. Tests that also run without a host can skip themselves with `XCTSkipUnless(NSApp != nil)`.
+`xctest` launches the app with `libXCTestHost` preloaded. Once the app has finished launching (after its own `applicationDidFinishLaunching:`), the test bundle is loaded and its tests run on the main thread inside the app, which then exits with the result. The app needs no changes. Filters, `-output-format` and `-junit-report` work as usual. If the app hasn't started the tests within 60 seconds (`-host-launch-timeout <seconds>`; 0 waits forever), `xctest` stops it and fails; the tests themselves have no time limit. On a headless machine, run it under `xvfb-run -a`. Tests that also run without a host can skip themselves with `XCTSkipUnless(NSApp != nil)`.
 
 You will need to compile the test cases into one or more bundles, as `xctest` expects `.bundle`'s. 
 

@@ -33,6 +33,8 @@
 // Settings from xctest, as JSON: bundlePath, targetName, bundleName, only,
 // skip, outputFormat, junitReport, performanceBaselines,
 // updatePerformanceBaselines, repetitionMode, testIterations, statusFile.
+// "<statusFile>.started" is created when the tests start, so xctest can
+// tell a slow test run from an app that never finished launching.
 static NSDictionary *GSHostConfig = nil;
 
 @interface GSXCTestHostLoader : NSObject
@@ -91,7 +93,16 @@ static NSDictionary *GSHostConfig = nil;
         NSString *bundlePath = [GSHostConfig objectForKey:@"bundlePath"];
         NSString *junitReport = [GSHostConfig objectForKey:@"junitReport"];
         NSString *statusFile = [GSHostConfig objectForKey:@"statusFile"];
-        NSBundle *bundle = [NSBundle bundleWithPath:bundlePath];
+        NSBundle *bundle = nil;
+
+        if ([statusFile isKindOfClass:[NSString class]]) {
+            [@"" writeToFile:[statusFile stringByAppendingString:@".started"]
+                  atomically:NO
+                    encoding:NSUTF8StringEncoding
+                       error:NULL];
+        }
+
+        bundle = [NSBundle bundleWithPath:bundlePath];
 
         if (bundle == nil || ![bundle load]) {
             fprintf(stderr, "xctest: host could not load test bundle '%s'\n", [bundlePath UTF8String]);
