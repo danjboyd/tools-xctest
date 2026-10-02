@@ -184,6 +184,9 @@ NSArray *_GSXCTestCaseSubclasses(void)
 // The class suite whose tests are running. Not retained.
 static GSXCTestCaseSuite *GSCurrentClassSuite = nil;
 
+static GSXCTestRepetitionMode GSRepetitionMode = GSXCTestRepetitionNone;
+static NSUInteger GSRepetitionIterations = 1;
+
 @implementation GSXCTestCaseSuite
 
 @synthesize testCaseClass = _testCaseClass;
@@ -199,6 +202,52 @@ static GSXCTestCaseSuite *GSCurrentClassSuite = nil;
 + (GSXCTestCaseSuite *) _gsCurrentClassSuite
 {
     return GSCurrentClassSuite;
+}
+
++ (void) _gsSetRepetitionMode: (GSXCTestRepetitionMode)mode iterations: (NSUInteger)iterations
+{
+    GSRepetitionMode = mode;
+    GSRepetitionIterations = iterations > 0 ? iterations : 1;
+}
+
+// Runs a test once, or repeatedly per the repetition mode, each time with
+// a fresh test case, adding the runs that count to \a suiteRun.
+- (void) _gsRunTestCase: (XCTestCase *)testCase suiteRun: (XCTestSuiteRun *)suiteRun
+{
+    NSUInteger iterations = GSRepetitionMode == GSXCTestRepetitionNone ? 1 : GSRepetitionIterations;
+
+    for (NSUInteger iteration = 1; iteration <= iterations; iteration++) {
+        @autoreleasepool {
+            XCTestCase *attempt = iteration == 1 ? testCase
+                : [[[[testCase class] alloc] initWithInvocation:[testCase invocation]] autorelease];
+            XCTestRun *attemptRun = nil;
+            BOOL failed = NO;
+
+            if (GSRepetitionMode != GSXCTestRepetitionNone) {
+                [attempt _gsSetIteration:iteration of:iterations];
+            }
+            [attempt runTest];
+            attemptRun = [attempt testRun];
+            failed = [attemptRun totalFailureCount] > 0;
+
+            if (GSRepetitionMode == GSXCTestRepetitionRetryOnFailure && failed && iteration < iterations) {
+                [[XCTestObservationCenter sharedTestObservationCenter] _gsNotifyObservers:^(id observer) {
+                    if ([observer respondsToSelector:@selector(_gsTestCaseAttemptWasDiscarded:)]) {
+                        [observer _gsTestCaseAttemptWasDiscarded:attempt];
+                    }
+                }];
+                continue;
+            }
+
+            [suiteRun addTestRun:attemptRun];
+
+            if ([attemptRun hasBeenSkipped]
+                || (GSRepetitionMode == GSXCTestRepetitionUntilFailure && failed)
+                || (GSRepetitionMode == GSXCTestRepetitionRetryOnFailure && !failed)) {
+                break;
+            }
+        }
+    }
 }
 
 - (void) _gsRecordClassFailure: (NSString *)description
@@ -260,7 +309,12 @@ static GSXCTestCaseSuite *GSCurrentClassSuite = nil;
 
         for (XCTest *test in _tests) {
             @autoreleasepool {
-                if (runTests || ![test isKindOfClass:[XCTestCase class]]) {
+                if (runTests && [test isKindOfClass:[XCTestCase class]]) {
+                    [self _gsRunTestCase:(XCTestCase *)test suiteRun:(XCTestSuiteRun *)run];
+                    continue;
+                }
+
+                if (runTests) {
                     [test runTest];
                 } else if (!classSetUpSucceeded) {
                     [(XCTestCase *)test _gsFailWithoutRunning:cause];

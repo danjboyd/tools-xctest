@@ -411,6 +411,22 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     [run release];
 }
 
+- (NSUInteger) _gsIteration
+{
+    return _gsIteration;
+}
+
+- (NSUInteger) _gsIterationCount
+{
+    return _gsIterationCount;
+}
+
+- (void) _gsSetIteration: (NSUInteger)iteration of: (NSUInteger)iterationCount
+{
+    _gsIteration = iteration;
+    _gsIterationCount = iterationCount;
+}
+
 - (void) _gsSkipWithoutRunning: (GSXCTestIssue *)skip
 {
     XCTestRun *run = [[[self testRunClass] alloc] initWithTest:self];

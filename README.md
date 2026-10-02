@@ -131,6 +131,8 @@ To see which tests a run would select without running them, add `-list-tests` (o
 xctest MyTests.bundle -list-tests -only-testing:MyTests/FooTests
 ```
 
+To find flaky tests, `-test-iterations <n>` runs each test n times. With `-run-tests-until-failure` a test repeats until it fails (at most 100 times, or n), and with `-retry-tests-on-failure` a failing test is retried until it passes (at most 3 times, or n); failed attempts followed by a pass don't count. Each run uses a fresh test case; class `+setUp`/`+tearDown` still run once.
+
 Automated CLI regression tests can be run with `make check` or `meson test -C build`.
 
 ## License

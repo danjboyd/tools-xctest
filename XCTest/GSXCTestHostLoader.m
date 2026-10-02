@@ -32,7 +32,7 @@
 
 // Settings from xctest, as JSON: bundlePath, targetName, bundleName, only,
 // skip, outputFormat, junitReport, performanceBaselines,
-// updatePerformanceBaselines, statusFile.
+// updatePerformanceBaselines, repetitionMode, testIterations, statusFile.
 static NSDictionary *GSHostConfig = nil;
 
 @interface GSXCTestHostLoader : NSObject
@@ -105,6 +105,8 @@ static NSDictionary *GSHostConfig = nil;
             if ([junitReport isKindOfClass:[NSString class]]) {
                 [runner setJunitReportPath:junitReport];
             }
+            [runner setRepetitionMode:(GSXCTestRepetitionMode)[[GSHostConfig objectForKey:@"repetitionMode"] intValue]];
+            [runner setTestIterations:[[GSHostConfig objectForKey:@"testIterations"] unsignedIntegerValue]];
             if ([[GSHostConfig objectForKey:@"performanceBaselines"] isKindOfClass:[NSString class]]) {
                 [runner setPerformanceBaselinesPath:[GSHostConfig objectForKey:@"performanceBaselines"]];
                 [runner setUpdatePerformanceBaselines:[[GSHostConfig objectForKey:@"updatePerformanceBaselines"] boolValue]];

@@ -36,6 +36,8 @@
     NSMutableArray *_expectedFailureScopes;
     BOOL _gsRecordingUnmatched;
     id _gsPerformance;
+    NSUInteger _gsIteration;
+    NSUInteger _gsIterationCount;
 }
 
 + (id) testCaseWithInvocation: (NSInvocation *)invocation;

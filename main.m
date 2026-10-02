@@ -40,6 +40,9 @@ static void PrintUsage(FILE *stream)
     fprintf(stream, "  -host <app>                 Run the tests inside a running application (.app or executable)\n");
     fprintf(stream, "  -performance-baselines <path>  Fail measured tests that regress against these baselines (JSON)\n");
     fprintf(stream, "  -update-performance-baselines  Record measured averages into the -performance-baselines file\n");
+    fprintf(stream, "  -test-iterations <n>        Run each test n times (the maximum, with the two options below)\n");
+    fprintf(stream, "  -run-tests-until-failure    Repeat each test until it fails (at most 100 times by default)\n");
+    fprintf(stream, "  -retry-tests-on-failure     Retry a failing test until it passes (at most 3 times by default)\n");
     fprintf(stream, "  -h, --help                  Show this help message\n");
 }
 
@@ -73,7 +76,8 @@ static NSString *HostLibraryPath(void)
 static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString *targetName,
                           NSArray *onlyTestIdentifiers, NSArray *skipTestIdentifiers,
                           GSXCTestOutputFormat outputFormat, NSString *junitReportPath,
-                          NSString *performanceBaselinesPath, BOOL updatePerformanceBaselines)
+                          NSString *performanceBaselinesPath, BOOL updatePerformanceBaselines,
+                          GSXCTestRepetitionMode repetitionMode, NSInteger testIterations)
 {
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSString *executable = hostPath;
@@ -106,6 +110,8 @@ static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString
     [config setObject:skipTestIdentifiers forKey:@"skip"];
     [config setObject:(outputFormat == GSXCTestOutputFormatApple ? @"apple" : @"classic") forKey:@"outputFormat"];
     [config setObject:statusFile forKey:@"statusFile"];
+    [config setObject:[NSNumber numberWithInt:repetitionMode] forKey:@"repetitionMode"];
+    [config setObject:[NSNumber numberWithInteger:testIterations] forKey:@"testIterations"];
     if (performanceBaselinesPath != nil) {
         [config setObject:([performanceBaselinesPath isAbsolutePath] ? performanceBaselinesPath
                            : [[fileManager currentDirectoryPath] stringByAppendingPathComponent:performanceBaselinesPath])
@@ -215,6 +221,10 @@ int main(int argc, char *argv[]) {
     NSString *hostPath = nil;
     NSString *performanceBaselinesPath = nil;
     BOOL updatePerformanceBaselines = NO;
+    NSInteger testIterations = 0;
+    BOOL runUntilFailure = NO;
+    BOOL retryOnFailure = NO;
+    GSXCTestRepetitionMode repetitionMode = GSXCTestRepetitionNone;
 
     if (argc == 1) {
         PrintUsage(stderr);
@@ -292,6 +302,26 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        if ([argument isEqualToString:@"-test-iterations"]) {
+            testIterations = (i + 1 < argc) ? atoi(argv[++i]) : 0;
+            if (testIterations < 1) {
+                fprintf(stderr, "xctest: -test-iterations needs a number of at least 1\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            continue;
+        }
+
+        if ([argument isEqualToString:@"-run-tests-until-failure"]) {
+            runUntilFailure = YES;
+            continue;
+        }
+
+        if ([argument isEqualToString:@"-retry-tests-on-failure"]) {
+            retryOnFailure = YES;
+            continue;
+        }
+
         if ([argument isEqualToString:@"-update-performance-baselines"]) {
             updatePerformanceBaselines = YES;
             continue;
@@ -332,6 +362,20 @@ int main(int argc, char *argv[]) {
         testBundlePath = argument;
     }
 
+    if (runUntilFailure && retryOnFailure) {
+        fprintf(stderr, "xctest: -run-tests-until-failure and -retry-tests-on-failure can't be combined\n");
+        goto cleanup;
+    }
+    if (runUntilFailure) {
+        repetitionMode = GSXCTestRepetitionUntilFailure;
+        testIterations = testIterations ? testIterations : 100;
+    } else if (retryOnFailure) {
+        repetitionMode = GSXCTestRepetitionRetryOnFailure;
+        testIterations = testIterations ? testIterations : 3;
+    } else if (testIterations > 0) {
+        repetitionMode = GSXCTestRepetitionFixed;
+    }
+
     if (updatePerformanceBaselines && performanceBaselinesPath == nil) {
         fprintf(stderr, "xctest: -update-performance-baselines needs -performance-baselines <path>\n");
         goto cleanup;
@@ -347,7 +391,8 @@ int main(int argc, char *argv[]) {
     if (hostPath != nil && !listTests) {
         exitCode = RunTestsInHost(hostPath, testBundlePath, TargetNameForBundlePath(testBundlePath),
                                   onlyTestIdentifiers, skipTestIdentifiers, outputFormat, junitReportPath,
-                                  performanceBaselinesPath, updatePerformanceBaselines);
+                                  performanceBaselinesPath, updatePerformanceBaselines,
+                                  repetitionMode, testIterations);
         goto cleanup;
     }
 
@@ -377,6 +422,8 @@ int main(int argc, char *argv[]) {
     [runner setTestBundle:testBundle];
     [runner setPerformanceBaselinesPath:performanceBaselinesPath];
     [runner setUpdatePerformanceBaselines:updatePerformanceBaselines];
+    [runner setRepetitionMode:repetitionMode];
+    [runner setTestIterations:(NSUInteger)testIterations];
     [runner setJunitReportPath:junitReportPath];
     BOOL result = [runner runTestsForTargetName:targetName
                             onlyTestIdentifiers:onlyTestIdentifiers
