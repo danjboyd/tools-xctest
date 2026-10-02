@@ -91,6 +91,8 @@ FooTests.m:12: error: -[FooTests testBar] : ((1 + 1) equal to (3)) failed: ("2")
 Test Case '-[FooTests testBar]' failed (0.001 seconds).
 ```
 
+For CI, `-junit-report <path>` also writes the results as JUnit XML (one `<testsuite>` per test class; assertion failures as `<failure>`, uncaught exceptions as `<error>`, skips as `<skipped>`), which GitHub Actions, GitLab CI and Jenkins can display.
+
 Automated CLI regression tests can be run with `make check` or `meson test -C build`.
 
 ## License

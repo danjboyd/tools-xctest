@@ -139,3 +139,17 @@ typedef enum {
 /*! Output in the format of Apple's xctest, on stdout. */
 @interface GSXCTestAppleReporter : NSObject <GSXCTestReporter>
 @end
+
+/*!
+ * Writes a JUnit XML report when the run finishes. Each test class is a
+ * <testsuite>; failures from uncaught exceptions are <error>s, others are
+ * <failure>s. A failed +tearDown is reported as an extra "+tearDown" case.
+ */
+@interface GSXCTestJUnitReporter : NSObject <GSXCTestReporter> {
+    NSString *_path;
+    BOOL _wroteReport;
+}
+- (id) initWithPath: (NSString *)path;
+/*! NO until the report has been written successfully. */
+@property (readonly) BOOL wroteReport;
+@end

@@ -192,6 +192,7 @@ static NSString *GSDescribeException(NSException *exception)
 
 @synthesize outputFormat;
 @synthesize bundleName;
+@synthesize junitReportPath;
 
 - (id)init
 {
@@ -208,6 +209,7 @@ static NSString *GSDescribeException(NSException *exception)
     [runLock release];
     [reporters release];
     [bundleName release];
+    [junitReportPath release];
     [super dealloc];
 }
 
@@ -393,8 +395,12 @@ static NSString *GSDescribeException(NSException *exception)
         ? (id<GSXCTestReporter>)[[[GSXCTestAppleReporter alloc] init] autorelease]
         : (id<GSXCTestReporter>)[[[GSXCTestClassicReporter alloc] init] autorelease];
 
+    GSXCTestJUnitReporter *junitReporter = junitReportPath
+        ? [[[GSXCTestJUnitReporter alloc] initWithPath:junitReportPath] autorelease]
+        : nil;
+
     [reporters release];
-    reporters = [[NSArray alloc] initWithObjects:consoleReporter, nil];
+    reporters = [[NSArray alloc] initWithObjects:consoleReporter, junitReporter, nil];
 
     [run setFiltersActive:filtersActive];
     [run setStartDate:[NSDate date]];
@@ -438,7 +444,11 @@ static NSString *GSDescribeException(NSException *exception)
                     [test setStartDate:[NSDate date]];
                     currentTestResult = test;
                     GS_REPORT(reporters, testDidStart:test)
-                    [self recordFailureWithMessage:@"+setUp failed" filePath:nil lineNumber:0 unexpected:NO];
+                    GSXCTestIssue *cause = [[suite classFailures] objectAtIndex:0];
+                    [self recordFailureWithMessage:[NSString stringWithFormat:@"+setUp failed: %@", [cause message]]
+                                          filePath:[cause filePath]
+                                        lineNumber:[cause lineNumber]
+                                        unexpected:[cause unexpected]];
                     [test setStatus:GSXCTestStatusFailed];
                     currentTestResult = nil;
                     GS_REPORT(reporters, testDidFinish:test)
@@ -464,7 +474,7 @@ static NSString *GSDescribeException(NSException *exception)
 
     [runLock unlock];
     
-    return ![run hasFailed];
+    return ![run hasFailed] && (junitReporter == nil || [junitReporter wroteReport]);
 }
 
 - (BOOL)runClassMethod:(SEL)selector ofClass:(Class)testCaseClass
