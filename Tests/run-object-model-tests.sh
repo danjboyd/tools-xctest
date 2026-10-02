@@ -64,4 +64,13 @@ run_fixture ObjectModelFixture -list-tests -only-testing:ObjectModelFixture/Gett
 [ "$output" = $'ObjectModelFixture/GetterTests/testOnewayVoid\nObjectModelFixture/GetterTests/testReal' ] \
   || fail "expected only void test methods to be listed, got: $output"
 
+# Suites containing suites: skip counts, and failing +setUp.
+run_fixture ObjectModelFixture -only-testing:ObjectModelFixture/NestedSuiteRunTests -only-testing:ObjectModelFixture/NestedSuiteTests
+assert_status 0
+assert_contains "NestedSuiteRunTests: 2 tests PASSED"
+assert_contains "NestedSuiteTests: 1 tests PASSED"
+# The suite run inside a test isn't reported as a class of its own.
+assert_not_contains "NestedSuiteTests +setUp FAILED"
+assert_not_contains "+tearDown FAILED"
+
 echo "Object model tests passed."

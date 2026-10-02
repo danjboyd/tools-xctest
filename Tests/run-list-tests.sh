@@ -51,4 +51,18 @@ else
   assert_contains '"identifier": "FilterFixture/BetaTests/testThree"'
 fi
 
+# A bundle whose name has no basename still gets a complete JSON listing.
+odd_dir=$(mktemp -d)
+cp -r "$source_root/Tests/FilterFixture/FilterFixture.bundle" "$odd_dir/.bundle"
+set +e
+output=$(LD_LIBRARY_PATH="$xctest_lib_dir${runtime_lib_dirs:+:$runtime_lib_dirs}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+  "$xctest_bin" -list-tests-json "$odd_dir/.bundle" 2>&1)
+status=$?
+set -e
+rm -rf "$odd_dir"
+assert_status 0
+assert_contains '"tests"'
+assert_contains '"target"'
+assert_contains '"identifier"'
+
 echo "Test listing tests passed."

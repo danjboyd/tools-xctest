@@ -251,3 +251,79 @@
 - (void)testReal { }
 
 @end
+
+// Its +setUp fails only when ProgrammaticTests asks it to, and its default
+// suite nests another suite.
+static BOOL failNestedSetUp = NO;
+
+@interface NestedSuiteTests : XCTestCase
+@end
+
+@implementation NestedSuiteTests
+
++ (XCTestSuite *)defaultTestSuite
+{
+    XCTestSuite *suite = [super defaultTestSuite];
+    XCTestSuite *nested = [XCTestSuite testSuiteWithName:@"nested"];
+
+    [nested addTest:[InnerTests testCaseWithSelector:@selector(testInnerPasses)]];
+    [suite addTest:nested];
+    return suite;
+}
+
++ (void)setUp
+{
+    if (failNestedSetUp) {
+        [NSException raise:NSInternalInconsistencyException format:@"nested +setUp failure"];
+    }
+}
+
+- (void)testOwn { }
+
+@end
+
+@interface NestedSuiteRunTests : XCTestCase
+@end
+
+@implementation NestedSuiteRunTests
+
+- (void)testSkippedCountsAcrossNestedSuites
+{
+    XCTestSuite *outer = [XCTestSuite testSuiteWithName:@"outer"];
+    XCTestSuite *inner = [XCTestSuite testSuiteWithName:@"inner"];
+
+    // One of two nested test cases skipped: the outer suite isn't skipped.
+    [inner addTest:[InnerTests testCaseWithSelector:@selector(testInnerPasses)]];
+    [inner addTest:[InnerTests testCaseWithSelector:@selector(testInnerSkips)]];
+    [outer addTest:inner];
+    [outer runTest];
+    XCTAssertFalse([[outer testRun] hasBeenSkipped]);
+    XCTAssertEqual([[outer testRun] skipCount], (NSUInteger)1);
+    XCTAssertEqual([[outer testRun] executionCount], (NSUInteger)2);
+
+    // Every nested test case skipped: it is.
+    XCTestSuite *allSkipped = [XCTestSuite testSuiteWithName:@"all skipped"];
+    XCTestSuite *skippedInner = [XCTestSuite testSuiteWithName:@"skipped inner"];
+    [skippedInner addTest:[InnerTests testCaseWithSelector:@selector(testInnerSkips)]];
+    [skippedInner addTest:[InnerTests testCaseWithSelector:@selector(testInnerSkips)]];
+    [allSkipped addTest:skippedInner];
+    [allSkipped runTest];
+    XCTAssertTrue([[allSkipped testRun] hasBeenSkipped]);
+}
+
+- (void)testFailedSetUpWithNestedSuite
+{
+    XCTestSuite *suite = [NestedSuiteTests defaultTestSuite];
+
+    failNestedSetUp = YES;
+    [suite runTest];
+    failNestedSetUp = NO;
+
+    // Both test cases (one inside the nested suite) failed without running.
+    XCTAssertEqual([[suite testRun] testCaseCount], (NSUInteger)2);
+    XCTAssertEqual([[suite testRun] executionCount], (NSUInteger)2);
+    XCTAssertEqual([[suite testRun] totalFailureCount], (NSUInteger)3);  // +setUp, and each test
+    XCTAssertFalse([[suite testRun] hasSucceeded]);
+}
+
+@end

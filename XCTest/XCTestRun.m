@@ -351,7 +351,10 @@ NSString *_GSXCTDescribeException(NSException *exception)
 
 - (BOOL) hasBeenSkipped
 {
-    return [_testRuns count] > 0 && [self skipCount] == [_testRuns count];
+    // Both counts are of test cases across all nested suites.
+    NSUInteger executed = [self executionCount];
+
+    return executed > 0 && [self skipCount] == executed;
 }
 
 - (NSArray *) _gsOwnIssues

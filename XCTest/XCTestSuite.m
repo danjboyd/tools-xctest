@@ -181,6 +181,43 @@ NSArray *_GSXCTestCaseSubclasses(void)
 
 @end
 
+@implementation XCTestSuite (GSPrivate)
+
+- (void) _gsRecordChildrenWithoutRunning: (GSXCTestIssue *)issue failing: (BOOL)failing
+{
+    XCTestRun *run = [[[self testRunClass] alloc] initWithTest:self];
+
+    [self _gsSetTestRun:run];
+    [run start];
+    for (XCTest *test in _tests) {
+        @autoreleasepool {
+            if (failing && [test respondsToSelector:@selector(_gsFailWithoutRunning:)]) {
+                [(id)test _gsFailWithoutRunning:issue];
+            } else if (!failing && [test respondsToSelector:@selector(_gsSkipWithoutRunning:)]) {
+                [(id)test _gsSkipWithoutRunning:issue];
+            } else {
+                // Some other XCTest subclass: nothing better than running it.
+                [test runTest];
+            }
+            [(XCTestSuiteRun *)run addTestRun:[test testRun]];
+        }
+    }
+    [run stop];
+    [run release];
+}
+
+- (void) _gsFailWithoutRunning: (GSXCTestIssue *)cause
+{
+    [self _gsRecordChildrenWithoutRunning:cause failing:YES];
+}
+
+- (void) _gsSkipWithoutRunning: (GSXCTestIssue *)skip
+{
+    [self _gsRecordChildrenWithoutRunning:skip failing:NO];
+}
+
+@end
+
 // The class suite whose tests are running. Not retained.
 static GSXCTestCaseSuite *GSCurrentClassSuite = nil;
 
@@ -314,12 +351,14 @@ static NSUInteger GSRepetitionIterations = 1;
                     continue;
                 }
 
-                if (runTests) {
+                // Test cases and nested suites both know how to record
+                // themselves as failed or skipped without running.
+                if (runTests || ![test respondsToSelector:@selector(_gsFailWithoutRunning:)]) {
                     [test runTest];
                 } else if (!classSetUpSucceeded) {
-                    [(XCTestCase *)test _gsFailWithoutRunning:cause];
+                    [(id)test _gsFailWithoutRunning:cause];
                 } else {
-                    [(XCTestCase *)test _gsSkipWithoutRunning:classSkip];
+                    [(id)test _gsSkipWithoutRunning:classSkip];
                 }
                 [(XCTestSuiteRun *)run addTestRun:[test testRun]];
             }
