@@ -101,6 +101,10 @@ assert_not_contains "fixture: StopAfterFailureTests continued"
 assert_contains "fixture: StopAfterFailureTests tearDown ran"
 assert_contains "StopAfterFailureTests: 1/1 tests FAILED"
 
+# ...including when the failure happens inside another assertion's expression.
+assert_not_contains "fixture: StopInsideAssertionTests continued"
+assert_contains "StopInsideAssertionTests: 1/1 tests FAILED"
+
 # continueAfterFailure defaults to YES.
 assert_contains "fixture: ContinueAfterFailureTests continued"
 assert_contains "ContinueAfterFailureTests: 1/1 tests FAILED"
@@ -110,5 +114,51 @@ assert_contains "fixture: InheritedBaseTests.testInherited"
 assert_contains "fixture: InheritedDerivedTests.testInherited"
 assert_contains "fixture: InheritedDerivedTests.testOwn"
 assert_contains "InheritedDerivedTests: 2 tests PASSED"
+
+# XCTSkip stops the test and reports it as skipped; teardown still runs.
+assert_contains "testSkip SKIPPED at "
+assert_contains "fixture skip reason 42"
+assert_not_contains "fixture: SkipTests continued"
+assert_contains "fixture: SkipTests tearDown ran"
+assert_contains "SkipTests: 0 tests PASSED, 1 skipped"
+
+# XCTSkipIf / XCTSkipUnless only skip when their condition says so.
+assert_contains "fixture: SkipConditionTests.testSkipIfFalse continued"
+assert_not_contains "fixture: SkipConditionTests.testSkipIfTrue continued"
+assert_contains "(1 + 1 == 2) is true: fixture skipIf"
+assert_not_contains "fixture: SkipConditionTests.testSkipUnlessFalse continued"
+assert_contains "(1 + 1 == 3) is false"
+assert_contains "fixture: SkipConditionTests.testSkipUnlessTrue continued"
+assert_contains "SkipConditionTests: 2 tests PASSED, 2 skipped"
+
+# Skipping in setUp skips the test body; teardown still runs.
+assert_not_contains "fixture: SkipInSetUpTests test ran"
+assert_contains "fixture: SkipInSetUpTests tearDown ran"
+assert_contains "SkipInSetUpTests: 0 tests PASSED, 1 skipped"
+
+# A skip raised inside an assertion's expression is a skip, not a failure.
+assert_not_contains "fixture: SkipInsideAssertionTests continued"
+assert_contains "SkipInsideAssertionTests: 0 tests PASSED, 1 skipped"
+
+# A failure recorded before a skip still fails the test.
+assert_contains "FailThenSkipTests: 1/1 tests FAILED"
+
+# An exception while evaluating a skip condition is a failure, not a skip.
+assert_contains "([self throwingCondition]) threw exception: fixture condition exception"
+assert_contains "fixture: SkipConditionThrowsTests continued"
+assert_contains "SkipConditionThrowsTests: 1/1 tests FAILED"
+
+assert_contains "tests skipped)"
+
+# Skipped tests do not make the run fail.
+set +e
+output=$(LD_LIBRARY_PATH="$xctest_lib_dir${runtime_lib_dirs:+:$runtime_lib_dirs}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+  "$xctest_bin" "$fixture_bundle" \
+  -only-testing:LifecycleFixture/SkipTests \
+  -only-testing:LifecycleFixture/SkipConditionTests 2>&1)
+status=$?
+set -e
+[ "$status" -eq 0 ] || fail "expected a run with only passed and skipped tests to succeed"
+assert_contains "2 tests PASSED (3 tests skipped)"
 
 echo "Lifecycle tests passed."

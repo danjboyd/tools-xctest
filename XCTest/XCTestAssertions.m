@@ -24,6 +24,9 @@
 @implementation _XCTestCaseInterruptionException
 @end
 
+@implementation _XCTSkipFailureException
+@end
+
 @interface GSXCTestRunner (GSPrivate)
 - (void)registerAssertionFailed;
 @end
@@ -57,6 +60,32 @@ void _XCTPreformattedFailureHandler(XCTestCase *test, BOOL expected, NSString *f
                                                       reason:@"Test stopped after failure (continueAfterFailure is NO)"
                                                     userInfo:nil] raise];
     }
+}
+
+void _XCTSkipHandler(XCTestCase *test, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...)
+{
+    NSString *message = nil;
+    NSString *reason = nil;
+
+    if ([format length] > 0) {
+        va_list args;
+        va_start(args, format);
+        message = [[[NSString alloc] initWithFormat:format arguments:args] autorelease];
+        va_end(args);
+    }
+
+    // The runner logs the reason as "SKIPPED <reason>".
+    reason = [NSString stringWithFormat:@"at %s:%lu", filePath, (unsigned long)lineNumber];
+    if ([condition length] > 0) {
+        reason = [reason stringByAppendingFormat:@", %@", condition];
+    }
+    if ([message length] > 0) {
+        reason = [reason stringByAppendingFormat:@": %@", message];
+    }
+
+    [[_XCTSkipFailureException exceptionWithName:@"_XCTSkipFailureException"
+                                          reason:reason
+                                        userInfo:nil] raise];
 }
 
 NSString * _XCTFailureFormat (_XCTAssertionType assertionType, NSUInteger formatIndex)

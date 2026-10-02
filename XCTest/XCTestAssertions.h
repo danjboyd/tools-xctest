@@ -246,3 +246,30 @@
 #define XCTAssertNoThrowSpecificNamed(expression, exception_class, exception_name, ...) \
     _XCTPrimitiveAssertNoThrowSpecificNamed(self, expression, @#expression, exception_class, exception_name, __VA_ARGS__)
 
+/*!
+ * @define XCTSkip(...)
+ * Skips the rest of the current test. A skipped test is reported as skipped
+ * rather than passed or failed, unless it had already failed. Teardown still runs.
+ * @param ... An optional supplementary description of the skip. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
+*/
+#define XCTSkip(...) \
+    _XCTPrimitiveSkip(self, __VA_ARGS__)
+
+/*!
+ * @define XCTSkipIf(expression, ...)
+ * Skips the rest of the current test when \a expression is true.
+ * @param expression An expression of boolean type.
+ * @param ... An optional supplementary description of the skip. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
+*/
+#define XCTSkipIf(expression, ...) \
+    _XCTPrimitiveSkipWhen(self, expression, @#expression, YES, __VA_ARGS__)
+
+/*!
+ * @define XCTSkipUnless(expression, ...)
+ * Skips the rest of the current test when \a expression is false.
+ * @param expression An expression of boolean type.
+ * @param ... An optional supplementary description of the skip. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
+*/
+#define XCTSkipUnless(expression, ...) \
+    _XCTPrimitiveSkipWhen(self, expression, @#expression, NO, __VA_ARGS__)
+

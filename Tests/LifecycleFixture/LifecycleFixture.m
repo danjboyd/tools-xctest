@@ -184,3 +184,129 @@
 - (void)testOwn { NSLog(@"fixture: InheritedDerivedTests.testOwn"); }
 
 @end
+
+@interface SkipTests : XCTestCase
+@end
+
+@implementation SkipTests
+
+- (void)testSkip
+{
+    XCTSkip(@"fixture skip reason %d", 42);
+    NSLog(@"fixture: SkipTests continued");
+}
+
+- (void)tearDown { NSLog(@"fixture: SkipTests tearDown ran"); }
+
+@end
+
+@interface SkipConditionTests : XCTestCase
+@end
+
+@implementation SkipConditionTests
+
+- (void)testSkipIfFalse
+{
+    XCTSkipIf(1 + 1 == 3);
+    NSLog(@"fixture: SkipConditionTests.testSkipIfFalse continued");
+}
+
+- (void)testSkipIfTrue
+{
+    XCTSkipIf(1 + 1 == 2, @"fixture skipIf");
+    NSLog(@"fixture: SkipConditionTests.testSkipIfTrue continued");
+}
+
+- (void)testSkipUnlessFalse
+{
+    XCTSkipUnless(1 + 1 == 3);
+    NSLog(@"fixture: SkipConditionTests.testSkipUnlessFalse continued");
+}
+
+- (void)testSkipUnlessTrue
+{
+    XCTSkipUnless(1 + 1 == 2);
+    NSLog(@"fixture: SkipConditionTests.testSkipUnlessTrue continued");
+}
+
+@end
+
+@interface SkipInSetUpTests : XCTestCase
+@end
+
+@implementation SkipInSetUpTests
+
+- (void)setUp { XCTSkip(@"fixture skip in setUp"); }
+- (void)testShouldNotRun { NSLog(@"fixture: SkipInSetUpTests test ran"); }
+- (void)tearDown { NSLog(@"fixture: SkipInSetUpTests tearDown ran"); }
+
+@end
+
+@interface SkipInsideAssertionTests : XCTestCase
+@end
+
+@implementation SkipInsideAssertionTests
+
+- (void)skipFromHelper
+{
+    XCTSkip(@"fixture skip from helper");
+}
+
+- (void)testSkipInsideAssertion
+{
+    XCTAssertNoThrow([self skipFromHelper]);
+    NSLog(@"fixture: SkipInsideAssertionTests continued");
+}
+
+@end
+
+@interface FailThenSkipTests : XCTestCase
+@end
+
+@implementation FailThenSkipTests
+
+- (void)testFailThenSkip
+{
+    XCTFail(@"fixture failure before skip");
+    XCTSkip();
+}
+
+@end
+
+@interface SkipConditionThrowsTests : XCTestCase
+@end
+
+@implementation SkipConditionThrowsTests
+
+- (BOOL)throwingCondition
+{
+    [NSException raise:NSInternalInconsistencyException format:@"fixture condition exception"];
+    return YES;
+}
+
+- (void)testConditionThrows
+{
+    XCTSkipIf([self throwingCondition]);
+    NSLog(@"fixture: SkipConditionThrowsTests continued");
+}
+
+@end
+
+@interface StopInsideAssertionTests : XCTestCase
+@end
+
+@implementation StopInsideAssertionTests
+
+- (void)failFromHelper
+{
+    XCTFail(@"fixture failure from helper");
+}
+
+- (void)testStopsInsideAssertion
+{
+    self.continueAfterFailure = NO;
+    XCTAssertNoThrow([self failFromHelper]);
+    NSLog(@"fixture: StopInsideAssertionTests continued");
+}
+
+@end

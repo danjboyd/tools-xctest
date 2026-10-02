@@ -34,6 +34,13 @@
 @interface _XCTestCaseInterruptionException : NSException
 @end
 
+// Raised by XCTSkip and friends. Subclassing the interruption exception
+// means the assertion macros re-raise it rather than recording a failure.
+@interface _XCTSkipFailureException : _XCTestCaseInterruptionException
+@end
+
+void _XCTSkipHandler(XCTestCase *test, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...);
+
 void _XCTFailureHandler(XCTestCase *test, BOOL expected, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...);
 
 void _XCTPreformattedFailureHandler(XCTestCase *test, BOOL expected, NSString *filePath, NSUInteger lineNumber, NSString *condition, NSString *message);
@@ -358,6 +365,7 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     @try { \
         (void)(expression); \
     } \
+    @catch (_XCTestCaseInterruptionException *interruption) { [interruption raise]; } \
     @catch (...) { \
         __didThrow = YES; \
     } \
@@ -372,6 +380,7 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     @try { \
         (void)(expression); \
     } \
+    @catch (_XCTestCaseInterruptionException *interruption) { [interruption raise]; } \
     @catch (exception_class *exception) { \
         __didThrow = YES; \
     } \
@@ -394,6 +403,7 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     @try { \
         (void)(expression); \
     } \
+    @catch (_XCTestCaseInterruptionException *interruption) { [interruption raise]; } \
     @catch (exception_class *exception) { \
         __didThrow = YES; \
         if (![exception_name isEqualToString:[exception name]]) { \
@@ -418,6 +428,7 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     @try { \
         (void)(expression); \
     } \
+    @catch (_XCTestCaseInterruptionException *interruption) { [interruption raise]; } \
     @catch (NSException *exception) { \
         _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NoThrow, 0, expressionStr, [exception reason]), __VA_ARGS__); \
     } \
@@ -431,6 +442,7 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     @try { \
         (void)(expression); \
     } \
+    @catch (_XCTestCaseInterruptionException *interruption) { [interruption raise]; } \
     @catch (exception_class *exception) { \
         _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NoThrowSpecific, 0, expressionStr, @#exception_class, [exception class], [exception reason]), __VA_ARGS__); \
     } \
@@ -444,6 +456,7 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     @try { \
         (void)(expression); \
     } \
+    @catch (_XCTestCaseInterruptionException *interruption) { [interruption raise]; } \
     @catch (exception_class *exception) { \
         if ([exception_name isEqualToString:[exception name]]) { \
             _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NoThrowSpecificNamed, 0, expressionStr, @#exception_class, exception_name, [exception class], [exception name], [exception reason]), __VA_ARGS__); \
@@ -451,6 +464,29 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     } \
     @catch (...) { \
         ; \
+    } \
+})
+
+#define _XCTPrimitiveSkip(test, ...) \
+({ \
+    _XCTSkipHandler(test, __FILE__, __LINE__, nil, @"" __VA_ARGS__); \
+})
+
+#define _XCTPrimitiveSkipWhen(test, expression, expressionStr, skipWhen, ...) \
+({ \
+    BOOL shouldSkip = NO; \
+    @try { \
+        shouldSkip = (!!(expression) == (skipWhen)); \
+    } \
+    @catch (_XCTestCaseInterruptionException *interruption) { [interruption raise]; } \
+    @catch (NSException *exception) { \
+        _XCTRegisterFailure(test, ([NSString stringWithFormat:@"(%@) threw exception: %@", expressionStr, [exception reason]]), __VA_ARGS__); \
+    } \
+    @catch (...) { \
+        _XCTRegisterFailure(test, ([NSString stringWithFormat:@"(%@) threw unknown exception", expressionStr]), __VA_ARGS__); \
+    } \
+    if (shouldSkip) { \
+        _XCTSkipHandler(test, __FILE__, __LINE__, [NSString stringWithFormat:@"(%@) is %@", expressionStr, (skipWhen) ? @"true" : @"false"], @"" __VA_ARGS__); \
     } \
 })
 

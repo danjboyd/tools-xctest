@@ -36,13 +36,19 @@
 - (void (^)(void))_gsPopTeardownBlock;
 @end
 
+typedef enum {
+    GSXCTestResultPassed,
+    GSXCTestResultFailed,
+    GSXCTestResultSkipped,
+} GSXCTestResult;
+
 @interface GSXCTestRunner ()
 - (BOOL)runTestsForTargetName:(NSString *)targetName
           onlyTestIdentifiers:(NSArray *)onlyTestIdentifiers
           skipTestIdentifiers:(NSArray *)skipTestIdentifiers
               legacyTestNames:(NSArray *)legacyTestNames;
 - (BOOL)runClassMethod:(SEL)selector ofClass:(Class)testCaseClass;
-- (BOOL)runTestMethod:(NSString *)methodName ofClass:(Class)testCaseClass;
+- (GSXCTestResult)runTestMethod:(NSString *)methodName ofClass:(Class)testCaseClass;
 - (BOOL)runPhase:(NSString *)phaseName
           ofTest:(NSString *)methodName
            block:(BOOL (^)(NSError **error))block;
@@ -176,6 +182,16 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     return [[names allObjects] sortedArrayUsingSelector:@selector(compare:)];
 }
 
+static NSString *GSSkippedSummary(NSUInteger skipCount)
+{
+    if (skipCount == 0) {
+        return @"";
+    }
+
+    return [NSString stringWithFormat:@" (%lu %@ skipped)",
+        (unsigned long)skipCount, skipCount == 1 ? @"test" : @"tests"];
+}
+
 @implementation GSXCTestRunner
 
 - (id)init
@@ -191,6 +207,7 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
 - (void)dealloc
 {
     [runLock release];
+    [skipReason release];
     [super dealloc];
 }
 
@@ -280,6 +297,7 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     NSUInteger testCaseFailureCount = 0;
     NSUInteger testCaseSuccessCount = 0;
     NSUInteger selectedTestCount = 0;
+    NSUInteger totalSkipCount = 0;
     
     NSArray *testCaseClasses = [ClassGetSubclasses([XCTestCase class])
         sortedArrayUsingComparator:^NSComparisonResult(id a, id b) {
@@ -291,6 +309,7 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
             NSString *className = NSStringFromClass(testCaseClass);
             NSUInteger methodFailureCount = 0;
             NSUInteger methodSuccessCount = 0;
+            NSUInteger methodSkipCount = 0;
             BOOL classTearDownFailed = NO;
             NSMutableArray *selectedMethodNames = [NSMutableArray array];
 
@@ -365,13 +384,20 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
                         NSLog(@"XCTest:     %@ FAILED, +setUp failed", methodName);
                         methodFailureCount++;
                     }
-                    else if ([self runTestMethod:methodName ofClass:testCaseClass])
-                    {
-                        methodSuccessCount++;
-                    }
                     else
                     {
-                        methodFailureCount++;
+                        switch ([self runTestMethod:methodName ofClass:testCaseClass])
+                        {
+                            case GSXCTestResultPassed:
+                                methodSuccessCount++;
+                                break;
+                            case GSXCTestResultSkipped:
+                                methodSkipCount++;
+                                break;
+                            case GSXCTestResultFailed:
+                                methodFailureCount++;
+                                break;
+                        }
                     }
                 }
 
@@ -382,19 +408,24 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
                 }
             }
             
-            if (methodFailureCount == 0 && methodSuccessCount == 0) {
+            NSString *skippedSuffix = methodSkipCount > 0
+                ? [NSString stringWithFormat:@", %lu skipped", (unsigned long)methodSkipCount]
+                : @"";
+            totalSkipCount += methodSkipCount;
+
+            if ([selectedMethodNames count] == 0) {
                 NSLog(@"XCTest:   %@ SKIPPED", className);
             }
             else if (methodFailureCount > 0) {
                 testCaseFailureCount++;
-                NSLog(@"XCTest:   %@: %lu/%lu tests FAILED", className, methodFailureCount, methodFailureCount + methodSuccessCount);
+                NSLog(@"XCTest:   %@: %lu/%lu tests FAILED%@", className, methodFailureCount, [selectedMethodNames count], skippedSuffix);
             }
             else if (classTearDownFailed) {
                 testCaseFailureCount++;
-                NSLog(@"XCTest:   %@: %lu tests passed, +tearDown FAILED", className, methodSuccessCount);
+                NSLog(@"XCTest:   %@: %lu tests passed%@, +tearDown FAILED", className, methodSuccessCount, skippedSuffix);
             } else {
                 testCaseSuccessCount++;
-                NSLog(@"XCTest:   %@: %lu tests PASSED", className, methodSuccessCount);
+                NSLog(@"XCTest:   %@: %lu tests PASSED%@", className, methodSuccessCount, skippedSuffix);
             }
         } // @autoreleasepool
     }
@@ -407,9 +438,9 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
         }
     }
     else if (testCaseFailureCount > 0) {
-        NSLog(@"XCTest: %lu/%lu test cases FAILED", testCaseFailureCount, testCaseFailureCount + testCaseSuccessCount);
+        NSLog(@"XCTest: %lu/%lu test cases FAILED%@", testCaseFailureCount, testCaseFailureCount + testCaseSuccessCount, GSSkippedSummary(totalSkipCount));
     } else {
-        NSLog(@"XCTest: %lu tests PASSED", testCaseSuccessCount);
+        NSLog(@"XCTest: %lu tests PASSED%@", testCaseSuccessCount, GSSkippedSummary(totalSkipCount));
     }
     
     [runLock unlock];
@@ -442,9 +473,9 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     return succeeded;
 }
 
-- (BOOL)runTestMethod:(NSString *)methodName ofClass:(Class)testCaseClass
+- (GSXCTestResult)runTestMethod:(NSString *)methodName ofClass:(Class)testCaseClass
 {
-    BOOL testSucceeded = NO;
+    GSXCTestResult result = GSXCTestResultPassed;
 
     NSLog(@"XCTest:     %@...", methodName);
 
@@ -454,6 +485,8 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
         void (^teardownBlock)(void) = nil;
 
         assertionFailureCount = 0;
+        [skipReason release];
+        skipReason = nil;
 
         BOOL setUpSucceeded = [self runPhase:@"setUpWithError:" ofTest:methodName block:^BOOL(NSError **error) {
             return [testCase setUpWithError:error];
@@ -490,14 +523,24 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
             return [testCase tearDownWithError:error];
         }];
 
-        testSucceeded = (assertionFailureCount == 0);
+        // A failure outranks a skip, as in Apple's XCTest.
+        if (assertionFailureCount > 0) {
+            result = GSXCTestResultFailed;
+        } else if (skipReason != nil) {
+            result = GSXCTestResultSkipped;
+        }
     }
 
-    if (!testSucceeded) {
+    if (result == GSXCTestResultFailed) {
         NSLog(@"XCTest:     %@ FAILED", methodName);
+    } else if (result == GSXCTestResultSkipped) {
+        NSLog(@"XCTest:     %@ SKIPPED %@", methodName, skipReason);
     }
 
-    return testSucceeded;
+    [skipReason release];
+    skipReason = nil;
+
+    return result;
 }
 
 - (BOOL)runPhase:(NSString *)phaseName
@@ -514,6 +557,12 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
             NSLog(@"XCTest:     %@ failed%@ - %@", methodName, where,
                 error ? [error localizedDescription] : @"returned NO without an error");
             [self registerAssertionFailed];
+        }
+    }
+    @catch (_XCTSkipFailureException *skip) {
+        // Remaining set up and the test body are skipped; teardown still runs.
+        if (skipReason == nil) {
+            skipReason = [[skip reason] copy];
         }
     }
     @catch (_XCTestCaseInterruptionException *interruption) {
