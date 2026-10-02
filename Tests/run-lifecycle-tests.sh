@@ -96,6 +96,9 @@ assert_not_contains "fixture: ClassSetUpThrowsTests test ran"
 assert_not_contains "fixture: ClassSetUpThrowsTests +tearDown ran"
 assert_contains "ClassSetUpThrowsTests: 1/1 tests FAILED"
 
+# A throwing +tearDown fails the class even though its tests passed.
+assert_contains "ClassTearDownThrowsTests: 1 tests passed, +tearDown FAILED"
+
 # continueAfterFailure = NO stops the test at the first failure; teardown runs.
 assert_not_contains "fixture: StopAfterFailureTests continued"
 assert_contains "fixture: StopAfterFailureTests tearDown ran"

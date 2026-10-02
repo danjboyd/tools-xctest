@@ -45,9 +45,9 @@ assert_matches "^Test Case '-\[SkipConditionTests testSkipIfFalse\]' passed \("
 assert_matches "^Test Suite 'SkipConditionTests' passed at "
 assert_matches "^Test Suite 'TestThrowsTests' failed at "
 assert_matches "^	 Executed 4 tests, with 2 tests skipped and 0 failures \(0 unexpected\) in [0-9.]+ \([0-9.]+\) seconds$"
-assert_matches "^	 Executed 1 test, with 2 failures \(1 unexpected\) in "
+assert_matches "^	 Executed 1 test, with 2 failures \(2 unexpected\) in "
 assert_matches "^Test Suite 'Selected tests' failed at "
-assert_matches "^	 Executed 7 tests, with 2 tests skipped and 4 failures \(2 unexpected\) in "
+assert_matches "^	 Executed 7 tests, with 2 tests skipped and 4 failures \(3 unexpected\) in "
 
 # Per-test durations are measured.
 run_fixture_stdout AsyncFixture -output-format apple -only-testing:AsyncFixture/AsyncPassingTests/testInvertedWaitsFullTimeout

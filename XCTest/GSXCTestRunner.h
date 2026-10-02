@@ -42,12 +42,17 @@ typedef enum {
     NSString *currentClassContext;
     GSXCTestOutputFormat outputFormat;
     NSString *bundleName;
+    NSString *junitReportPath;
 }
 
 @property GSXCTestOutputFormat outputFormat;
 
 /*! The test bundle's file name, used to name its suite in reports. */
 @property (copy) NSString *bundleName;
+
+/*! If set, a JUnit XML report is written here after each run. A run that
+ * cannot write its report counts as failed. */
+@property (copy) NSString *junitReportPath;
 
 - (BOOL)runAll;
 - (BOOL)runTestsNamed:(NSArray *)testNames; // nil for all tests

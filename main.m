@@ -31,6 +31,7 @@ static void PrintUsage(FILE *stream)
     fprintf(stream, "  -only-testing:<identifier>  Run only tests matching TestTarget[/TestClass[/TestMethod]]\n");
     fprintf(stream, "  -skip-testing:<identifier>  Skip tests matching TestTarget[/TestClass[/TestMethod]]\n");
     fprintf(stream, "  -output-format <format>     Console output: 'classic' (default) or 'apple'\n");
+    fprintf(stream, "  -junit-report <path>        Also write results to <path> as JUnit XML\n");
     fprintf(stream, "  -h, --help                  Show this help message\n");
 }
 
@@ -47,6 +48,7 @@ int main(int argc, char *argv[]) {
     NSMutableArray *skipTestIdentifiers = [NSMutableArray array];
     NSString *testBundlePath = nil;
     GSXCTestOutputFormat outputFormat = GSXCTestOutputFormatClassic;
+    NSString *junitReportPath = nil;
 
     if (argc == 1) {
         PrintUsage(stderr);
@@ -103,6 +105,16 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        if ([argument isEqualToString:@"-junit-report"]) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "xctest: missing path for -junit-report\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            junitReportPath = [NSString stringWithUTF8String:argv[++i]];
+            continue;
+        }
+
         if ([argument hasPrefix:@"-"]) {
             fprintf(stderr, "xctest: unknown option '%s'\n", argv[i]);
             PrintUsage(stderr);
@@ -140,6 +152,7 @@ int main(int argc, char *argv[]) {
     GSXCTestRunner *runner = [GSXCTestRunner sharedRunner];
     [runner setOutputFormat:outputFormat];
     [runner setBundleName:[testBundlePath lastPathComponent]];
+    [runner setJunitReportPath:junitReportPath];
     BOOL result = [runner runTestsForTargetName:targetName
                             onlyTestIdentifiers:onlyTestIdentifiers
                             skipTestIdentifiers:skipTestIdentifiers];

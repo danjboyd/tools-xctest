@@ -513,3 +513,191 @@ static NSString *GSAppleLocation(GSXCTestIssue *issue)
 }
 
 @end
+
+#pragma mark - JUnit reporter
+
+// Escapes text for XML attributes and content, dropping characters XML 1.0
+// does not allow.
+static NSString *GSXMLEscape(NSString *string)
+{
+    NSMutableString *escaped = [NSMutableString stringWithCapacity:[string length]];
+    NSUInteger length = [string length];
+
+    for (NSUInteger i = 0; i < length; i++) {
+        unichar c = [string characterAtIndex:i];
+
+        switch (c) {
+            case '&': [escaped appendString:@"&amp;"]; break;
+            case '<': [escaped appendString:@"&lt;"]; break;
+            case '>': [escaped appendString:@"&gt;"]; break;
+            case '"': [escaped appendString:@"&quot;"]; break;
+            case '\'': [escaped appendString:@"&apos;"]; break;
+            default:
+                if (c >= 0x20 || c == '\t' || c == '\n' || c == '\r') {
+                    [escaped appendFormat:@"%C", c];
+                }
+                break;
+        }
+    }
+
+    return escaped;
+}
+
+static NSString *GSJUnitIssueLine(GSXCTestIssue *issue)
+{
+    if ([issue filePath] == nil) {
+        return [issue message];
+    }
+
+    return [NSString stringWithFormat:@"%@:%lu: %@",
+        [issue filePath], (unsigned long)[issue lineNumber], [issue message]];
+}
+
+static NSString *GSJUnitTimestamp(NSDate *date)
+{
+    NSCalendarDate *calendarDate = [NSCalendarDate dateWithTimeIntervalSinceReferenceDate:
+        [date timeIntervalSinceReferenceDate]];
+
+    return [calendarDate descriptionWithCalendarFormat:@"%Y-%m-%dT%H:%M:%S"];
+}
+
+// Appends a <failure> or <error> element for a list of failures.
+static void GSAppendJUnitFailures(NSMutableString *xml, NSArray *failures)
+{
+    GSXCTestIssue *first = [failures objectAtIndex:0];
+    BOOL unexpected = NO;
+    NSMutableArray *lines = [NSMutableArray array];
+
+    for (GSXCTestIssue *failure in failures) {
+        if ([failure unexpected] && !unexpected) {
+            unexpected = YES;
+            first = failure;
+        }
+        [lines addObject:GSJUnitIssueLine(failure)];
+    }
+
+    [xml appendFormat:@"      <%@ message=\"%@\" type=\"%@\">%@</%@>\n",
+        unexpected ? @"error" : @"failure",
+        GSXMLEscape([first message]),
+        unexpected ? @"UncaughtException" : @"XCTestFailure",
+        GSXMLEscape([lines componentsJoinedByString:@"\n"]),
+        unexpected ? @"error" : @"failure"];
+}
+
+static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
+{
+    for (GSXCTestIssue *issue in issues) {
+        if ([issue unexpected]) {
+            return YES;
+        }
+    }
+
+    return NO;
+}
+
+@implementation GSXCTestJUnitReporter
+
+@synthesize wroteReport = _wroteReport;
+
+- (id) initWithPath: (NSString *)path
+{
+    self = [super init];
+    if (self) {
+        _path = [path copy];
+    }
+
+    return self;
+}
+
+- (void) dealloc
+{
+    [_path release];
+    [super dealloc];
+}
+
+- (void) runDidStart: (GSXCTestRunResult *)run {}
+- (void) suiteHasNoSelectedTests: (GSXCTestSuiteResult *)suite {}
+- (void) suiteDidStart: (GSXCTestSuiteResult *)suite {}
+- (void) testDidStart: (GSXCTestCaseResult *)test {}
+- (void) test: (GSXCTestCaseResult *)test didRecordFailure: (GSXCTestIssue *)failure {}
+- (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure {}
+- (void) testDidFinish: (GSXCTestCaseResult *)test {}
+- (void) suiteDidFinish: (GSXCTestSuiteResult *)suite {}
+
+- (void) runDidFinish: (GSXCTestRunResult *)run
+{
+    NSMutableString *suitesXML = [NSMutableString string];
+    NSMutableString *xml = [NSMutableString string];
+    NSUInteger totalTests = 0, totalFailures = 0, totalErrors = 0, totalSkipped = 0;
+    NSError *error = nil;
+
+    for (GSXCTestSuiteResult *suite in [run suiteResults]) {
+        NSMutableString *casesXML = [NSMutableString string];
+        NSMutableArray *tearDownFailures = [NSMutableArray array];
+        NSUInteger tests = 0, failures = 0, errors = 0, skipped = 0;
+
+        for (GSXCTestCaseResult *test in [suite testResults]) {
+            tests++;
+            [casesXML appendFormat:@"    <testcase classname=\"%@\" name=\"%@\" time=\"%.3f\"",
+                GSXMLEscape([test className]), GSXMLEscape([test methodName]), [test duration]];
+
+            if ([test status] == GSXCTestStatusFailed) {
+                if (GSIssuesIncludeUnexpected([test failures])) {
+                    errors++;
+                } else {
+                    failures++;
+                }
+                [casesXML appendString:@">\n"];
+                GSAppendJUnitFailures(casesXML, [test failures]);
+                [casesXML appendString:@"    </testcase>\n"];
+            } else if ([test status] == GSXCTestStatusSkipped) {
+                skipped++;
+                [casesXML appendFormat:@">\n      <skipped message=\"%@\"/>\n    </testcase>\n",
+                    GSXMLEscape(GSJUnitIssueLine([test skip]))];
+            } else {
+                [casesXML appendString:@"/>\n"];
+            }
+        }
+
+        for (GSXCTestIssue *failure in [suite classFailures]) {
+            if ([[failure context] isEqualToString:@"+tearDown"]) {
+                [tearDownFailures addObject:failure];
+            }
+        }
+        if ([tearDownFailures count] > 0) {
+            tests++;
+            if (GSIssuesIncludeUnexpected(tearDownFailures)) {
+                errors++;
+            } else {
+                failures++;
+            }
+            [casesXML appendFormat:@"    <testcase classname=\"%@\" name=\"+tearDown\" time=\"0.000\">\n",
+                GSXMLEscape([suite name])];
+            GSAppendJUnitFailures(casesXML, tearDownFailures);
+            [casesXML appendString:@"    </testcase>\n"];
+        }
+
+        [suitesXML appendFormat:@"  <testsuite name=\"%@\" tests=\"%lu\" failures=\"%lu\" errors=\"%lu\" skipped=\"%lu\" time=\"%.3f\" timestamp=\"%@\">\n%@  </testsuite>\n",
+            GSXMLEscape([suite name]), (unsigned long)tests, (unsigned long)failures,
+            (unsigned long)errors, (unsigned long)skipped, [suite duration],
+            GSJUnitTimestamp([suite startDate]), casesXML];
+
+        totalTests += tests;
+        totalFailures += failures;
+        totalErrors += errors;
+        totalSkipped += skipped;
+    }
+
+    [xml appendString:@"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"];
+    [xml appendFormat:@"<testsuites name=\"%@\" tests=\"%lu\" failures=\"%lu\" errors=\"%lu\" skipped=\"%lu\" time=\"%.3f\">\n%@</testsuites>\n",
+        GSXMLEscape([run bundleName]), (unsigned long)totalTests, (unsigned long)totalFailures,
+        (unsigned long)totalErrors, (unsigned long)totalSkipped, [run duration], suitesXML];
+
+    _wroteReport = [xml writeToFile:_path atomically:YES encoding:NSUTF8StringEncoding error:&error];
+    if (!_wroteReport) {
+        NSLog(@"XCTest: Could not write JUnit report to '%@': %@", _path,
+            error ? [error localizedDescription] : @"unknown error");
+    }
+}
+
+@end

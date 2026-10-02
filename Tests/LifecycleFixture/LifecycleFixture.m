@@ -310,3 +310,17 @@
 }
 
 @end
+
+@interface ClassTearDownThrowsTests : XCTestCase
+@end
+
+@implementation ClassTearDownThrowsTests
+
++ (void)tearDown
+{
+    [NSException raise:NSInternalInconsistencyException format:@"fixture +tearDown <exception> & \"quotes\""];
+}
+
+- (void)testPasses { }
+
+@end
