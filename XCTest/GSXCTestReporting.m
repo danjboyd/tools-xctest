@@ -61,6 +61,7 @@
 @synthesize methodName = _methodName;
 @synthesize status = _status;
 @synthesize failures = _failures;
+@synthesize expectedFailures = _expectedFailures;
 @synthesize skip = _skip;
 @synthesize startDate = _startDate;
 @synthesize duration = _duration;
@@ -72,6 +73,7 @@
         _className = [className copy];
         _methodName = [methodName copy];
         _failures = [[NSMutableArray alloc] init];
+        _expectedFailures = [[NSMutableArray alloc] init];
     }
 
     return self;
@@ -82,6 +84,7 @@
     [_className release];
     [_methodName release];
     [_failures release];
+    [_expectedFailures release];
     [_skip release];
     [_startDate release];
     [super dealloc];
@@ -336,6 +339,16 @@ static NSString *GSSkippedSummary(NSUInteger skipCount)
     }
 }
 
+- (void) test: (GSXCTestCaseResult *)test didRecordExpectedFailure: (GSXCTestIssue *)failure
+{
+    if ([failure filePath] != nil) {
+        NSLog(@"XCTest:     Expected failure (%@) at %@:%lu, %@", [failure context],
+            [failure filePath], (unsigned long)[failure lineNumber], [failure message]);
+    } else {
+        NSLog(@"XCTest:     Expected failure (%@): %@", [failure context], [failure message]);
+    }
+}
+
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure
 {
     if ([failure filePath] != nil) {
@@ -488,6 +501,12 @@ static NSString *GSAppleLocation(GSXCTestIssue *issue)
 {
     GSPrintLine([NSString stringWithFormat:@"%@: error: %@ : %@",
         GSAppleLocation(failure), GSAppleTestName(test), [failure message]]);
+}
+
+- (void) test: (GSXCTestCaseResult *)test didRecordExpectedFailure: (GSXCTestIssue *)failure
+{
+    GSPrintLine([NSString stringWithFormat:@"%@: %@ : Expected failure: %@: %@",
+        GSAppleLocation(failure), GSAppleTestName(test), [failure context], [failure message]]);
 }
 
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure
@@ -674,6 +693,7 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
 - (void) suiteDidStart: (GSXCTestSuiteResult *)suite {}
 - (void) testDidStart: (GSXCTestCaseResult *)test {}
 - (void) test: (GSXCTestCaseResult *)test didRecordFailure: (GSXCTestIssue *)failure {}
+- (void) test: (GSXCTestCaseResult *)test didRecordExpectedFailure: (GSXCTestIssue *)failure {}
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure {}
 - (void) testDidFinish: (GSXCTestCaseResult *)test {}
 - (void) suiteDidFinish: (GSXCTestSuiteResult *)suite {}
@@ -708,8 +728,29 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
                 skipped++;
                 [casesXML appendFormat:@">\n      <skipped message=\"%@\"/>\n    </testcase>\n",
                     GSXMLEscape(GSJUnitIssueLine([test skip]))];
+            } else if ([[test expectedFailures] count] > 0) {
+                [casesXML appendString:@">\n"];
             } else {
                 [casesXML appendString:@"/>\n"];
+            }
+
+            // Expected failures don't fail the test; list them as output.
+            if ([[test expectedFailures] count] > 0) {
+                NSMutableArray *lines = [NSMutableArray array];
+                for (GSXCTestIssue *expected in [test expectedFailures]) {
+                    [lines addObject:[NSString stringWithFormat:@"Expected failure (%@): %@",
+                        [expected context], GSJUnitIssueLine(expected)]];
+                }
+                if ([test status] == GSXCTestStatusPassed) {
+                    [casesXML appendFormat:@"      <system-out>%@</system-out>\n    </testcase>\n",
+                        GSXMLEscape([lines componentsJoinedByString:@"\n"])];
+                } else {
+                    // Insert before the closing tag written above.
+                    NSRange close = [casesXML rangeOfString:@"    </testcase>\n" options:NSBackwardsSearch];
+                    [casesXML insertString:[NSString stringWithFormat:@"      <system-out>%@</system-out>\n",
+                                               GSXMLEscape([lines componentsJoinedByString:@"\n"])]
+                                   atIndex:close.location];
+                }
             }
         }
 
@@ -862,6 +903,16 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
 
     [[_currentTest failures] addObject:issue];
     GS_REPORT(test:_currentTest didRecordFailure:issue)
+}
+
+- (void) _gsTestCase: (XCTestCase *)testCase didRecordExpectedFailure: (GSXCTestIssue *)issue
+{
+    if (testCase != _currentTestCase || _currentTest == nil) {
+        return;
+    }
+
+    [[_currentTest expectedFailures] addObject:issue];
+    GS_REPORT(test:_currentTest didRecordExpectedFailure:issue)
 }
 
 - (void) _gsTestSuite: (XCTestSuite *)testSuite didRecordIssue: (GSXCTestIssue *)issue

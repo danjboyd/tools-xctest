@@ -151,6 +151,7 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     [self _gsInvalidateExpectations];
     [_teardownBlocks release];
     [_invocation release];
+    [_expectedFailureScopes release];
     [super dealloc];
 }
 
@@ -187,6 +188,17 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
                                atLine: (NSUInteger)lineNumber
                              expected: (BOOL)expected
 {
+    GSXCTestIssue *failure = [GSXCTestIssue issueWithMessage:description
+                                                    filePath:filePath
+                                                  lineNumber:lineNumber
+                                                  unexpected:!expected];
+
+    // Failures inside XCTExpectFailure are reported, but neither fail nor
+    // stop the test.
+    if ([self _gsAbsorbExpectedFailure:failure]) {
+        return;
+    }
+
     if ([self testRun] != nil) {
         [[self testRun] recordFailureWithDescription:description
                                               inFile:filePath
@@ -337,6 +349,11 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
                           expected:NO];
         }
 
+        @try {
+            [self _gsFinishExpectedFailures];
+        }
+        @catch (NSException *exception) {
+        }
         [self _gsInvalidateExpectations];
     }
 

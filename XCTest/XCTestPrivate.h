@@ -93,6 +93,8 @@ NSString *_GSXCTDescribeException(NSException *exception);
 - (void) _gsTestCase: (XCTestCase *)testCase didRecordIssue: (GSXCTestIssue *)issue;
 - (void) _gsTestSuite: (XCTestSuite *)testSuite didRecordIssue: (GSXCTestIssue *)issue;
 - (void) _gsTestCase: (XCTestCase *)testCase didSkipWithIssue: (GSXCTestIssue *)issue;
+// A failure absorbed by XCTExpectFailure; its context is the reason.
+- (void) _gsTestCase: (XCTestCase *)testCase didRecordExpectedFailure: (GSXCTestIssue *)issue;
 @end
 
 @interface XCTestObservationCenter (GSPrivate)
@@ -111,6 +113,17 @@ NSString *_GSXCTDescribeException(NSException *exception);
 - (void) _gsFailWithoutRunning: (GSXCTestIssue *)cause;
 // Records the test as started and skipped, without running it.
 - (void) _gsSkipWithoutRunning: (GSXCTestIssue *)skip;
+@end
+
+@interface XCTestCase (GSExpectedFailures)
+// Active XCTExpectFailure scopes, innermost last.
+- (NSMutableArray *) _gsExpectedFailureScopes;
+// If an active scope expects \a failure, reports it as expected (setting
+// its context to the reason) and returns YES.
+- (BOOL) _gsAbsorbExpectedFailure: (GSXCTestIssue *)failure;
+- (void) _gsRecordUnmatchedExpectedFailure: (NSString *)reason;
+// At the end of a test: fails for strict scopes that absorbed nothing.
+- (void) _gsFinishExpectedFailures;
 @end
 
 @interface XCTestCase (GSAsynchronousTestingPrivate)

@@ -33,6 +33,8 @@
     NSMutableArray *_teardownBlocks;
     NSMutableArray *_expectations;
     NSInvocation *_invocation;
+    NSMutableArray *_expectedFailureScopes;
+    BOOL _gsRecordingUnmatched;
 }
 
 + (id) testCaseWithInvocation: (NSInvocation *)invocation;
