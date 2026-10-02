@@ -503,10 +503,10 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, ([NSString stringWithFormat:@"(%@) threw __xctException: %@", expressionStr, [__xctException reason]]), __VA_ARGS__); \
+        _XCTRegisterFailure(test, ([NSString stringWithFormat:@"(%@) threw exception: %@", expressionStr, [__xctException reason]]), __VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, ([NSString stringWithFormat:@"(%@) threw unknown __xctException", expressionStr]), __VA_ARGS__); \
+        _XCTRegisterFailure(test, ([NSString stringWithFormat:@"(%@) threw unknown exception", expressionStr]), __VA_ARGS__); \
     } \
     if (__xctShouldSkip) { \
         _XCTSkipHandler(test, __FILE__, __LINE__, [NSString stringWithFormat:@"(%@) is %@", expressionStr, (skipWhen) ? @"true" : @"false"], @"" __VA_ARGS__); \
