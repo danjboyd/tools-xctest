@@ -232,3 +232,22 @@
 }
 
 @end
+
+// Only void methods are tests (as in Apple's XCTest).
+@interface GetterTests : XCTestCase {
+    NSString *_testData;
+}
+@property (copy) NSString *testData;
+@end
+
+@implementation GetterTests
+
+@synthesize testData = _testData;
+
+- (void)dealloc { [_testData release]; [super dealloc]; }
+- (NSRect)testFrame { return NSMakeRect(1, 2, 3, 4); }
+- (BOOL)testReturnsBool { return YES; }
+- (oneway void)testOnewayVoid { }
+- (void)testReal { }
+
+@end

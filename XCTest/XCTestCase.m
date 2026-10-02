@@ -37,6 +37,26 @@ GSXCTestIssue *_GSXCTIssueForSkip(_XCTSkipFailureException *skip)
 // The test being run. Not retained; cleared after each test.
 static XCTestCase *GSCurrentTestCase = nil;
 
+// Like Apple, only void methods are tests; this skips getters such as a
+// testData property, which also must not be called through a void cast.
+static BOOL GSReturnsVoid(Method method)
+{
+    char *returnType = method_copyReturnType(method);
+    const char *type = returnType;
+    BOOL isVoid = NO;
+
+    if (type != NULL) {
+        // Skip qualifiers such as oneway ('V').
+        while (*type != '\0' && strchr("rnNoORV", *type) != NULL) {
+            type++;
+        }
+        isVoid = strcmp(type, "v") == 0;
+    }
+    free(returnType);
+
+    return isVoid;
+}
+
 // Test methods of a class, including those inherited from superclasses
 // below XCTestCase, sorted by name to match Apple's run order.
 static NSArray *GSTestMethodNames(Class testCaseClass)
@@ -56,7 +76,8 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
             NSString *methodName = [NSString stringWithUTF8String:sel_getName(method_getName(method))];
 
             if ([methodName hasPrefix:@"test"]
-                && method_getNumberOfArguments(method) == 2)
+                && method_getNumberOfArguments(method) == 2
+                && GSReturnsVoid(method))
             {
                 [names addObject:methodName];
             }

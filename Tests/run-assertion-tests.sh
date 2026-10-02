@@ -37,7 +37,10 @@ assert_contains '(([self boom]) does not throw <NSException, "NSInternalInconsis
 assert_not_contains 'assertion failed'
 assert_contains '"a") is not identical to ("a")'
 assert_contains '((object) not identical to (object)) failed: ("<NSObject: '
-assert_contains 'AssertionMessageTests: 25/25 tests FAILED'
+assert_contains '(([self boom]) does not throw) failed: threw "boom": caller'"'"'s context'
+assert_contains 'AssertionMessageTests: 26/26 tests FAILED'
+assert_contains 'MacroHygieneTests: 1 tests PASSED, 1 skipped'
+assert_not_contains 'XCTSkipIf ignored the caller'
 assert_contains 'PassingIdentityTests: 1 tests PASSED'
 
 echo "Assertion message tests passed."
