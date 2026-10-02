@@ -8,3 +8,5 @@ Tests/AssertionFixture/AssertionFixture.bundle
 Tests/AssertionFixture/obj
 Tests/AsyncFixture/AsyncFixture.bundle
 Tests/AsyncFixture/obj
+Tests/ObjectModelFixture/ObjectModelFixture.bundle
+Tests/ObjectModelFixture/obj

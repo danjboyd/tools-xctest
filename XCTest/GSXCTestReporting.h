@@ -153,3 +153,25 @@ typedef enum {
 /*! NO until the report has been written successfully. */
 @property (readonly) BOOL wroteReport;
 @end
+
+@class XCTestSuite;
+
+/*!
+ * An XCTestObservation observer that turns test events into results and
+ * reporter calls. topSuite is the suite the run starts with; each
+ * GSXCTestCaseSuite inside it is reported as one class.
+ */
+@interface GSXCTestReportingObserver : NSObject {
+    NSArray *_reporters;
+    GSXCTestRunResult *_run;
+    XCTestSuite *_topSuite;
+    GSXCTestSuiteResult *_currentSuite;
+    // The scheduled test that is running (not retained) and its result.
+    // Tests that it runs itself are not reported.
+    id _currentTestCase;
+    GSXCTestCaseResult *_currentTest;
+}
+- (id) initWithReporters: (NSArray *)reporters
+                     run: (GSXCTestRunResult *)run
+                topSuite: (XCTestSuite *)topSuite;
+@end

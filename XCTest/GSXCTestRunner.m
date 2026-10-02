@@ -44,11 +44,6 @@
           onlyTestIdentifiers:(NSArray *)onlyTestIdentifiers
           skipTestIdentifiers:(NSArray *)skipTestIdentifiers
               legacyTestNames:(NSArray *)legacyTestNames;
-- (BOOL)runClassMethod:(SEL)selector ofClass:(Class)testCaseClass;
-- (void)runTest:(GSXCTestCaseResult *)test ofClass:(Class)testCaseClass;
-- (BOOL)runPhase:(NSString *)phaseName
-          ofTest:(GSXCTestCaseResult *)test
-           block:(BOOL (^)(NSError **error))block;
 @end
 
 static NSArray *GSParseAppleTestIdentifier(NSString *identifier)
@@ -116,83 +111,24 @@ static BOOL GSLegacyTestNameMatches(NSString *testName,
     return NO;
 }
 
-// From: https://www.cocoawithlove.com/2010/01/getting-subclasses-of-objective-c-class.html
-NSArray *ClassGetSubclasses(Class parentClass)
+// Adds the test cases in a test (itself, or a suite's, recursively).
+static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 {
-    int numClasses = objc_getClassList(NULL, 0);
-    Class *classes = NULL;
-
-    classes = malloc(sizeof(Class) * numClasses);
-    numClasses = objc_getClassList(classes, numClasses);
-    
-    NSMutableArray *result = [NSMutableArray array];
-    for (NSInteger i = 0; i < numClasses; i++)
-    {
-        Class superClass = classes[i];
-        do
-        {
-            superClass = class_getSuperclass(superClass);
-        } while(superClass && superClass != parentClass);
-        
-        if (superClass == nil)
-        {
-            continue;
+    if ([test isKindOfClass:[XCTestCase class]]) {
+        [testCases addObject:test];
+    } else if ([test isKindOfClass:[XCTestSuite class]]) {
+        for (XCTest *child in [(XCTestSuite *)test tests]) {
+            GSCollectTestCases(child, testCases);
         }
-        
-        [result addObject:classes[i]];
     }
-
-    free(classes);
-    
-    return result;
 }
-
-// Test methods of a class, including those inherited from superclasses
-// below XCTestCase, sorted by name to match Apple's run order.
-static NSArray *GSTestMethodNames(Class testCaseClass)
-{
-    NSMutableSet *names = [NSMutableSet set];
-
-    for (Class cls = testCaseClass;
-         cls != Nil && cls != [XCTestCase class];
-         cls = class_getSuperclass(cls))
-    {
-        unsigned int methodCount = 0;
-        Method *methods = class_copyMethodList(cls, &methodCount);
-
-        for (unsigned int i = 0; i < methodCount; i++)
-        {
-            Method method = methods[i];
-            NSString *methodName = [NSString stringWithUTF8String:sel_getName(method_getName(method))];
-
-            if ([methodName hasPrefix:@"test"]
-                && method_getNumberOfArguments(method) == 2)
-            {
-                [names addObject:methodName];
-            }
-        }
-
-        free(methods);
-    }
-
-    return [[names allObjects] sortedArrayUsingSelector:@selector(compare:)];
-}
-
-// "Name", "reason" -- the way Apple's XCTest describes a caught exception.
-static NSString *GSDescribeException(NSException *exception)
-{
-    return [NSString stringWithFormat:@"\"%@\", \"%@\"", [exception name], [exception reason]];
-}
-
-// Sends a reporter message to every reporter.
-#define GS_REPORT(reporters, call) \
-    for (id<GSXCTestReporter> reporter in (reporters)) { [reporter call]; }
 
 @implementation GSXCTestRunner
 
 @synthesize outputFormat;
 @synthesize bundleName;
 @synthesize junitReportPath;
+@synthesize testBundle;
 
 - (id)init
 {
@@ -207,7 +143,8 @@ static NSString *GSDescribeException(NSException *exception)
 - (void)dealloc
 {
     [runLock release];
-    [reporters release];
+    [testBundle release];
+    [principalObject release];
     [bundleName release];
     [junitReportPath release];
     [super dealloc];
@@ -299,17 +236,18 @@ static NSString *GSDescribeException(NSException *exception)
         *filtersActive = usingAnyFilters;
     }
 
-    NSArray *testCaseClasses = [ClassGetSubclasses([XCTestCase class])
-        sortedArrayUsingComparator:^NSComparisonResult(id a, id b) {
-            return [NSStringFromClass(a) compare:NSStringFromClass(b)];
-        }];
-    for (Class testCaseClass in testCaseClasses)
+    // Each class's tests come from its +defaultTestSuite, so a class can
+    // override that (or +testInvocations) to change what runs.
+    for (Class testCaseClass in _GSXCTestCaseSubclasses())
     {
-        NSString *className = NSStringFromClass(testCaseClass);
-        NSMutableArray *selectedMethodNames = [NSMutableArray array];
+        GSXCTestCaseSuite *suite = [GSXCTestCaseSuite suiteForTestCaseClass:testCaseClass];
+        NSMutableArray *testCases = [NSMutableArray array];
 
-        for (NSString *methodName in GSTestMethodNames(testCaseClass))
+        GSCollectTestCases([testCaseClass defaultTestSuite], testCases);
+        for (XCTestCase *testCase in testCases)
         {
+            NSString *className = NSStringFromClass([testCase class]);
+            NSString *methodName = [testCase _gsMethodName];
             BOOL testIsEnabled = YES;
             if (usingAppleStyleFilters)
             {
@@ -359,11 +297,11 @@ static NSString *GSDescribeException(NSException *exception)
 
             if (testIsEnabled)
             {
-                [selectedMethodNames addObject:methodName];
+                [suite addTest:testCase];
             }
         }
 
-        [plan addObject:[NSArray arrayWithObjects:testCaseClass, selectedMethodNames, nil]];
+        [plan addObject:suite];
     }
 
     return plan;
@@ -384,12 +322,10 @@ static NSString *GSDescribeException(NSException *exception)
         return nil;
     }
 
-    for (NSArray *entry in plan) {
-        NSString *className = NSStringFromClass([entry objectAtIndex:0]);
-
-        for (NSString *methodName in [entry objectAtIndex:1]) {
+    for (XCTestSuite *suite in plan) {
+        for (XCTestCase *testCase in [suite tests]) {
             [identifiers addObject:[NSString stringWithFormat:@"%@/%@/%@",
-                targetName ? targetName : @"", className, methodName]];
+                targetName ? targetName : @"", NSStringFromClass([testCase class]), [testCase _gsMethodName]]];
         }
     }
 
@@ -414,259 +350,76 @@ static NSString *GSDescribeException(NSException *exception)
 
     [runLock lock];
 
-    NSString *runBundleName = bundleName ? bundleName : (targetName ? targetName : @"XCTest");
+    NSString *runBundleName = bundleName ? bundleName
+        : (testBundle ? [[testBundle bundlePath] lastPathComponent] : (targetName ? targetName : @"XCTest"));
+    XCTestSuite *topSuite = [XCTestSuite testSuiteWithName:(filtersActive ? @"Selected tests" : @"All tests")];
+    XCTestSuite *bundleSuite = [XCTestSuite testSuiteWithName:runBundleName];
     GSXCTestRunResult *run = [[[GSXCTestRunResult alloc]
-        initWithName:(filtersActive ? @"Selected tests" : @"All tests")
-          bundleName:runBundleName] autorelease];
+        initWithName:[topSuite name] bundleName:runBundleName] autorelease];
     id<GSXCTestReporter> consoleReporter = (outputFormat == GSXCTestOutputFormatApple)
         ? (id<GSXCTestReporter>)[[[GSXCTestAppleReporter alloc] init] autorelease]
         : (id<GSXCTestReporter>)[[[GSXCTestClassicReporter alloc] init] autorelease];
-
     GSXCTestJUnitReporter *junitReporter = junitReportPath
         ? [[[GSXCTestJUnitReporter alloc] initWithPath:junitReportPath] autorelease]
         : nil;
+    NSArray *reporters = [NSArray arrayWithObjects:consoleReporter, junitReporter, nil];
+    GSXCTestReportingObserver *reportingObserver = [[[GSXCTestReportingObserver alloc]
+        initWithReporters:reporters run:run topSuite:topSuite] autorelease];
+    XCTestObservationCenter *center = [XCTestObservationCenter sharedTestObservationCenter];
 
-    [reporters release];
-    reporters = [[NSArray alloc] initWithObjects:consoleReporter, junitReporter, nil];
-
+    for (XCTestSuite *suite in plan) {
+        [bundleSuite addTest:suite];
+    }
+    [topSuite addTest:bundleSuite];
     [run setFiltersActive:filtersActive];
-    [run setStartDate:[NSDate date]];
-    GS_REPORT(reporters, runDidStart:run)
 
-    for (NSArray *entry in plan)
-    {
-        @autoreleasepool {
-            Class testCaseClass = [entry objectAtIndex:0];
-            NSArray *selectedMethodNames = [entry objectAtIndex:1];
-            GSXCTestSuiteResult *suite = [[[GSXCTestSuiteResult alloc]
-                initWithName:NSStringFromClass(testCaseClass)] autorelease];
+    [self _gsCreatePrincipalObject];
+    [center addTestObserver:(id<XCTestObservation>)reportingObserver];
 
-            if ([selectedMethodNames count] == 0)
-            {
-                GS_REPORT(reporters, suiteHasNoSelectedTests:suite)
-                continue;
+    if (testBundle != nil) {
+        [center _gsNotifyObservers:^(id observer) {
+            if ([observer respondsToSelector:@selector(testBundleWillStart:)]) {
+                [observer testBundleWillStart:testBundle];
             }
-
-            [run.suiteResults addObject:suite];
-            [suite setStartDate:[NSDate date]];
-            currentSuiteResult = suite;
-            GS_REPORT(reporters, suiteDidStart:suite)
-
-            BOOL classSetUpSucceeded = [self runClassMethod:@selector(setUp)
-                                                    ofClass:testCaseClass];
-
-            for (NSString *methodName in selectedMethodNames)
-            {
-                GSXCTestCaseResult *test = [[[GSXCTestCaseResult alloc]
-                    initWithClassName:[suite name] methodName:methodName] autorelease];
-
-                [suite.testResults addObject:test];
-                if (classSetUpSucceeded)
-                {
-                    [self runTest:test ofClass:testCaseClass];
-                }
-                else
-                {
-                    // Report each test as failed without running it.
-                    [test setStartDate:[NSDate date]];
-                    currentTestResult = test;
-                    GS_REPORT(reporters, testDidStart:test)
-                    GSXCTestIssue *cause = [[suite classFailures] objectAtIndex:0];
-                    [self recordFailureWithMessage:[NSString stringWithFormat:@"+setUp failed: %@", [cause message]]
-                                          filePath:[cause filePath]
-                                        lineNumber:[cause lineNumber]
-                                        unexpected:[cause unexpected]];
-                    [test setStatus:GSXCTestStatusFailed];
-                    currentTestResult = nil;
-                    GS_REPORT(reporters, testDidFinish:test)
-                }
-            }
-
-            if (classSetUpSucceeded)
-            {
-                [self runClassMethod:@selector(tearDown) ofClass:testCaseClass];
-            }
-
-            currentSuiteResult = nil;
-            [suite setDuration:-[[suite startDate] timeIntervalSinceNow]];
-            GS_REPORT(reporters, suiteDidFinish:suite)
-        } // @autoreleasepool
+        }];
     }
 
-    [run setDuration:-[[run startDate] timeIntervalSinceNow]];
-    GS_REPORT(reporters, runDidFinish:run)
+    [topSuite runTest];
 
-    [reporters release];
-    reporters = nil;
+    if (testBundle != nil) {
+        [center _gsNotifyObservers:^(id observer) {
+            if ([observer respondsToSelector:@selector(testBundleDidFinish:)]) {
+                [observer testBundleDidFinish:testBundle];
+            }
+        }];
+    }
+
+    [center removeTestObserver:(id<XCTestObservation>)reportingObserver];
 
     [runLock unlock];
-    
-    return ![run hasFailed] && (junitReporter == nil || [junitReporter wroteReport]);
+
+    return [[topSuite testRun] hasSucceeded] && (junitReporter == nil || [junitReporter wroteReport]);
 }
 
-- (BOOL)runClassMethod:(SEL)selector ofClass:(Class)testCaseClass
+// Creates the test bundle's principal class (NSPrincipalClass in its
+// Info.plist), once, so it can register test observers before tests run.
+- (void)_gsCreatePrincipalObject
 {
-    GSXCTestSuiteResult *suite = currentSuiteResult;
-    NSUInteger failuresBefore = [[suite classFailures] count];
+    NSString *className = [[testBundle infoDictionary] objectForKey:@"NSPrincipalClass"];
+    Class principalClass = className ? NSClassFromString(className) : Nil;
 
-    currentClassContext = (selector == @selector(setUp)) ? @"+setUp" : @"+tearDown";
-    @try {
-        [testCaseClass performSelector:selector];
-    }
-    @catch (NSException *exception) {
-        [self recordFailureWithMessage:[NSString stringWithFormat:@"threw exception: %@", GSDescribeException(exception)]
-                              filePath:nil
-                            lineNumber:0
-                            unexpected:YES];
-    }
-    currentClassContext = nil;
-
-    return [[suite classFailures] count] == failuresBefore;
-}
-
-- (void)runTest:(GSXCTestCaseResult *)test ofClass:(Class)testCaseClass
-{
-    [test setStartDate:[NSDate date]];
-    currentTestResult = test;
-    GS_REPORT(reporters, testDidStart:test)
-
-    @autoreleasepool {
-        SEL selector = NSSelectorFromString([test methodName]);
-        XCTestCase *testCase = [[[testCaseClass alloc] init] autorelease];
-        void (^teardownBlock)(void) = nil;
-
-        [XCTestCase _gsSetCurrentTestCase:testCase];
-
-        BOOL setUpSucceeded = [self runPhase:@"setUpWithError:" ofTest:test block:^BOOL(NSError **error) {
-            return [testCase setUpWithError:error];
-        }];
-
-        if (setUpSucceeded) {
-            setUpSucceeded = [self runPhase:@"setUp" ofTest:test block:^BOOL(NSError **error) {
-                [testCase setUp];
-                return YES;
-            }];
-        }
-
-        if (setUpSucceeded) {
-            BOOL testCompleted = [self runPhase:nil ofTest:test block:^BOOL(NSError **error) {
-                ((void (*)(id, SEL))[testCase methodForSelector:selector])(testCase, selector);
-                return YES;
-            }];
-
-            // Only a test that ran to the end could have waited on everything.
-            if (testCompleted) {
-                [self runPhase:nil ofTest:test block:^BOOL(NSError **error) {
-                    [testCase _gsRecordUnwaitedExpectations];
-                    return YES;
-                }];
-            }
-        }
-
-        // Teardown always runs, whether or not set up or the test failed.
-        while ((teardownBlock = [testCase _gsPopTeardownBlock]) != nil) {
-            [self runPhase:@"a teardown block" ofTest:test block:^BOOL(NSError **error) {
-                teardownBlock();
-                return YES;
-            }];
-        }
-
-        [self runPhase:@"tearDown" ofTest:test block:^BOOL(NSError **error) {
-            [testCase tearDown];
-            return YES;
-        }];
-
-        [self runPhase:@"tearDownWithError:" ofTest:test block:^BOOL(NSError **error) {
-            return [testCase tearDownWithError:error];
-        }];
-
-        [testCase _gsInvalidateExpectations];
-        [XCTestCase _gsSetCurrentTestCase:nil];
+    if (principalObject != nil || principalClass == Nil
+        || [principalClass isSubclassOfClass:[XCTest class]]) {
+        return;
     }
 
-    // A failure outranks a skip, as in Apple's XCTest.
-    if ([[test failures] count] > 0) {
-        [test setStatus:GSXCTestStatusFailed];
-    } else if ([test skip] != nil) {
-        [test setStatus:GSXCTestStatusSkipped];
-    } else {
-        [test setStatus:GSXCTestStatusPassed];
-    }
-
-    [test setDuration:-[[test startDate] timeIntervalSinceNow]];
-    currentTestResult = nil;
-    GS_REPORT(reporters, testDidFinish:test)
-}
-
-- (BOOL)runPhase:(NSString *)phaseName
-          ofTest:(GSXCTestCaseResult *)test
-           block:(BOOL (^)(NSError **error))block
-{
-    NSString *where = phaseName ? [NSString stringWithFormat:@" in %@", phaseName] : @"";
-    NSError *error = nil;
-    BOOL succeeded = NO;
-
-    @try {
-        succeeded = block(&error);
-        if (!succeeded) {
-            [self recordFailureWithMessage:[NSString stringWithFormat:@"failed%@ - %@", where,
-                                               error ? [error localizedDescription] : @"returned NO without an error"]
-                                  filePath:nil
-                                lineNumber:0
-                                unexpected:NO];
-        }
-    }
-    @catch (_XCTSkipFailureException *skip) {
-        // Remaining set up and the test body are skipped; teardown still runs.
-        if ([test skip] == nil) {
-            NSDictionary *info = [skip userInfo];
-            [test setSkip:[GSXCTestIssue issueWithMessage:[info objectForKey:@"message"]
-                                                 filePath:[info objectForKey:@"file"]
-                                               lineNumber:[[info objectForKey:@"line"] unsignedIntegerValue]
-                                               unexpected:NO]];
-        }
-    }
-    @catch (_XCTestCaseInterruptionException *interruption) {
-        // continueAfterFailure is NO; the failure has already been reported.
-    }
-    @catch (NSException *exception) {
-        [self recordFailureWithMessage:[NSString stringWithFormat:@"threw exception%@: %@", where, GSDescribeException(exception)]
-                              filePath:nil
-                            lineNumber:0
-                            unexpected:YES];
-    }
-
-    return succeeded;
+    principalObject = [[principalClass alloc] init];
 }
 
 - (void)waitForCompletion
 {
     [runLock lock];
     [runLock unlock];
-}
-
-- (void)recordFailureWithMessage:(NSString *)message
-                        filePath:(NSString *)filePath
-                      lineNumber:(NSUInteger)lineNumber
-                      unexpected:(BOOL)unexpected
-{
-    GSXCTestIssue *failure = [GSXCTestIssue issueWithMessage:message
-                                                    filePath:filePath
-                                                  lineNumber:lineNumber
-                                                  unexpected:unexpected];
-
-    @synchronized (self) {
-        if (currentTestResult != nil) {
-            [[currentTestResult failures] addObject:failure];
-            GS_REPORT(reporters, test:currentTestResult didRecordFailure:failure)
-        } else if (currentSuiteResult != nil) {
-            [failure setContext:currentClassContext ? currentClassContext : @"+setUp"];
-            [[currentSuiteResult classFailures] addObject:failure];
-            GS_REPORT(reporters, suite:currentSuiteResult didRecordClassFailure:failure)
-        } else {
-            NSLog(@"XCTest: Failure outside of a test: %@", message);
-        }
-    }
 }
 
 + (GSXCTestRunner *)sharedRunner

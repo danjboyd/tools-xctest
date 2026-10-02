@@ -19,6 +19,7 @@
 */
 
 #import <XCTest/GSXCTestReporting.h>
+#import <XCTest/XCTestPrivate.h>
 
 #include <stdio.h>
 
@@ -751,6 +752,158 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
         NSLog(@"XCTest: Could not write JUnit report to '%@': %@", _path,
             error ? [error localizedDescription] : @"unknown error");
     }
+}
+
+@end
+
+#pragma mark - Observation bridge
+
+// Sends a reporter message to every reporter.
+#define GS_REPORT(call) \
+    for (id<GSXCTestReporter> reporter in _reporters) { [reporter call]; }
+
+@interface GSXCTestReportingObserver () <XCTestObservation, GSXCTestObservationPrivate>
+@end
+
+@implementation GSXCTestReportingObserver
+
+- (id) initWithReporters: (NSArray *)reporters
+                     run: (GSXCTestRunResult *)run
+                topSuite: (XCTestSuite *)topSuite
+{
+    self = [super init];
+    if (self) {
+        _reporters = [reporters copy];
+        _run = [run retain];
+        _topSuite = [topSuite retain];
+    }
+
+    return self;
+}
+
+- (void) dealloc
+{
+    [_reporters release];
+    [_run release];
+    [_topSuite release];
+    [_currentSuite release];
+    [_currentTest release];
+    [super dealloc];
+}
+
+- (void) testSuiteWillStart: (XCTestSuite *)testSuite
+{
+    GSXCTestSuiteResult *suite = nil;
+
+    if (testSuite == _topSuite) {
+        [_run setStartDate:[[testSuite testRun] startDate]];
+        GS_REPORT(runDidStart:_run)
+        return;
+    }
+
+    if (![testSuite isKindOfClass:[GSXCTestCaseSuite class]]) {
+        return;
+    }
+
+    suite = [[[GSXCTestSuiteResult alloc] initWithName:[testSuite name]] autorelease];
+    if ([testSuite testCaseCount] == 0) {
+        GS_REPORT(suiteHasNoSelectedTests:suite)
+        return;
+    }
+
+    [suite setStartDate:[[testSuite testRun] startDate]];
+    [[_run suiteResults] addObject:suite];
+    [_currentSuite release];
+    _currentSuite = [suite retain];
+    GS_REPORT(suiteDidStart:suite)
+}
+
+- (void) testSuiteDidFinish: (XCTestSuite *)testSuite
+{
+    if (testSuite == _topSuite) {
+        [_run setDuration:[[testSuite testRun] totalDuration]];
+        GS_REPORT(runDidFinish:_run)
+        return;
+    }
+
+    if (_currentSuite != nil && [testSuite isKindOfClass:[GSXCTestCaseSuite class]]
+        && [[testSuite name] isEqualToString:[_currentSuite name]]) {
+        [_currentSuite setDuration:[[testSuite testRun] totalDuration]];
+        GS_REPORT(suiteDidFinish:_currentSuite)
+        [_currentSuite release];
+        _currentSuite = nil;
+    }
+}
+
+- (void) testCaseWillStart: (XCTestCase *)testCase
+{
+    if (_currentTestCase != nil) {
+        return;
+    }
+
+    GSXCTestCaseResult *test = [[[GSXCTestCaseResult alloc]
+        initWithClassName:NSStringFromClass([testCase class])
+               methodName:[testCase _gsMethodName]] autorelease];
+
+    [test setStartDate:[[testCase testRun] startDate]];
+    [[_currentSuite testResults] addObject:test];
+    _currentTestCase = testCase;
+    _currentTest = [test retain];
+    GS_REPORT(testDidStart:test)
+}
+
+- (void) _gsTestCase: (XCTestCase *)testCase didRecordIssue: (GSXCTestIssue *)issue
+{
+    // Ignores tests run by the running test, and failures from other
+    // threads that arrive after their test has finished.
+    if (testCase != _currentTestCase || _currentTest == nil) {
+        return;
+    }
+
+    [[_currentTest failures] addObject:issue];
+    GS_REPORT(test:_currentTest didRecordFailure:issue)
+}
+
+- (void) _gsTestSuite: (XCTestSuite *)testSuite didRecordIssue: (GSXCTestIssue *)issue
+{
+    if (_currentSuite == nil || ![[testSuite name] isEqualToString:[_currentSuite name]]) {
+        return;
+    }
+
+    [[_currentSuite classFailures] addObject:issue];
+    GS_REPORT(suite:_currentSuite didRecordClassFailure:issue)
+}
+
+- (void) _gsTestCase: (XCTestCase *)testCase didSkipWithIssue: (GSXCTestIssue *)issue
+{
+    if (testCase == _currentTestCase && _currentTest != nil && [_currentTest skip] == nil) {
+        [_currentTest setSkip:issue];
+    }
+}
+
+- (void) testCaseDidFinish: (XCTestCase *)testCase
+{
+    XCTestRun *run = [testCase testRun];
+    GSXCTestCaseResult *test = nil;
+
+    if (testCase != _currentTestCase || _currentTest == nil) {
+        return;
+    }
+    test = [_currentTest autorelease];
+    _currentTestCase = nil;
+    _currentTest = nil;
+
+    // A failure outranks a skip, as in Apple's XCTest.
+    if ([run totalFailureCount] > 0) {
+        [test setStatus:GSXCTestStatusFailed];
+    } else if ([run hasBeenSkipped]) {
+        [test setStatus:GSXCTestStatusSkipped];
+    } else {
+        [test setStatus:GSXCTestStatusPassed];
+    }
+    [test setDuration:[run testDuration]];
+
+    GS_REPORT(testDidFinish:test)
 }
 
 @end

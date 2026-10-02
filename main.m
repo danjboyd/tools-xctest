@@ -223,6 +223,7 @@ int main(int argc, char *argv[]) {
 
     [runner setOutputFormat:outputFormat];
     [runner setBundleName:[testBundlePath lastPathComponent]];
+    [runner setTestBundle:testBundle];
     [runner setJunitReportPath:junitReportPath];
     BOOL result = [runner runTestsForTargetName:targetName
                             onlyTestIdentifiers:onlyTestIdentifiers
