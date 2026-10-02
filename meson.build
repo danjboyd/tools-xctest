@@ -126,175 +126,38 @@ xctest_host_lib = library(
 xctest_tool = executable('xctest', 'main.m', link_with: xctest_lib, install: true)
 
 if host_machine.system() != 'darwin'
-  cli_filter_tests = find_program('Tests/run-cli-filter-tests.sh')
-  lifecycle_tests = find_program('Tests/run-lifecycle-tests.sh')
-  assertion_tests = find_program('Tests/run-assertion-tests.sh')
-  async_tests = find_program('Tests/run-async-tests.sh')
-  output_tests = find_program('Tests/run-output-tests.sh')
-  junit_tests = find_program('Tests/run-junit-tests.sh')
-  list_tests = find_program('Tests/run-list-tests.sh')
-  object_model_tests = find_program('Tests/run-object-model-tests.sh')
-  hosted_tests = find_program('Tests/run-hosted-tests.sh')
-  expected_failure_tests = find_program('Tests/run-expected-failure-tests.sh')
-  performance_tests = find_program('Tests/run-performance-tests.sh')
-  repetition_tests = find_program('Tests/run-repetition-tests.sh')
-  out_of_test_tests = find_program('Tests/run-out-of-test-tests.sh')
   xctest_test_env = environment()
   xctest_test_env.set('GNUSTEP_MAKEFILES', gnustep_makefiles)
-  test('cli-filters',
-       cli_filter_tests,
-       args: [
-         join_paths(meson.current_build_dir(), 'xctest'),
-         meson.current_build_dir(),
-         meson.current_source_dir(),
-         ':'.join(gnustep_runtime_lib_dirs),
-       ],
-       env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib],
-       # The scripts rebuild shared fixture bundles in the source tree.
-       is_parallel: false)
-  test('lifecycle',
-       lifecycle_tests,
-       args: [
-         join_paths(meson.current_build_dir(), 'xctest'),
-         meson.current_build_dir(),
-         meson.current_source_dir(),
-         ':'.join(gnustep_runtime_lib_dirs),
-       ],
-       env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib],
-       # The scripts rebuild shared fixture bundles in the source tree.
-       is_parallel: false)
-  test('assertions',
-       assertion_tests,
-       args: [
-         join_paths(meson.current_build_dir(), 'xctest'),
-         meson.current_build_dir(),
-         meson.current_source_dir(),
-         ':'.join(gnustep_runtime_lib_dirs),
-       ],
-       env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib],
-       # The scripts rebuild shared fixture bundles in the source tree.
-       is_parallel: false)
-  test('async',
-       async_tests,
-       args: [
-         join_paths(meson.current_build_dir(), 'xctest'),
-         meson.current_build_dir(),
-         meson.current_source_dir(),
-         ':'.join(gnustep_runtime_lib_dirs),
-       ],
-       env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib],
-       # The scripts rebuild shared fixture bundles in the source tree.
-       is_parallel: false)
-  test('output',
-       output_tests,
-       args: [
-         join_paths(meson.current_build_dir(), 'xctest'),
-         meson.current_build_dir(),
-         meson.current_source_dir(),
-         ':'.join(gnustep_runtime_lib_dirs),
-       ],
-       env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib],
-       # The scripts rebuild shared fixture bundles in the source tree.
-       is_parallel: false)
-  test('junit',
-       junit_tests,
-       args: [
-         join_paths(meson.current_build_dir(), 'xctest'),
-         meson.current_build_dir(),
-         meson.current_source_dir(),
-         ':'.join(gnustep_runtime_lib_dirs),
-       ],
-       env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib],
-       # The scripts rebuild shared fixture bundles in the source tree.
-       is_parallel: false)
-  test('list-tests',
-       list_tests,
-       args: [
-         join_paths(meson.current_build_dir(), 'xctest'),
-         meson.current_build_dir(),
-         meson.current_source_dir(),
-         ':'.join(gnustep_runtime_lib_dirs),
-       ],
-       env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib],
-       # The scripts rebuild shared fixture bundles in the source tree.
-       is_parallel: false)
-  test('object-model',
-       object_model_tests,
-       args: [
-         join_paths(meson.current_build_dir(), 'xctest'),
-         meson.current_build_dir(),
-         meson.current_source_dir(),
-         ':'.join(gnustep_runtime_lib_dirs),
-       ],
-       env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib],
-       # The scripts rebuild shared fixture bundles in the source tree.
-       is_parallel: false)
-  test('expected-failures',
-       expected_failure_tests,
-       args: [
-         join_paths(meson.current_build_dir(), 'xctest'),
-         meson.current_build_dir(),
-         meson.current_source_dir(),
-         ':'.join(gnustep_runtime_lib_dirs),
-       ],
-       env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib],
-       # The scripts rebuild shared fixture bundles in the source tree.
-       is_parallel: false)
-  test('performance',
-       performance_tests,
-       args: [
-         join_paths(meson.current_build_dir(), 'xctest'),
-         meson.current_build_dir(),
-         meson.current_source_dir(),
-         ':'.join(gnustep_runtime_lib_dirs),
-       ],
-       env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib],
-       # The scripts rebuild shared fixture bundles in the source tree.
-       is_parallel: false)
-  test('repetition',
-       repetition_tests,
-       args: [
-         join_paths(meson.current_build_dir(), 'xctest'),
-         meson.current_build_dir(),
-         meson.current_source_dir(),
-         ':'.join(gnustep_runtime_lib_dirs),
-       ],
-       env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib],
-       # The scripts rebuild shared fixture bundles in the source tree.
-       is_parallel: false)
-  test('out-of-test',
-       out_of_test_tests,
-       args: [
-         join_paths(meson.current_build_dir(), 'xctest'),
-         meson.current_build_dir(),
-         meson.current_source_dir(),
-         ':'.join(gnustep_runtime_lib_dirs),
-       ],
-       env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib],
-       # The scripts rebuild shared fixture bundles in the source tree.
-       is_parallel: false)
-  test('hosted',
-       hosted_tests,
-       args: [
-         join_paths(meson.current_build_dir(), 'xctest'),
-         meson.current_build_dir(),
-         meson.current_source_dir(),
-         ':'.join(gnustep_runtime_lib_dirs),
-       ],
-       env: xctest_test_env,
-       depends: [xctest_tool, xctest_lib, xctest_host_lib],
-       # The scripts rebuild shared fixture bundles in the source tree.
-       is_parallel: false)
+
+  # Regression scripts: [test name, script]. Each takes the same arguments.
+  xctest_tests = [
+    ['cli-filters', 'run-cli-filter-tests.sh'],
+    ['lifecycle', 'run-lifecycle-tests.sh'],
+    ['assertions', 'run-assertion-tests.sh'],
+    ['async', 'run-async-tests.sh'],
+    ['output', 'run-output-tests.sh'],
+    ['junit', 'run-junit-tests.sh'],
+    ['list-tests', 'run-list-tests.sh'],
+    ['object-model', 'run-object-model-tests.sh'],
+    ['expected-failures', 'run-expected-failure-tests.sh'],
+    ['performance', 'run-performance-tests.sh'],
+    ['repetition', 'run-repetition-tests.sh'],
+    ['out-of-test', 'run-out-of-test-tests.sh'],
+    ['hosted', 'run-hosted-tests.sh'],
+  ]
+
+  foreach t : xctest_tests
+    test(t[0],
+         find_program('Tests/' + t[1]),
+         args: [
+           join_paths(meson.current_build_dir(), 'xctest'),
+           meson.current_build_dir(),
+           meson.current_source_dir(),
+           ':'.join(gnustep_runtime_lib_dirs),
+         ],
+         env: xctest_test_env,
+         depends: [xctest_tool, xctest_lib, xctest_host_lib],
+         # The scripts rebuild shared fixture bundles in the source tree.
+         is_parallel: false)
+  endforeach
 endif
