@@ -18,10 +18,13 @@
  Boston, MA 02110-1301, USA.
 */
 
+#define _GNU_SOURCE
+#include <dlfcn.h>
 #include <stdio.h>
 
 #import <Foundation/Foundation.h>
 #import <XCTest/GSXCTestRunner.h>
+#import <XCTest/XCTestAssertionsImpl.h>
 
 static void PrintUsage(FILE *stream)
 {
@@ -34,6 +37,7 @@ static void PrintUsage(FILE *stream)
     fprintf(stream, "  -junit-report <path>        Also write results to <path> as JUnit XML\n");
     fprintf(stream, "  -list-tests                 List the selected tests, one identifier per line, without running them\n");
     fprintf(stream, "  -list-tests-json            List the selected tests as JSON, without running them\n");
+    fprintf(stream, "  -host <app>                 Run the tests inside a running application (.app or executable)\n");
     fprintf(stream, "  -h, --help                  Show this help message\n");
 }
 
@@ -41,6 +45,103 @@ static NSString *TargetNameForBundlePath(NSString *testBundlePath)
 {
     NSString *bundleName = [[testBundlePath lastPathComponent] stringByDeletingPathExtension];
     return [bundleName length] > 0 ? bundleName : nil;
+}
+
+// libXCTestHost sits next to libXCTest; XCTEST_HOST_LIBRARY overrides it.
+static NSString *HostLibraryPath(void)
+{
+    const char *override = getenv("XCTEST_HOST_LIBRARY");
+    Dl_info info;
+
+    if (override != NULL && *override != '\0') {
+        return [NSString stringWithUTF8String:override];
+    }
+
+    if (dladdr((void *)_XCTFailureHandler, &info) == 0 || info.dli_fname == NULL) {
+        return nil;
+    }
+
+    return [[[NSString stringWithUTF8String:info.dli_fname] stringByDeletingLastPathComponent]
+        stringByAppendingPathComponent:@"libXCTestHost.so"];
+}
+
+// Launches the host application with libXCTestHost preloaded, which runs
+// the tests once the application has finished launching. Returns the exit
+// code for xctest.
+static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString *targetName,
+                          NSArray *onlyTestIdentifiers, NSArray *skipTestIdentifiers,
+                          GSXCTestOutputFormat outputFormat, NSString *junitReportPath)
+{
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSString *executable = hostPath;
+    NSString *hostLibrary = HostLibraryPath();
+    NSString *statusFile = [NSTemporaryDirectory() stringByAppendingPathComponent:
+        [NSString stringWithFormat:@"xctest-host-%d-%@", getpid(), [[NSProcessInfo processInfo] globallyUniqueString]]];
+    BOOL isDirectory = NO;
+
+    if (![fileManager fileExistsAtPath:hostPath isDirectory:&isDirectory]) {
+        fprintf(stderr, "xctest: could not find host application '%s'\n", [hostPath UTF8String]);
+        return 1;
+    }
+    if (isDirectory) {
+        executable = [[NSBundle bundleWithPath:hostPath] executablePath];
+    }
+    if (executable == nil || ![fileManager isExecutableFileAtPath:executable]) {
+        fprintf(stderr, "xctest: host application '%s' has no executable\n", [hostPath UTF8String]);
+        return 1;
+    }
+    if (hostLibrary == nil || ![fileManager fileExistsAtPath:hostLibrary]) {
+        fprintf(stderr, "xctest: could not find libXCTestHost (set XCTEST_HOST_LIBRARY)\n");
+        return 1;
+    }
+
+    NSMutableDictionary *config = [NSMutableDictionary dictionary];
+    [config setObject:[[testBundlePath stringByStandardizingPath] stringByResolvingSymlinksInPath] forKey:@"bundlePath"];
+    [config setObject:[testBundlePath lastPathComponent] forKey:@"bundleName"];
+    [config setObject:(targetName ? targetName : @"") forKey:@"targetName"];
+    [config setObject:onlyTestIdentifiers forKey:@"only"];
+    [config setObject:skipTestIdentifiers forKey:@"skip"];
+    [config setObject:(outputFormat == GSXCTestOutputFormatApple ? @"apple" : @"classic") forKey:@"outputFormat"];
+    [config setObject:statusFile forKey:@"statusFile"];
+    if (junitReportPath != nil) {
+        NSString *absoluteReport = [junitReportPath isAbsolutePath] ? junitReportPath
+            : [[fileManager currentDirectoryPath] stringByAppendingPathComponent:junitReportPath];
+        [config setObject:absoluteReport forKey:@"junitReport"];
+    }
+
+    NSData *configJSON = [NSJSONSerialization dataWithJSONObject:config options:0 error:NULL];
+    NSMutableDictionary *environment = [[[[NSProcessInfo processInfo] environment] mutableCopy] autorelease];
+    NSString *originalPreload = [environment objectForKey:@"LD_PRELOAD"];
+
+    [environment setObject:[[[NSString alloc] initWithData:configJSON encoding:NSUTF8StringEncoding] autorelease]
+                    forKey:@"XCTEST_HOST_CONFIG"];
+    [environment setObject:(originalPreload ? originalPreload : @"") forKey:@"XCTEST_HOST_ORIGINAL_LD_PRELOAD"];
+    [environment setObject:([originalPreload length] > 0
+                            ? [NSString stringWithFormat:@"%@:%@", hostLibrary, originalPreload]
+                            : hostLibrary)
+                    forKey:@"LD_PRELOAD"];
+
+    NSTask *task = [[[NSTask alloc] init] autorelease];
+    [task setLaunchPath:executable];
+    [task setArguments:[NSArray array]];
+    [task setEnvironment:environment];
+    [task launch];
+    [task waitUntilExit];
+
+    BOOL testsRan = [fileManager fileExistsAtPath:statusFile];
+    [fileManager removeItemAtPath:statusFile error:NULL];
+
+    if ([task terminationReason] == NSTaskTerminationReasonUncaughtSignal) {
+        fprintf(stderr, "xctest: host application crashed (signal %d)\n", [task terminationStatus]);
+        return 1;
+    }
+    if (!testsRan) {
+        fprintf(stderr, "xctest: host application exited (status %d) before running the tests\n",
+            [task terminationStatus]);
+        return 1;
+    }
+
+    return [task terminationStatus] == 0 ? 0 : 1;
 }
 
 // Prints the tests a run would select. Returns NO if a filter is invalid.
@@ -102,6 +203,7 @@ int main(int argc, char *argv[]) {
     NSString *junitReportPath = nil;
     BOOL listTests = NO;
     BOOL listTestsAsJSON = NO;
+    NSString *hostPath = nil;
 
     if (argc == 1) {
         PrintUsage(stderr);
@@ -169,6 +271,16 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        if ([argument isEqualToString:@"-host"]) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "xctest: missing application for -host\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            hostPath = [NSString stringWithUTF8String:argv[++i]];
+            continue;
+        }
+
         if ([argument isEqualToString:@"-junit-report"]) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "xctest: missing path for -junit-report\n");
@@ -197,6 +309,13 @@ int main(int argc, char *argv[]) {
     if (testBundlePath == nil) {
         fprintf(stderr, "xctest: missing test bundle path\n");
         PrintUsage(stderr);
+        goto cleanup;
+    }
+
+    // In a host application the bundle is loaded there, not here.
+    if (hostPath != nil && !listTests) {
+        exitCode = RunTestsInHost(hostPath, testBundlePath, TargetNameForBundlePath(testBundlePath),
+                                  onlyTestIdentifiers, skipTestIdentifiers, outputFormat, junitReportPath);
         goto cleanup;
     }
 

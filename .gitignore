@@ -10,3 +10,7 @@ Tests/AsyncFixture/AsyncFixture.bundle
 Tests/AsyncFixture/obj
 Tests/ObjectModelFixture/ObjectModelFixture.bundle
 Tests/ObjectModelFixture/obj
+Tests/HostedFixture/HostedFixture.bundle
+Tests/HostedFixture/obj
+Tests/HostApp/HostApp.app
+Tests/HostApp/obj
