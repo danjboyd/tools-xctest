@@ -153,6 +153,7 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     [_invocation release];
     [_expectedFailureScopes release];
     [_gsPerformance release];
+    [_gsReportResult release];
     [super dealloc];
 }
 
@@ -409,6 +410,19 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
                              expected:![cause unexpected]];
     [run stop];
     [run release];
+}
+
+- (GSXCTestCaseResult *) _gsReportResult
+{
+    return _gsReportResult;
+}
+
+- (void) _gsSetReportResult: (GSXCTestCaseResult *)result
+{
+    if (result != _gsReportResult) {
+        [_gsReportResult release];
+        _gsReportResult = [result retain];
+    }
 }
 
 - (NSUInteger) _gsIteration

@@ -289,7 +289,8 @@ static NSArray *GSFailedTestLines(GSXCTestRunResult *run, NSString *(^testName)(
     for (GSXCTestSuiteResult *suite in [run suiteResults]) {
         for (GSXCTestCaseResult *test in [suite testResults]) {
             if ([test status] == GSXCTestStatusFailed) {
-                GSXCTestIssue *first = [[test failures] objectAtIndex:0];
+                GSXCTestIssue *first = [[test failures] count] > 0 ? [[test failures] objectAtIndex:0]
+                    : [GSXCTestIssue issueWithMessage:@"failed" filePath:nil lineNumber:0 unexpected:NO];
                 NSString *location = [first filePath]
                     ? [NSString stringWithFormat:@"%@:%lu: ", [first filePath], (unsigned long)[first lineNumber]]
                     : @"";
@@ -362,6 +363,13 @@ static NSString *GSSkippedSummary(NSUInteger skipCount)
     } else {
         NSLog(@"XCTest:     %@: %@", [test methodName], [failure message]);
     }
+}
+
+- (void) test: (GSXCTestCaseResult *)test didRecordFailureAfterFinishing: (GSXCTestIssue *)failure
+{
+    NSLog(@"XCTest:   %@.%@ FAILED after it finished: %@%@", [test className], [test displayName],
+        [failure filePath] ? [NSString stringWithFormat:@"%@:%lu: ", [failure filePath], (unsigned long)[failure lineNumber]] : @"",
+        [failure message]);
 }
 
 - (void) test: (GSXCTestCaseResult *)test didRecordExpectedFailure: (GSXCTestIssue *)failure
@@ -544,6 +552,12 @@ static NSString *GSAppleLocation(GSXCTestIssue *issue)
         GSAppleLocation(failure), GSAppleTestName(test), [failure message]]);
 }
 
+- (void) test: (GSXCTestCaseResult *)test didRecordFailureAfterFinishing: (GSXCTestIssue *)failure
+{
+    GSPrintLine([NSString stringWithFormat:@"%@: error: %@ : (after the test finished) %@",
+        GSAppleLocation(failure), GSAppleTestName(test), [failure message]]);
+}
+
 - (void) test: (GSXCTestCaseResult *)test didRecordExpectedFailure: (GSXCTestIssue *)failure
 {
     GSPrintLine([NSString stringWithFormat:@"%@: %@ : Expected failure: %@: %@",
@@ -690,7 +704,14 @@ static NSString *GSJUnitTimestamp(NSDate *date)
 // Appends a <failure> or <error> element for a list of failures.
 static void GSAppendJUnitFailures(NSMutableString *xml, NSArray *failures)
 {
-    GSXCTestIssue *first = [failures objectAtIndex:0];
+    GSXCTestIssue *first = nil;
+
+    // A test can be failed with no failure seen by the reporters.
+    if ([failures count] == 0) {
+        failures = [NSArray arrayWithObject:
+            [GSXCTestIssue issueWithMessage:@"failed" filePath:nil lineNumber:0 unexpected:NO]];
+    }
+    first = [failures objectAtIndex:0];
     BOOL unexpected = NO;
     NSMutableArray *lines = [NSMutableArray array];
 
@@ -746,6 +767,7 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
 - (void) suiteDidStart: (GSXCTestSuiteResult *)suite {}
 - (void) testDidStart: (GSXCTestCaseResult *)test {}
 - (void) test: (GSXCTestCaseResult *)test didRecordFailure: (GSXCTestIssue *)failure {}
+- (void) test: (GSXCTestCaseResult *)test didRecordFailureAfterFinishing: (GSXCTestIssue *)failure {}
 - (void) test: (GSXCTestCaseResult *)test didRecordExpectedFailure: (GSXCTestIssue *)failure {}
 - (void) test: (GSXCTestCaseResult *)test didMeasure: (GSXCTMeasurement *)measurement {}
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure {}
@@ -895,152 +917,200 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
 
 - (void) testSuiteWillStart: (XCTestSuite *)testSuite
 {
-    GSXCTestSuiteResult *suite = nil;
+    // Events can come from other threads (late failures).
+    @synchronized (self) {
+        GSXCTestSuiteResult *suite = nil;
 
-    if (testSuite == _topSuite) {
-        [_run setStartDate:[[testSuite testRun] startDate]];
-        GS_REPORT(runDidStart:_run)
-        return;
+        if (testSuite == _topSuite) {
+            [_run setStartDate:[[testSuite testRun] startDate]];
+            GS_REPORT(runDidStart:_run)
+            return;
+        }
+
+        if (![testSuite isKindOfClass:[GSXCTestCaseSuite class]]) {
+            return;
+        }
+
+        suite = [[[GSXCTestSuiteResult alloc] initWithName:[testSuite name]] autorelease];
+        if ([testSuite testCaseCount] == 0) {
+            GS_REPORT(suiteHasNoSelectedTests:suite)
+            return;
+        }
+
+        [suite setStartDate:[[testSuite testRun] startDate]];
+        [[_run suiteResults] addObject:suite];
+        [_currentSuite release];
+        _currentSuite = [suite retain];
+        GS_REPORT(suiteDidStart:suite)
     }
-
-    if (![testSuite isKindOfClass:[GSXCTestCaseSuite class]]) {
-        return;
-    }
-
-    suite = [[[GSXCTestSuiteResult alloc] initWithName:[testSuite name]] autorelease];
-    if ([testSuite testCaseCount] == 0) {
-        GS_REPORT(suiteHasNoSelectedTests:suite)
-        return;
-    }
-
-    [suite setStartDate:[[testSuite testRun] startDate]];
-    [[_run suiteResults] addObject:suite];
-    [_currentSuite release];
-    _currentSuite = [suite retain];
-    GS_REPORT(suiteDidStart:suite)
 }
 
 - (void) testSuiteDidFinish: (XCTestSuite *)testSuite
 {
-    if (testSuite == _topSuite) {
-        [_run setDuration:[[testSuite testRun] totalDuration]];
-        GS_REPORT(runDidFinish:_run)
-        return;
-    }
+    // Events can come from other threads (late failures).
+    @synchronized (self) {
+        if (testSuite == _topSuite) {
+            [_run setDuration:[[testSuite testRun] totalDuration]];
+            GS_REPORT(runDidFinish:_run)
+            return;
+        }
 
-    if (_currentSuite != nil && [testSuite isKindOfClass:[GSXCTestCaseSuite class]]
-        && [[testSuite name] isEqualToString:[_currentSuite name]]) {
-        [_currentSuite setDuration:[[testSuite testRun] totalDuration]];
-        GS_REPORT(suiteDidFinish:_currentSuite)
-        [_currentSuite release];
-        _currentSuite = nil;
+        if (_currentSuite != nil && [testSuite isKindOfClass:[GSXCTestCaseSuite class]]
+            && [[testSuite name] isEqualToString:[_currentSuite name]]) {
+            [_currentSuite setDuration:[[testSuite testRun] totalDuration]];
+            GS_REPORT(suiteDidFinish:_currentSuite)
+            [_currentSuite release];
+            _currentSuite = nil;
+        }
     }
 }
 
 - (void) testCaseWillStart: (XCTestCase *)testCase
 {
-    if (_currentTestCase != nil) {
-        return;
+    // Events can come from other threads (late failures).
+    @synchronized (self) {
+        if (_currentTestCase != nil) {
+            return;
+        }
+
+        GSXCTestCaseResult *test = [[[GSXCTestCaseResult alloc]
+            initWithClassName:NSStringFromClass([testCase class])
+                   methodName:[testCase _gsMethodName]] autorelease];
+
+        [test setStartDate:[[testCase testRun] startDate]];
+        [test setIteration:[testCase _gsIteration]];
+        [test setIterationCount:[testCase _gsIterationCount]];
+        [[_currentSuite testResults] addObject:test];
+        [testCase _gsSetReportResult:test];
+        _currentTestCase = testCase;
+        _currentTest = [test retain];
+        GS_REPORT(testDidStart:test)
     }
-
-    GSXCTestCaseResult *test = [[[GSXCTestCaseResult alloc]
-        initWithClassName:NSStringFromClass([testCase class])
-               methodName:[testCase _gsMethodName]] autorelease];
-
-    [test setStartDate:[[testCase testRun] startDate]];
-    [test setIteration:[testCase _gsIteration]];
-    [test setIterationCount:[testCase _gsIterationCount]];
-    [[_currentSuite testResults] addObject:test];
-    _currentTestCase = testCase;
-    _currentTest = [test retain];
-    GS_REPORT(testDidStart:test)
 }
 
 - (void) _gsTestCase: (XCTestCase *)testCase didRecordIssue: (GSXCTestIssue *)issue
 {
-    // Ignores tests run by the running test, and failures from other
-    // threads that arrive after their test has finished.
-    if (testCase != _currentTestCase || _currentTest == nil) {
-        return;
-    }
+    // Events can come from other threads (late failures).
+    @synchronized (self) {
+        // Ignores tests run by the running test, and failures from other
+        // threads that arrive after their test has finished.
+        if (testCase != _currentTestCase || _currentTest == nil) {
+            return;
+        }
 
-    [[_currentTest failures] addObject:issue];
-    GS_REPORT(test:_currentTest didRecordFailure:issue)
+        [[_currentTest failures] addObject:issue];
+        GS_REPORT(test:_currentTest didRecordFailure:issue)
+    }
 }
 
 - (void) _gsTestCase: (XCTestCase *)testCase didRecordExpectedFailure: (GSXCTestIssue *)issue
 {
-    if (testCase != _currentTestCase || _currentTest == nil) {
-        return;
-    }
+    // Events can come from other threads (late failures).
+    @synchronized (self) {
+        if (testCase != _currentTestCase || _currentTest == nil) {
+            return;
+        }
 
-    [[_currentTest expectedFailures] addObject:issue];
-    GS_REPORT(test:_currentTest didRecordExpectedFailure:issue)
+        [[_currentTest expectedFailures] addObject:issue];
+        GS_REPORT(test:_currentTest didRecordExpectedFailure:issue)
+    }
 }
 
 - (void) _gsTestCase: (XCTestCase *)testCase didMeasure: (GSXCTMeasurement *)measurement
 {
-    if (testCase != _currentTestCase || _currentTest == nil) {
-        return;
-    }
+    // Events can come from other threads (late failures).
+    @synchronized (self) {
+        if (testCase != _currentTestCase || _currentTest == nil) {
+            return;
+        }
 
-    [[_currentTest measurements] addObject:measurement];
-    GS_REPORT(test:_currentTest didMeasure:measurement)
+        [[_currentTest measurements] addObject:measurement];
+        GS_REPORT(test:_currentTest didMeasure:measurement)
+    }
+}
+
+- (void) _gsTestCase: (XCTestCase *)testCase didRecordIssueAfterFinishing: (GSXCTestIssue *)issue
+{
+    // Events can come from other threads (late failures).
+    @synchronized (self) {
+        GSXCTestCaseResult *test = [testCase _gsReportResult];
+
+        // Only tests this observer reported (not ones run by other tests).
+        if (test == nil) {
+            return;
+        }
+
+        [[test failures] addObject:issue];
+        [test setStatus:GSXCTestStatusFailed];
+        GS_REPORT(test:test didRecordFailureAfterFinishing:issue)
+    }
 }
 
 - (void) _gsTestCaseAttemptWasDiscarded: (XCTestCase *)testCase
 {
-    GSXCTestCaseResult *attempt = [[[_currentSuite testResults] lastObject] retain];
+    // Events can come from other threads (late failures).
+    @synchronized (self) {
+        GSXCTestCaseResult *attempt = [[[_currentSuite testResults] lastObject] retain];
 
-    if (attempt == nil) {
-        return;
+        if (attempt == nil) {
+            return;
+        }
+
+        [[_currentSuite testResults] removeLastObject];
+        GS_REPORT(testWillBeRetried:attempt)
+        [attempt release];
     }
-
-    [[_currentSuite testResults] removeLastObject];
-    GS_REPORT(testWillBeRetried:attempt)
-    [attempt release];
 }
 
 - (void) _gsTestSuite: (XCTestSuite *)testSuite didRecordIssue: (GSXCTestIssue *)issue
 {
-    if (_currentSuite == nil || ![[testSuite name] isEqualToString:[_currentSuite name]]) {
-        return;
-    }
+    // Events can come from other threads (late failures).
+    @synchronized (self) {
+        if (_currentSuite == nil || ![[testSuite name] isEqualToString:[_currentSuite name]]) {
+            return;
+        }
 
-    [[_currentSuite classFailures] addObject:issue];
-    GS_REPORT(suite:_currentSuite didRecordClassFailure:issue)
+        [[_currentSuite classFailures] addObject:issue];
+        GS_REPORT(suite:_currentSuite didRecordClassFailure:issue)
+    }
 }
 
 - (void) _gsTestCase: (XCTestCase *)testCase didSkipWithIssue: (GSXCTestIssue *)issue
 {
-    if (testCase == _currentTestCase && _currentTest != nil && [_currentTest skip] == nil) {
-        [_currentTest setSkip:issue];
+    // Events can come from other threads (late failures).
+    @synchronized (self) {
+        if (testCase == _currentTestCase && _currentTest != nil && [_currentTest skip] == nil) {
+            [_currentTest setSkip:issue];
+        }
     }
 }
 
 - (void) testCaseDidFinish: (XCTestCase *)testCase
 {
-    XCTestRun *run = [testCase testRun];
-    GSXCTestCaseResult *test = nil;
+    // Events can come from other threads (late failures).
+    @synchronized (self) {
+        XCTestRun *run = [testCase testRun];
+        GSXCTestCaseResult *test = nil;
 
-    if (testCase != _currentTestCase || _currentTest == nil) {
-        return;
+        if (testCase != _currentTestCase || _currentTest == nil) {
+            return;
+        }
+        test = [_currentTest autorelease];
+        _currentTestCase = nil;
+        _currentTest = nil;
+
+        // A failure outranks a skip, as in Apple's XCTest.
+        if ([run totalFailureCount] > 0) {
+            [test setStatus:GSXCTestStatusFailed];
+        } else if ([run hasBeenSkipped]) {
+            [test setStatus:GSXCTestStatusSkipped];
+        } else {
+            [test setStatus:GSXCTestStatusPassed];
+        }
+        [test setDuration:[run testDuration]];
+
+        GS_REPORT(testDidFinish:test)
     }
-    test = [_currentTest autorelease];
-    _currentTestCase = nil;
-    _currentTest = nil;
-
-    // A failure outranks a skip, as in Apple's XCTest.
-    if ([run totalFailureCount] > 0) {
-        [test setStatus:GSXCTestStatusFailed];
-    } else if ([run hasBeenSkipped]) {
-        [test setStatus:GSXCTestStatusSkipped];
-    } else {
-        [test setStatus:GSXCTestStatusPassed];
-    }
-    [test setDuration:[run testDuration]];
-
-    GS_REPORT(testDidFinish:test)
 }
 
 @end

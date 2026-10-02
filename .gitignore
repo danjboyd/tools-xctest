@@ -20,3 +20,5 @@ Tests/PerformanceFixture/PerformanceFixture.bundle
 Tests/PerformanceFixture/obj
 Tests/RepetitionFixture/RepetitionFixture.bundle
 Tests/RepetitionFixture/obj
+Tests/OutOfTestFixture/OutOfTestFixture.bundle
+Tests/OutOfTestFixture/obj

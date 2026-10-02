@@ -61,6 +61,15 @@
     }
 }
 
+- (void) _gsAddTestObserverFirst: (id<XCTestObservation>)testObserver
+{
+    @synchronized (self) {
+        if (testObserver != nil && [_observers indexOfObjectIdenticalTo:testObserver] == NSNotFound) {
+            [_observers insertObject:testObserver atIndex:0];
+        }
+    }
+}
+
 - (void) removeTestObserver: (id<XCTestObservation>)testObserver
 {
     @synchronized (self) {

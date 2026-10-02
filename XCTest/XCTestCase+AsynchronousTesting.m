@@ -38,6 +38,10 @@ static NSString *GSQuotedDescriptions(NSArray *expectations)
 
 - (id) _gsAddExpectation: (XCTestExpectation *)expectation
 {
+    // The test's array releases its expectations when the test ends, so
+    // this doesn't keep a cycle alive.
+    [expectation _gsSetOwner:self];
+
     @synchronized (self) {
         if (_expectations == nil) {
             _expectations = [[NSMutableArray alloc] init];

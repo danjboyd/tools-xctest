@@ -65,7 +65,18 @@ static BOOL GSObjectsEqual(id a, id b)
 - (void) dealloc
 {
     [_expectationDescription release];
+    [_gsOwner release];
     [super dealloc];
+}
+
+- (void) _gsSetOwner: (XCTestCase *)owner
+{
+    @synchronized (self) {
+        if (owner != _gsOwner) {
+            [_gsOwner release];
+            _gsOwner = [owner retain];
+        }
+    }
 }
 
 - (NSString *) description
@@ -90,7 +101,12 @@ static BOOL GSObjectsEqual(id a, id b)
     }
 
     if (overFulfilled && _assertForOverFulfill) {
-        _XCTRecordFailure([XCTestCase _gsCurrentTestCase],
+        XCTestCase *owner = nil;
+
+        @synchronized (self) {
+            owner = [[_gsOwner retain] autorelease];
+        }
+        _XCTRecordFailure(owner ? owner : [XCTestCase _gsCurrentTestCase],
             [NSString stringWithFormat:@"API violation - multiple calls made to -[XCTestExpectation fulfill] for %@.",
                 _expectationDescription]);
     }

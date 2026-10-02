@@ -38,6 +38,7 @@
     id _gsPerformance;
     NSUInteger _gsIteration;
     NSUInteger _gsIterationCount;
+    id _gsReportResult;
 }
 
 + (id) testCaseWithInvocation: (NSInvocation *)invocation;

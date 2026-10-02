@@ -33,6 +33,7 @@
     BOOL _inverted;
     BOOL _assertForOverFulfill;
     BOOL _hasBeenWaitedOn;
+    id _gsOwner;
 }
 
 - (id) initWithDescription: (NSString *)expectationDescription;
