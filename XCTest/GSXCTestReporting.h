@@ -56,6 +56,7 @@ typedef enum {
     NSString *_methodName;
     GSXCTestStatus _status;
     NSMutableArray *_failures;
+    NSMutableArray *_expectedFailures;
     GSXCTestIssue *_skip;
     NSDate *_startDate;
     NSTimeInterval _duration;
@@ -65,6 +66,8 @@ typedef enum {
 @property (readonly, copy) NSString *methodName;
 @property GSXCTestStatus status;
 @property (readonly) NSMutableArray *failures;
+/*! Failures absorbed by XCTExpectFailure; each issue's context is the reason. */
+@property (readonly) NSMutableArray *expectedFailures;
 @property (retain) GSXCTestIssue *skip;
 @property (retain) NSDate *startDate;
 @property NSTimeInterval duration;
@@ -126,6 +129,7 @@ typedef enum {
 - (void) suiteDidStart: (GSXCTestSuiteResult *)suite;
 - (void) testDidStart: (GSXCTestCaseResult *)test;
 - (void) test: (GSXCTestCaseResult *)test didRecordFailure: (GSXCTestIssue *)failure;
+- (void) test: (GSXCTestCaseResult *)test didRecordExpectedFailure: (GSXCTestIssue *)failure;
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure;
 - (void) testDidFinish: (GSXCTestCaseResult *)test;
 - (void) suiteDidFinish: (GSXCTestSuiteResult *)suite;
