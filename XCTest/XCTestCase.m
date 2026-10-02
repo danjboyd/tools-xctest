@@ -19,10 +19,10 @@
 */
 
 #import <XCTest/XCTestCase.h>
+#import <XCTest/XCTestPrivate.h>
 
-@interface XCTestCase (GSXCTestRunnerPrivate)
-- (void (^)(void)) _gsPopTeardownBlock;
-@end
+// The test being run. Not retained; the runner clears it after each test.
+static XCTestCase *GSCurrentTestCase = nil;
 
 @implementation XCTestCase
 
@@ -48,6 +48,7 @@
 
 - (void) dealloc
 {
+    [self _gsInvalidateExpectations];
     [_teardownBlocks release];
     [super dealloc];
 }
@@ -91,6 +92,16 @@
 @end
 
 @implementation XCTestCase (GSXCTestRunnerPrivate)
+
++ (XCTestCase *) _gsCurrentTestCase
+{
+    return GSCurrentTestCase;
+}
+
++ (void) _gsSetCurrentTestCase: (XCTestCase *)testCase
+{
+    GSCurrentTestCase = testCase;
+}
 
 - (void (^)(void)) _gsPopTeardownBlock
 {

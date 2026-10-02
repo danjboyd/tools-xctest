@@ -20,6 +20,7 @@
 
 #import <XCTest/XCTestAssertions.h>
 #import <GSXCTestRunner.h>
+#import <XCTest/XCTestPrivate.h>
 
 @implementation _XCTestCaseInterruptionException
 @end
@@ -30,6 +31,19 @@
 @interface GSXCTestRunner (GSPrivate)
 - (void)registerAssertionFailed;
 @end
+
+// Stops the test when continueAfterFailure is NO. Only possible on the main
+// thread, where tests run; a failure on another thread is just recorded.
+static void _XCTInterruptIfNeeded(XCTestCase *test)
+{
+    if ([NSThread isMainThread]
+        && [test isKindOfClass:[XCTestCase class]]
+        && ![test continueAfterFailure]) {
+        [[_XCTestCaseInterruptionException exceptionWithName:@"_XCTestCaseInterruptionException"
+                                                      reason:@"Test stopped after failure (continueAfterFailure is NO)"
+                                                    userInfo:nil] raise];
+    }
+}
 
 void _XCTFailureHandler(XCTestCase *test, BOOL expected, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...)
 {
@@ -54,12 +68,15 @@ void _XCTPreformattedFailureHandler(XCTestCase *test, BOOL expected, NSString *f
         ([message length] > 0 ? [NSString stringWithFormat:@": %@", message] : @""));
     
     [[GSXCTestRunner sharedRunner] registerAssertionFailed];
+    _XCTInterruptIfNeeded(test);
+}
 
-    if ([test isKindOfClass:[XCTestCase class]] && ![test continueAfterFailure]) {
-        [[_XCTestCaseInterruptionException exceptionWithName:@"_XCTestCaseInterruptionException"
-                                                      reason:@"Test stopped after failure (continueAfterFailure is NO)"
-                                                    userInfo:nil] raise];
-    }
+void _XCTRecordFailure(XCTestCase *test, NSString *description)
+{
+    NSLog(@"XCTest:     FAILED: %@", description);
+
+    [[GSXCTestRunner sharedRunner] registerAssertionFailed];
+    _XCTInterruptIfNeeded(test);
 }
 
 void _XCTSkipHandler(XCTestCase *test, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...)
