@@ -6,6 +6,23 @@
 @interface FixtureException : NSException
 @end
 
+@interface PassingIdentityTests : XCTestCase
+@end
+
+@implementation PassingIdentityTests
+
+- (void)testIdentityAssertionsPass
+{
+    NSString *a = [NSMutableString stringWithString:@"a"];
+    NSString *b = [NSMutableString stringWithString:@"a"];
+
+    XCTAssertIdentical(a, a);
+    XCTAssertNotIdentical(a, b);
+    XCTAssertEqualObjects(a, b);
+}
+
+@end
+
 @implementation FixtureException
 @end
 
@@ -29,6 +46,8 @@
 - (void)testNotEqualWithAccuracy { XCTAssertNotEqualWithAccuracy(1.0, 1.05, 0.1); }
 - (void)testEqualObjects { XCTAssertEqualObjects(@"a", @"b"); }
 - (void)testNotEqualObjects { XCTAssertNotEqualObjects(@"a", @"a"); }
+- (void)testIdentical { XCTAssertIdentical([NSMutableString stringWithString:@"a"], [NSMutableString stringWithString:@"a"]); }
+- (void)testNotIdentical { NSObject *object = [NSObject new]; XCTAssertNotIdentical(object, object); [object release]; }
 - (void)testNil { XCTAssertNil(@"x"); }
 - (void)testNotNil { XCTAssertNotNil(nil); }
 - (void)testGreaterThan { XCTAssertGreaterThan(1, 2); }

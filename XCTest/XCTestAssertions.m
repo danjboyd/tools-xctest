@@ -214,6 +214,14 @@ static NSString * const _XCTFailureFormats[][4] = {
         @"((%@) does not throw <%@>) failed: threw <%@> \"%@\"" },
     [_XCTAssertion_NoThrowSpecificNamed] = {
         @"((%@) does not throw <%@, \"%@\">) failed: threw <%@, \"%@\"> \"%@\"" },
+    [_XCTAssertion_Identical] = {
+        @"((%@) identical to (%@)) failed: (\"%@\") is not identical to (\"%@\")",
+        @"((%@) identical to (%@))" _XCT_THROWING,
+        @"((%@) identical to (%@))" _XCT_THROWING_UNKNOWN },
+    [_XCTAssertion_NotIdentical] = {
+        @"((%@) not identical to (%@)) failed: (\"%@\") is identical to (\"%@\")",
+        @"((%@) not identical to (%@))" _XCT_THROWING,
+        @"((%@) not identical to (%@))" _XCT_THROWING_UNKNOWN },
 };
 
 NSString * _XCTFailureFormat (_XCTAssertionType assertionType, NSUInteger formatIndex)

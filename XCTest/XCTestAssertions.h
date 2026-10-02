@@ -95,6 +95,28 @@
     _XCTPrimitiveAssertEqualObjects(self, expression1, @#expression1, expression2, @#expression2, __VA_ARGS__)
 
 /*!
+ * @define XCTAssertIdentical(expression1, expression2, ...)
+ * Generates a failure when ((\a expression1) != (\a expression2)), i.e. when they are not the same object.
+ * Not part of Apple's Objective-C XCTest; mirrors its Swift XCTAssertIdentical.
+ * @param expression1 An expression of id type.
+ * @param expression2 An expression of id type.
+ * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
+*/
+#define XCTAssertIdentical(expression1, expression2, ...) \
+    _XCTPrimitiveAssertIdentical(self, expression1, @#expression1, expression2, @#expression2, YES, __VA_ARGS__)
+
+/*!
+ * @define XCTAssertNotIdentical(expression1, expression2, ...)
+ * Generates a failure when ((\a expression1) == (\a expression2)), i.e. when they are the same object.
+ * Not part of Apple's Objective-C XCTest; mirrors its Swift XCTAssertNotIdentical.
+ * @param expression1 An expression of id type.
+ * @param expression2 An expression of id type.
+ * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
+*/
+#define XCTAssertNotIdentical(expression1, expression2, ...) \
+    _XCTPrimitiveAssertIdentical(self, expression1, @#expression1, expression2, @#expression2, NO, __VA_ARGS__)
+
+/*!
  * @define XCTAssertNotEqualObjects(expression1, expression2, ...)
  * Generates a failure when ((\a expression1) equal to (\a expression2)).
  * @param expression1 An expression of id type.
