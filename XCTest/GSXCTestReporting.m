@@ -472,8 +472,9 @@ static NSString *GSSkippedSummary(NSUInteger skipCount)
             [[measurement baselineAverage] doubleValue], [measurement maxPercentRegression]]
         : @"";
 
-    NSLog(@"XCTest:     %@ measured [Time, seconds] average: %.6f, relative standard deviation: %.3f%%%@, values: %@",
-        [test methodName], [measurement average], [measurement relativeStandardDeviation], baseline,
+    NSLog(@"XCTest:     %@ measured %@ average: %.6f, relative standard deviation: %.3f%%%@, values: %@",
+        [test methodName], [measurement metricDescription], [measurement average],
+        [measurement relativeStandardDeviation], baseline,
         [measurement valuesDescription]);
 }
 
@@ -664,13 +665,13 @@ static NSString *GSAppleLocation(GSXCTestIssue *issue)
 - (void) test: (GSXCTestCaseResult *)test didMeasure: (GSXCTMeasurement *)measurement
 {
     // The shape of Apple's measurement line.
-    GSPrintLine([NSString stringWithFormat:@"Test Case '%@' measured [Time, seconds] average: %.3f, "
+    GSPrintLine([NSString stringWithFormat:@"Test Case '%@' measured %@ average: %.3f, "
         @"relative standard deviation: %.3f%%, values: %@, performanceMetricID:%@, baselineName: \"\", "
-        @"baselineAverage: %@, polarity: prefers smaller, maxPercentRegression: %.3f%%",
-        GSAppleTestName(test), [measurement average], [measurement relativeStandardDeviation],
-        [measurement valuesDescription], [measurement metricIdentifier],
+        @"baselineAverage: %@, polarity: %@, maxPercentRegression: %.3f%%",
+        GSAppleTestName(test), [measurement metricDescription], [measurement average],
+        [measurement relativeStandardDeviation], [measurement valuesDescription], [measurement metricIdentifier],
         [measurement baselineAverage] ? [NSString stringWithFormat:@"%.3f", [[measurement baselineAverage] doubleValue]] : @"",
-        [measurement maxPercentRegression]]);
+        [measurement polarityDescription], [measurement maxPercentRegression]]);
 }
 
 - (void) test: (GSXCTestCaseResult *)test didStartActivity: (NSArray *)activityPath atTime: (NSTimeInterval)time
@@ -948,8 +949,8 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
                 }
                 for (GSXCTMeasurement *measurement in [test measurements]) {
                     [lines addObject:[NSString stringWithFormat:
-                        @"measured [Time, seconds] average: %.6f, relative standard deviation: %.3f%%, values: %@",
-                        [measurement average], [measurement relativeStandardDeviation],
+                        @"measured %@ average: %.6f, relative standard deviation: %.3f%%, values: %@",
+                        [measurement metricDescription], [measurement average], [measurement relativeStandardDeviation],
                         [measurement valuesDescription]]];
                 }
                 for (GSXCTAttachmentRecord *attachment in savedAttachments) {

@@ -538,27 +538,51 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     return YES;
 }
 
-- (NSDictionary *)_gsPerformanceBaselineForTest:(NSString *)identifier
+// The legacy wall-clock metric's baseline is the test's entry itself
+// ({"average", "maxPercentRegression"}); other metrics' are in its
+// "metrics" object, by measurement identifier.
+- (NSDictionary *)_gsPerformanceBaselineForTest:(NSString *)identifier metric:(NSString *)metric
 {
+    NSDictionary *entry = [performanceBaselines objectForKey:identifier];
+    id metrics = [entry objectForKey:@"metrics"];
+
     // When recording new baselines, don't judge against the old ones.
     if (updatePerformanceBaselines) {
         return nil;
     }
 
-    return [performanceBaselines objectForKey:identifier];
+    if ([metric isEqualToString:XCTPerformanceMetric_WallClockTime]) {
+        return [entry objectForKey:@"average"] ? entry : nil;
+    }
+    return [metrics isKindOfClass:[NSDictionary class]] ? [metrics objectForKey:metric] : nil;
 }
 
-- (void)_gsRecordPerformanceAverage:(double)average forTest:(NSString *)identifier
+- (void)_gsRecordPerformanceAverage:(double)average forTest:(NSString *)identifier metric:(NSString *)metric
 {
-    NSMutableDictionary *baseline = [performanceBaselines objectForKey:identifier];
+    NSMutableDictionary *entry = [performanceBaselines objectForKey:identifier];
+    NSMutableDictionary *baseline = nil;
 
     if (!updatePerformanceBaselines) {
         return;
     }
 
-    if (baseline == nil) {
-        baseline = [NSMutableDictionary dictionary];
-        [performanceBaselines setObject:baseline forKey:identifier];
+    if (entry == nil) {
+        entry = [NSMutableDictionary dictionary];
+        [performanceBaselines setObject:entry forKey:identifier];
+    }
+    if ([metric isEqualToString:XCTPerformanceMetric_WallClockTime]) {
+        baseline = entry;
+    } else {
+        id metrics = [entry objectForKey:@"metrics"];
+        NSMutableDictionary *mutableMetrics = [metrics isKindOfClass:[NSDictionary class]]
+            ? [[metrics mutableCopy] autorelease] : [NSMutableDictionary dictionary];
+
+        baseline = [[[mutableMetrics objectForKey:metric] mutableCopy] autorelease];
+        if (![baseline isKindOfClass:[NSMutableDictionary class]]) {
+            baseline = [NSMutableDictionary dictionary];
+        }
+        [mutableMetrics setObject:baseline forKey:metric];
+        [entry setObject:mutableMetrics forKey:@"metrics"];
     }
     [baseline setObject:[NSNumber numberWithDouble:average] forKey:@"average"];
 }

@@ -69,6 +69,7 @@ source = [
 	'XCTest/GSXCTestWatchdog.m',
 	'XCTest/XCTContext.m',
 	'XCTest/XCTAttachment.m',
+	'XCTest/XCTMetric.m',
 ]
 
 headers = [
@@ -91,6 +92,7 @@ headers = [
 	'XCTest/XCTActivity.h',
 	'XCTest/XCTContext.h',
 	'XCTest/XCTAttachment.h',
+	'XCTest/XCTMetric.h',
 ]
 
 include_dirs = include_directories(
@@ -154,6 +156,7 @@ if host_machine.system() != 'darwin'
     ['activities', 'run-activity-tests.sh'],
     ['attachments', 'run-attachment-tests.sh'],
     ['order', 'run-order-tests.sh'],
+    ['metrics', 'run-metric-tests.sh'],
     ['hosted', 'run-hosted-tests.sh'],
   ]
 

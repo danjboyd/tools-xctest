@@ -19,10 +19,10 @@
 */
 
 #import <XCTest/XCTestCase.h>
+#import <XCTest/XCTMetric.h>
 #import <XCTest/XCTestPrivate.h>
 
 #include <math.h>
-#include <time.h>
 
 XCTPerformanceMetric const XCTPerformanceMetric_WallClockTime = @"com.apple.XCTPerformanceMetric_WallClockTime";
 
@@ -30,13 +30,26 @@ XCTPerformanceMetric const XCTPerformanceMetric_WallClockTime = @"com.apple.XCTP
 static const NSUInteger GSMeasureIterations = 10;
 static const double GSDefaultMaxPercentRegression = 10.0;
 
-static double GSMonotonicSeconds(void)
-{
-    struct timespec now;
+/*! The metric behind -measureBlock:, reported as Apple reports it. */
+@interface GSXCTWallClockMetric : XCTClockMetric
+@end
 
-    clock_gettime(CLOCK_MONOTONIC, &now);
-    return now.tv_sec + now.tv_nsec / 1e9;
+@implementation GSXCTWallClockMetric
+
+- (NSArray *) reportMeasurementsFromStartTime: (XCTPerformanceMeasurementTimestamp *)startTime
+                                    toEndTime: (XCTPerformanceMeasurementTimestamp *)endTime
+                                        error: (NSError **)error
+{
+    double seconds = ([endTime absoluteTime] - [startTime absoluteTime]) / 1e9;
+
+    return [NSArray arrayWithObject:[[[XCTPerformanceMeasurement alloc]
+        initWithIdentifier:XCTPerformanceMetric_WallClockTime
+               displayName:@"Time"
+               doubleValue:seconds
+                unitSymbol:@"seconds"] autorelease]];
 }
+
+@end
 
 /*! Per-test measuring state. */
 @interface GSXCTPerformanceState : NSObject {
@@ -45,17 +58,30 @@ static double GSMonotonicSeconds(void)
     BOOL insideMeasureBlock;
     NSUInteger startCount;
     NSUInteger stopCount;
-    double startTime;
-    double elapsed;
+    NSArray *metrics;
+    XCTPerformanceMeasurementTimestamp *startTime;
+    XCTPerformanceMeasurementTimestamp *endTime;
 }
 @end
 
 @implementation GSXCTPerformanceState
+
+- (void) dealloc
+{
+    [metrics release];
+    [startTime release];
+    [endTime release];
+    [super dealloc];
+}
+
 @end
 
 @implementation GSXCTMeasurement
 
 @synthesize metricIdentifier = _metricIdentifier;
+@synthesize displayName = _displayName;
+@synthesize unitSymbol = _unitSymbol;
+@synthesize polarity = _polarity;
 @synthesize values = _values;
 @synthesize baselineAverage = _baselineAverage;
 @synthesize maxPercentRegression = _maxPercentRegression;
@@ -63,6 +89,8 @@ static double GSMonotonicSeconds(void)
 - (void) dealloc
 {
     [_metricIdentifier release];
+    [_displayName release];
+    [_unitSymbol release];
     [_values release];
     [_baselineAverage release];
     [super dealloc];
@@ -92,7 +120,7 @@ static double GSMonotonicSeconds(void)
         squares += ([value doubleValue] - average) * ([value doubleValue] - average);
     }
 
-    return sqrt(squares / ([_values count] - 1)) / average * 100.0;
+    return fabs(sqrt(squares / ([_values count] - 1)) / average * 100.0);
 }
 
 - (NSString *) valuesDescription
@@ -104,6 +132,20 @@ static double GSMonotonicSeconds(void)
     }
 
     return [NSString stringWithFormat:@"[%@]", [values componentsJoinedByString:@", "]];
+}
+
+- (NSString *) metricDescription
+{
+    return [NSString stringWithFormat:@"[%@, %@]", _displayName, _unitSymbol];
+}
+
+- (NSString *) polarityDescription
+{
+    switch (_polarity) {
+        case XCTPerformanceMeasurementPolarityPrefersLarger: return @"prefers larger";
+        case XCTPerformanceMeasurementPolarityUnspecified: return @"unspecified";
+        default: return @"prefers smaller";
+    }
 }
 
 @end
@@ -146,7 +188,45 @@ automaticallyStartMeasuring: (BOOL)automaticallyStartMeasuring
                forBlock: (void (^)(void))block
 {
     GSXCTPerformanceState *state = [self _gsPerformanceState];
-    NSMutableArray *values = [NSMutableArray arrayWithCapacity:GSMeasureIterations];
+
+    if (state->measured) {
+        [self _gsPerformanceFailure:@"API violation - measure methods can only be called once per test."];
+        return;
+    }
+
+    for (NSString *metric in metrics) {
+        if (![metric isEqualToString:XCTPerformanceMetric_WallClockTime]) {
+            state->measured = YES;
+            [self _gsPerformanceFailure:[NSString stringWithFormat:@"Unsupported performance metric: %@", metric]];
+            return;
+        }
+    }
+    if (![metrics containsObject:XCTPerformanceMetric_WallClockTime]) {
+        state->measured = YES;
+        [self _gsPerformanceFailure:@"No performance metrics to measure."];
+        return;
+    }
+
+    [self _gsMeasureMetrics:[NSArray arrayWithObject:[[[GSXCTWallClockMetric alloc] init] autorelease]]
+                 iterations:GSMeasureIterations
+             automaticStart:automaticallyStartMeasuring
+              automaticStop:automaticallyStartMeasuring
+                      block:block];
+}
+
+// Runs \a block \a iterations times, with \a metrics measuring each run,
+// then reports what they measured.
+- (void) _gsMeasureMetrics: (NSArray *)metrics
+                iterations: (NSUInteger)iterations
+            automaticStart: (BOOL)automaticStart
+             automaticStop: (BOOL)automaticStop
+                     block: (void (^)(void))block
+{
+    GSXCTPerformanceState *state = [self _gsPerformanceState];
+    // Measurement identifier -> GSXCTMeasurement, in the order first reported.
+    NSMutableArray *identifiers = [NSMutableArray array];
+    NSMutableDictionary *measurements = [NSMutableDictionary dictionary];
+    NSMutableDictionary *values = [NSMutableDictionary dictionary];
 
     if (state->measured) {
         [self _gsPerformanceFailure:@"API violation - measure methods can only be called once per test."];
@@ -154,30 +234,37 @@ automaticallyStartMeasuring: (BOOL)automaticallyStartMeasuring
     }
     state->measured = YES;
 
-    for (NSString *metric in metrics) {
-        if (![metric isEqualToString:XCTPerformanceMetric_WallClockTime]) {
-            [self _gsPerformanceFailure:[NSString stringWithFormat:@"Unsupported performance metric: %@", metric]];
-            return;
-        }
-    }
-    if (![metrics containsObject:XCTPerformanceMetric_WallClockTime]) {
+    if ([metrics count] == 0) {
         [self _gsPerformanceFailure:@"No performance metrics to measure."];
         return;
     }
+    if (iterations == 0) {
+        [self _gsPerformanceFailure:@"The iteration count must be at least 1."];
+        return;
+    }
 
-    for (NSUInteger iteration = 0; iteration < GSMeasureIterations; iteration++) {
+    [state->metrics release];
+    state->metrics = [metrics copy];
+
+    for (NSUInteger iteration = 0; iteration < iterations; iteration++) {
         state->startCount = 0;
         state->stopCount = 0;
-        state->elapsed = 0;
         state->insideMeasureBlock = YES;
+
+        for (id<XCTMetric> metric in metrics) {
+            if ([metric respondsToSelector:@selector(willBeginMeasuring)]) {
+                [metric willBeginMeasuring];
+            }
+        }
 
         @try {
             @autoreleasepool {
-                if (automaticallyStartMeasuring) {
+                if (automaticStart) {
                     [self startMeasuring];
                 }
                 block();
-                if (automaticallyStartMeasuring && state->stopCount == 0) {
+                // A run that never started is reported below, not stopped.
+                if (automaticStop && state->stopCount == 0 && state->startCount > 0) {
                     [self stopMeasuring];
                 }
             }
@@ -190,23 +277,55 @@ automaticallyStartMeasuring: (BOOL)automaticallyStartMeasuring
             [self _gsPerformanceFailure:@"Must call -startMeasuring and -stopMeasuring once in each run of the measured block."];
             return;
         }
-        [values addObject:[NSNumber numberWithDouble:state->elapsed]];
+
+        for (id<XCTMetric> metric in metrics) {
+            NSError *error = nil;
+            NSArray *reported = [metric reportMeasurementsFromStartTime:state->startTime
+                                                              toEndTime:state->endTime
+                                                                  error:&error];
+
+            if (reported == nil) {
+                [self _gsPerformanceFailure:[NSString stringWithFormat:@"Failed to measure %@: %@",
+                    NSStringFromClass([(NSObject *)metric class]),
+                    error ? [error localizedDescription] : @"no measurements"]];
+                return;
+            }
+            for (XCTPerformanceMeasurement *reportedMeasurement in reported) {
+                NSString *identifier = [reportedMeasurement identifier];
+
+                if ([measurements objectForKey:identifier] == nil) {
+                    GSXCTMeasurement *measurement = [[[GSXCTMeasurement alloc] init] autorelease];
+
+                    [measurement setMetricIdentifier:identifier];
+                    [measurement setDisplayName:[reportedMeasurement displayName]];
+                    [measurement setUnitSymbol:[reportedMeasurement unitSymbol]];
+                    [measurement setPolarity:[reportedMeasurement polarity]];
+                    [measurements setObject:measurement forKey:identifier];
+                    [values setObject:[NSMutableArray array] forKey:identifier];
+                    [identifiers addObject:identifier];
+                }
+                [[values objectForKey:identifier] addObject:
+                    [NSNumber numberWithDouble:[reportedMeasurement doubleValue]]];
+            }
+        }
     }
 
-    [self _gsReportMeasurementWithValues:values];
+    for (NSString *identifier in identifiers) {
+        GSXCTMeasurement *measurement = [measurements objectForKey:identifier];
+
+        [measurement setValues:[values objectForKey:identifier]];
+        [self _gsReportMeasurement:measurement];
+    }
 }
 
-- (void) _gsReportMeasurementWithValues: (NSArray *)values
+- (void) _gsReportMeasurement: (GSXCTMeasurement *)measurement
 {
     GSXCTestRunner *runner = [GSXCTestRunner sharedRunner];
-    NSString *identifier = [NSString stringWithFormat:@"%@/%@",
+    NSString *test = [NSString stringWithFormat:@"%@/%@",
         NSStringFromClass([self class]), [self _gsMethodName]];
-    NSDictionary *baseline = [runner _gsPerformanceBaselineForTest:identifier];
-    GSXCTMeasurement *measurement = [[[GSXCTMeasurement alloc] init] autorelease];
+    NSDictionary *baseline = [runner _gsPerformanceBaselineForTest:test metric:[measurement metricIdentifier]];
     NSNumber *maxRegression = [baseline objectForKey:@"maxPercentRegression"];
 
-    [measurement setMetricIdentifier:XCTPerformanceMetric_WallClockTime];
-    [measurement setValues:values];
     [measurement setBaselineAverage:[baseline objectForKey:@"average"]];
     [measurement setMaxPercentRegression:maxRegression ? [maxRegression doubleValue] : GSDefaultMaxPercentRegression];
 
@@ -216,18 +335,22 @@ automaticallyStartMeasuring: (BOOL)automaticallyStartMeasuring
         }
     }];
 
-    [runner _gsRecordPerformanceAverage:[measurement average] forTest:identifier];
+    [runner _gsRecordPerformanceAverage:[measurement average] forTest:test metric:[measurement metricIdentifier]];
 
-    if ([measurement baselineAverage] != nil) {
+    // Only a known polarity says which way is worse.
+    if ([measurement baselineAverage] != nil && [measurement polarity] != XCTPerformanceMeasurementPolarityUnspecified) {
         double baselineAverage = [[measurement baselineAverage] doubleValue];
+        double change = [measurement average] - baselineAverage;
         double percentWorse = baselineAverage > 0
-            ? ([measurement average] - baselineAverage) / baselineAverage * 100.0
+            ? ([measurement polarity] == XCTPerformanceMeasurementPolarityPrefersLarger ? -change : change)
+                / baselineAverage * 100.0
             : 0;
 
         if (percentWorse > [measurement maxPercentRegression]) {
             [self _gsPerformanceRegression:[NSString stringWithFormat:
-                @"[Time, seconds] average: %.6f, %.1f%% worse than baseline %.6f (max allowed regression %.1f%%)",
-                [measurement average], percentWorse, baselineAverage, [measurement maxPercentRegression]]];
+                @"%@ average: %.6f, %.1f%% worse than baseline %.6f (max allowed regression %.1f%%)",
+                [measurement metricDescription], [measurement average], percentWorse, baselineAverage,
+                [measurement maxPercentRegression]]];
         }
     }
 }
@@ -245,12 +368,18 @@ automaticallyStartMeasuring: (BOOL)automaticallyStartMeasuring
         return;
     }
 
-    state->startTime = GSMonotonicSeconds();
+    for (id<XCTMetric> metric in state->metrics) {
+        if ([metric respondsToSelector:@selector(didStartMeasuring)]) {
+            [metric didStartMeasuring];
+        }
+    }
+    [state->startTime release];
+    state->startTime = [[XCTPerformanceMeasurementTimestamp alloc] init];
 }
 
 - (void) stopMeasuring
 {
-    double now = GSMonotonicSeconds();
+    XCTPerformanceMeasurementTimestamp *now = [[[XCTPerformanceMeasurementTimestamp alloc] init] autorelease];
     GSXCTPerformanceState *state = [self _gsPerformanceState];
 
     if (!state->insideMeasureBlock) {
@@ -266,7 +395,50 @@ automaticallyStartMeasuring: (BOOL)automaticallyStartMeasuring
         return;
     }
 
-    state->elapsed = now - state->startTime;
+    [state->endTime release];
+    state->endTime = [now retain];
+    for (id<XCTMetric> metric in state->metrics) {
+        if ([metric respondsToSelector:@selector(didStopMeasuring)]) {
+            [metric didStopMeasuring];
+        }
+    }
+}
+
+@end
+
+@implementation XCTestCase (XCTPerformanceAnalysis)
+
++ (NSArray *) defaultMetrics
+{
+    return [NSArray arrayWithObject:[[[XCTClockMetric alloc] init] autorelease]];
+}
+
++ (XCTMeasureOptions *) defaultMeasureOptions
+{
+    return [XCTMeasureOptions defaultOptions];
+}
+
+- (void) measureWithMetrics: (NSArray *)metrics block: (void (^)(void))block
+{
+    [self measureWithMetrics:metrics options:[[self class] defaultMeasureOptions] block:block];
+}
+
+- (void) measureWithOptions: (XCTMeasureOptions *)options block: (void (^)(void))block
+{
+    [self measureWithMetrics:[[self class] defaultMetrics] options:options block:block];
+}
+
+- (void) measureWithMetrics: (NSArray *)metrics
+                    options: (XCTMeasureOptions *)options
+                      block: (void (^)(void))block
+{
+    XCTMeasurementInvocationOptions invocation = [options invocationOptions];
+
+    [self _gsMeasureMetrics:metrics
+                 iterations:(options ? [options iterationCount] : 5)
+             automaticStart:!(invocation & XCTMeasurementInvocationManuallyStart)
+              automaticStop:!(invocation & XCTMeasurementInvocationManuallyStop)
+                      block:block];
 }
 
 @end
