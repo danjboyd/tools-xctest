@@ -40,6 +40,7 @@
     NSUInteger _gsIteration;
     NSUInteger _gsIterationCount;
     id _gsReportResult;
+    NSTimeInterval _executionTimeAllowance;
 }
 
 + (id) testCaseWithInvocation: (NSInvocation *)invocation;
@@ -97,6 +98,18 @@
  * When NO, the first failure stops the current test; teardown still runs.
  */
 @property BOOL continueAfterFailure;
+
+/*!
+ * How long the test may run, including set up and teardown, when xctest
+ * runs with time limits (-test-timeouts-enabled YES, or one of the
+ * execution time allowance options). Defaults to
+ * -default-test-execution-time-allowance (600 seconds); a test can change
+ * it, e.g. in -setUp, and -maximum-test-execution-time-allowance caps it.
+ * Unlike Apple's XCTest, it isn't rounded up to whole minutes. A test that
+ * runs out of time fails, the run's reports are written, and xctest exits
+ * without running the remaining tests.
+ */
+@property NSTimeInterval executionTimeAllowance;
 
 /*!
  * Called once before the first test of the class runs, and once after the

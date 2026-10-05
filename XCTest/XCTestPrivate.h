@@ -57,6 +57,17 @@ void _XCTRecordFailure(XCTestCase *test, NSString *description);
 // where tests run; a failure on another thread is just recorded.
 void _XCTInterruptIfNeeded(XCTestCase *test);
 
+// Per-test time limits (GSXCTestWatchdog.m). An allowance of 0 uses the
+// default (600 seconds) or, for the maximum, means none.
+void _GSXCTSetTimeouts(BOOL enabled, NSTimeInterval defaultAllowance, NSTimeInterval maximumAllowance);
+NSTimeInterval _GSXCTDefaultExecutionTimeAllowance(void);
+// Called around each test and suite as it runs, on the thread running it.
+void _GSXCTWatchdogTestWillStart(XCTestCase *test);
+void _GSXCTWatchdogTestDidFinish(XCTestCase *test);
+void _GSXCTWatchdogAllowanceDidChange(void);
+void _GSXCTWatchdogSuiteWillStart(XCTestSuite *suite);
+void _GSXCTWatchdogSuiteDidFinish(XCTestSuite *suite);
+
 // Every XCTestCase subclass, sorted by name.
 NSArray *_GSXCTestCaseSubclasses(void);
 
@@ -128,6 +139,12 @@ NSString *_GSXCTDescribeException(NSException *exception);
 - (void) _gsTestCase: (XCTestCase *)testCase didRecordIssueAfterFinishing: (GSXCTestIssue *)issue;
 // A failed attempt that will be retried, and so no longer counts.
 - (void) _gsTestCaseAttemptWasDiscarded: (XCTestCase *)testCase;
+@end
+
+@interface GSXCTestRunner (GSTerminationPrivate)
+// Ends the process early (a test ran out of time): tells observers the
+// bundle finished, then calls the termination handler or exits.
+- (void) _gsTerminateWithExitCode: (int)exitCode;
 @end
 
 @interface GSXCTestRunner (GSPerformancePrivate)

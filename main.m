@@ -46,7 +46,26 @@ static void PrintUsage(FILE *stream)
     fprintf(stream, "  -test-iterations <n>        Run each test n times (the maximum, with the two options below)\n");
     fprintf(stream, "  -run-tests-until-failure    Repeat each test until it fails (at most 100 times by default)\n");
     fprintf(stream, "  -retry-tests-on-failure     Retry a failing test until it passes (at most 3 times by default)\n");
+    fprintf(stream, "  -test-timeouts-enabled YES|NO  Fail a test that runs longer than its execution time allowance,\n");
+    fprintf(stream, "                              then stop the run (default NO)\n");
+    fprintf(stream, "  -default-test-execution-time-allowance <s>  Each test's allowance unless it sets its own\n");
+    fprintf(stream, "                              (default 600; implies -test-timeouts-enabled YES)\n");
+    fprintf(stream, "  -maximum-test-execution-time-allowance <s>  Cap on any test's allowance\n");
+    fprintf(stream, "                              (implies -test-timeouts-enabled YES)\n");
     fprintf(stream, "  -h, --help                  Show this help message\n");
+}
+
+// Parses a number of seconds greater than 0 from argv[i + 1]; returns -1
+// if there is none or it isn't valid.
+static NSTimeInterval ParseSeconds(int argc, char *argv[], int i)
+{
+    char *end = NULL;
+    double seconds = (i + 1 < argc) ? strtod(argv[i + 1], &end) : -1;
+
+    if (end == NULL || end == argv[i + 1] || *end != '\0' || seconds <= 0) {
+        return -1;
+    }
+    return seconds;
 }
 
 static NSString *TargetNameForBundlePath(NSString *testBundlePath)
@@ -81,7 +100,8 @@ static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString
                           GSXCTestOutputFormat outputFormat, NSString *junitReportPath,
                           NSString *performanceBaselinesPath, BOOL updatePerformanceBaselines,
                           GSXCTestRepetitionMode repetitionMode, NSInteger testIterations,
-                          NSTimeInterval launchTimeout)
+                          BOOL testTimeoutsEnabled, NSTimeInterval defaultAllowance,
+                          NSTimeInterval maximumAllowance, NSTimeInterval launchTimeout)
 {
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSString *executable = hostPath;
@@ -123,6 +143,9 @@ static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString
     [config setObject:statusFile forKey:@"statusFile"];
     [config setObject:[NSNumber numberWithInt:repetitionMode] forKey:@"repetitionMode"];
     [config setObject:[NSNumber numberWithInteger:testIterations] forKey:@"testIterations"];
+    [config setObject:[NSNumber numberWithBool:testTimeoutsEnabled] forKey:@"testTimeoutsEnabled"];
+    [config setObject:[NSNumber numberWithDouble:defaultAllowance] forKey:@"defaultExecutionTimeAllowance"];
+    [config setObject:[NSNumber numberWithDouble:maximumAllowance] forKey:@"maximumExecutionTimeAllowance"];
     if (performanceBaselinesPath != nil) {
         [config setObject:([performanceBaselinesPath isAbsolutePath] ? performanceBaselinesPath
                            : [[fileManager currentDirectoryPath] stringByAppendingPathComponent:performanceBaselinesPath])
@@ -271,6 +294,10 @@ int main(int argc, char *argv[]) {
     BOOL runUntilFailure = NO;
     BOOL retryOnFailure = NO;
     GSXCTestRepetitionMode repetitionMode = GSXCTestRepetitionNone;
+    BOOL testTimeoutsEnabled = NO;
+    BOOL testTimeoutsOptionGiven = NO;
+    NSTimeInterval defaultAllowance = 0;
+    NSTimeInterval maximumAllowance = 0;
 
     if (argc == 1) {
         PrintUsage(stderr);
@@ -368,6 +395,37 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        if ([argument isEqualToString:@"-test-timeouts-enabled"]) {
+            NSString *value = (i + 1 < argc) ? [NSString stringWithUTF8String:argv[++i]] : nil;
+            if ([value caseInsensitiveCompare:@"YES"] == NSOrderedSame) {
+                testTimeoutsEnabled = YES;
+            } else if ([value caseInsensitiveCompare:@"NO"] == NSOrderedSame) {
+                testTimeoutsEnabled = NO;
+            } else {
+                fprintf(stderr, "xctest: -test-timeouts-enabled must be YES or NO\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            testTimeoutsOptionGiven = YES;
+            continue;
+        }
+
+        if ([argument isEqualToString:@"-default-test-execution-time-allowance"]
+            || [argument isEqualToString:@"-maximum-test-execution-time-allowance"]) {
+            NSTimeInterval seconds = ParseSeconds(argc, argv, i++);
+            if (seconds < 0) {
+                fprintf(stderr, "xctest: %s needs a number of seconds greater than 0\n", argv[i - 1]);
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            if ([argument hasPrefix:@"-default"]) {
+                defaultAllowance = seconds;
+            } else {
+                maximumAllowance = seconds;
+            }
+            continue;
+        }
+
         if ([argument isEqualToString:@"-update-performance-baselines"]) {
             updatePerformanceBaselines = YES;
             continue;
@@ -433,6 +491,11 @@ int main(int argc, char *argv[]) {
         repetitionMode = GSXCTestRepetitionFixed;
     }
 
+    // Giving an allowance turns time limits on, unless they were turned off.
+    if (!testTimeoutsOptionGiven && (defaultAllowance > 0 || maximumAllowance > 0)) {
+        testTimeoutsEnabled = YES;
+    }
+
     if (updatePerformanceBaselines && performanceBaselinesPath == nil) {
         fprintf(stderr, "xctest: -update-performance-baselines needs -performance-baselines <path>\n");
         goto cleanup;
@@ -449,7 +512,8 @@ int main(int argc, char *argv[]) {
         exitCode = RunTestsInHost(hostPath, testBundlePath, TargetNameForBundlePath(testBundlePath),
                                   onlyTestIdentifiers, skipTestIdentifiers, outputFormat, junitReportPath,
                                   performanceBaselinesPath, updatePerformanceBaselines,
-                                  repetitionMode, testIterations, hostLaunchTimeout);
+                                  repetitionMode, testIterations, testTimeoutsEnabled,
+                                  defaultAllowance, maximumAllowance, hostLaunchTimeout);
         goto cleanup;
     }
 
@@ -482,6 +546,9 @@ int main(int argc, char *argv[]) {
     [runner setRepetitionMode:repetitionMode];
     [runner setTestIterations:(NSUInteger)testIterations];
     [runner setJunitReportPath:junitReportPath];
+    [runner setTestTimeoutsEnabled:testTimeoutsEnabled];
+    [runner setDefaultExecutionTimeAllowance:defaultAllowance];
+    [runner setMaximumExecutionTimeAllowance:maximumAllowance];
     BOOL result = [runner runTestsForTargetName:targetName
                             onlyTestIdentifiers:onlyTestIdentifiers
                             skipTestIdentifiers:skipTestIdentifiers];

@@ -178,6 +178,17 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     [super dealloc];
 }
 
+- (NSTimeInterval) executionTimeAllowance
+{
+    return _executionTimeAllowance > 0 ? _executionTimeAllowance : _GSXCTDefaultExecutionTimeAllowance();
+}
+
+- (void) setExecutionTimeAllowance: (NSTimeInterval)executionTimeAllowance
+{
+    _executionTimeAllowance = executionTimeAllowance;
+    _GSXCTWatchdogAllowanceDidChange();
+}
+
 - (NSInvocation *) invocation
 {
     return [[_invocation retain] autorelease];
@@ -437,6 +448,7 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
     [self _gsSetTestRun:run];
     GSCurrentTestCase = self;
     [run start];
+    _GSXCTWatchdogTestWillStart(self);
 
     @autoreleasepool {
         // invokeTest handles its own failures; this catches anything an
@@ -461,6 +473,7 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
         [self _gsInvalidateExpectations];
     }
 
+    _GSXCTWatchdogTestDidFinish(self);
     [run stop];
     GSCurrentTestCase = previous;
 }

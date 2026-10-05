@@ -29,10 +29,13 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 // Settings from xctest, as JSON: bundlePath, targetName, bundleName, only,
 // skip, outputFormat, junitReport, performanceBaselines,
-// updatePerformanceBaselines, repetitionMode, testIterations, statusFile.
+// updatePerformanceBaselines, repetitionMode, testIterations,
+// testTimeoutsEnabled, defaultExecutionTimeAllowance,
+// maximumExecutionTimeAllowance, statusFile.
 // "<statusFile>.started" is created when the tests start, so xctest can
 // tell a slow test run from an app that never finished launching.
 static NSDictionary *GSHostConfig = nil;
@@ -85,6 +88,20 @@ static NSDictionary *GSHostConfig = nil;
     [self performSelector:@selector(runTests) withObject:nil afterDelay:0];
 }
 
+// Tells xctest the tests ran, so it can tell this exit apart from the
+// application quitting on its own.
+static void GSWriteStatusFile(int exitCode)
+{
+    NSString *statusFile = [GSHostConfig objectForKey:@"statusFile"];
+
+    if ([statusFile isKindOfClass:[NSString class]]) {
+        [[NSString stringWithFormat:@"%d\n", exitCode] writeToFile:statusFile
+                                                         atomically:YES
+                                                           encoding:NSUTF8StringEncoding
+                                                              error:NULL];
+    }
+}
+
 + (void) runTests
 {
     int exitCode = 1;
@@ -118,6 +135,16 @@ static NSDictionary *GSHostConfig = nil;
             }
             [runner setRepetitionMode:(GSXCTestRepetitionMode)[[GSHostConfig objectForKey:@"repetitionMode"] intValue]];
             [runner setTestIterations:[[GSHostConfig objectForKey:@"testIterations"] unsignedIntegerValue]];
+            [runner setTestTimeoutsEnabled:[[GSHostConfig objectForKey:@"testTimeoutsEnabled"] boolValue]];
+            [runner setDefaultExecutionTimeAllowance:[[GSHostConfig objectForKey:@"defaultExecutionTimeAllowance"] doubleValue]];
+            [runner setMaximumExecutionTimeAllowance:[[GSHostConfig objectForKey:@"maximumExecutionTimeAllowance"] doubleValue]];
+            // A test that runs out of time ends the application early.
+            [runner setTerminationHandler:^(int code) {
+                GSWriteStatusFile(code);
+                fflush(stdout);
+                fflush(stderr);
+                _exit(code);
+            }];
             if ([[GSHostConfig objectForKey:@"performanceBaselines"] isKindOfClass:[NSString class]]) {
                 [runner setPerformanceBaselinesPath:[GSHostConfig objectForKey:@"performanceBaselines"]];
                 [runner setUpdatePerformanceBaselines:[[GSHostConfig objectForKey:@"updatePerformanceBaselines"] boolValue]];
@@ -128,14 +155,7 @@ static NSDictionary *GSHostConfig = nil;
                                  skipTestIdentifiers:[GSHostConfig objectForKey:@"skip"]] ? 0 : 1;
         }
 
-        // Tells xctest the tests ran, so it can tell this exit apart from
-        // the application quitting on its own.
-        if ([statusFile isKindOfClass:[NSString class]]) {
-            [[NSString stringWithFormat:@"%d\n", exitCode] writeToFile:statusFile
-                                                             atomically:YES
-                                                               encoding:NSUTF8StringEncoding
-                                                                  error:NULL];
-        }
+        GSWriteStatusFile(exitCode);
     }
 
     fflush(stdout);

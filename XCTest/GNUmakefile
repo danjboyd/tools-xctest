@@ -10,7 +10,7 @@ XCTest_HEADER_FILES = XCTest.h XCTestAssertions.h XCTestAssertionsImpl.h XCTestC
 XCTest_OBJC_FILES = XCTestAssertions.m XCTestCase.m GSXCTestRunner.m \
 	XCTestExpectation.m XCTWaiter.m XCTestCase+AsynchronousTesting.m GSXCTestReporting.m \
 	XCAbstractTest.m XCTestSuite.m XCTestRun.m XCTestObservationCenter.m \
-	XCTIssue.m XCTExpectedFailure.m XCTestCase+Performance.m
+	XCTIssue.m XCTExpectedFailure.m XCTestCase+Performance.m GSXCTestWatchdog.m
 XCTest_INCLUDE_DIRS = -I../
 
 # Preloaded into host applications by `xctest -host`.

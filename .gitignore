@@ -24,3 +24,5 @@ Tests/OutOfTestFixture/OutOfTestFixture.bundle
 Tests/OutOfTestFixture/obj
 Tests/IssueFixture/IssueFixture.bundle
 Tests/IssueFixture/obj
+Tests/TimeoutFixture/TimeoutFixture.bundle
+Tests/TimeoutFixture/obj

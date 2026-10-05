@@ -34,6 +34,9 @@
 
 #import <objc/runtime.h>
 
+#include <stdio.h>
+#include <unistd.h>
+
 @interface GSXCTestRunner ()
 - (NSArray *)testPlanForTargetName:(NSString *)targetName
                onlyTestIdentifiers:(NSArray *)onlyTestIdentifiers
@@ -133,6 +136,10 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 @synthesize updatePerformanceBaselines;
 @synthesize repetitionMode;
 @synthesize testIterations;
+@synthesize testTimeoutsEnabled;
+@synthesize defaultExecutionTimeAllowance;
+@synthesize maximumExecutionTimeAllowance;
+@synthesize terminationHandler;
 
 - (id)init
 {
@@ -153,6 +160,7 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     [performanceBaselines release];
     [bundleName release];
     [junitReportPath release];
+    [terminationHandler release];
     [super dealloc];
 }
 
@@ -385,6 +393,7 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     [run setFiltersActive:filtersActive];
 
     [GSXCTestCaseSuite _gsSetRepetitionMode:repetitionMode iterations:testIterations];
+    _GSXCTSetTimeouts(testTimeoutsEnabled, defaultExecutionTimeAllowance, maximumExecutionTimeAllowance);
     [self _gsCreatePrincipalObject];
     // First, so its results exist before other observers' callbacks run.
     [center _gsAddTestObserverFirst:(id<XCTestObservation>)reportingObserver];
@@ -513,6 +522,26 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     }
 
     principalObject = [[principalClass alloc] init];
+}
+
+- (void)_gsTerminateWithExitCode:(int)exitCode
+{
+    void (^handler)(int) = [[terminationHandler retain] autorelease];
+
+    if (testBundle != nil) {
+        [[XCTestObservationCenter sharedTestObservationCenter] _gsNotifyObservers:^(id observer) {
+            if ([observer respondsToSelector:@selector(testBundleDidFinish:)]) {
+                [observer testBundleDidFinish:testBundle];
+            }
+        }];
+    }
+
+    fflush(stdout);
+    fflush(stderr);
+    if (handler != nil) {
+        handler(exitCode);
+    }
+    _exit(exitCode);
 }
 
 - (void)waitForCompletion

@@ -58,6 +58,10 @@ typedef enum {
     GSXCTestOutputFormat outputFormat;
     NSString *bundleName;
     NSString *junitReportPath;
+    BOOL testTimeoutsEnabled;
+    NSTimeInterval defaultExecutionTimeAllowance;
+    NSTimeInterval maximumExecutionTimeAllowance;
+    void (^terminationHandler)(int exitCode);
 }
 
 @property GSXCTestOutputFormat outputFormat;
@@ -92,6 +96,26 @@ typedef enum {
 @property GSXCTestRepetitionMode repetitionMode;
 /*! The number of runs (or maximum attempts) per test when repeating. */
 @property NSUInteger testIterations;
+
+/*!
+ * If YES, each test may run for at most its executionTimeAllowance
+ * (including set up and teardown). A test that runs out of time fails;
+ * the run's reports are finished and the process ends (see
+ * terminationHandler) without running the remaining tests.
+ */
+@property BOOL testTimeoutsEnabled;
+/*! The default executionTimeAllowance of each test, in seconds; 0 for the
+ * default of 600. */
+@property NSTimeInterval defaultExecutionTimeAllowance;
+/*! A cap on executionTimeAllowance, in seconds; 0 for none. */
+@property NSTimeInterval maximumExecutionTimeAllowance;
+
+/*!
+ * Called, on another thread, instead of exiting when a run has to end the
+ * process early (a test ran out of time), after the reports are written.
+ * It should not return; if it does, the process exits with exitCode.
+ */
+@property (copy) void (^terminationHandler)(int exitCode);
 
 - (BOOL)runAll;
 - (BOOL)runTestsNamed:(NSArray *)testNames; // nil for all tests
