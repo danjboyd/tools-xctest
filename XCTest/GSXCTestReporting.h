@@ -39,6 +39,7 @@ typedef enum {
     BOOL _unexpected;
     NSString *_context;
     XCTIssue *_xctIssue;
+    NSArray *_activityPath;
 }
 + (GSXCTestIssue *) issueWithMessage: (NSString *)message
                             filePath: (NSString *)filePath
@@ -57,6 +58,12 @@ typedef enum {
 @property BOOL unexpected;
 /*! For class-level issues, "+setUp" or "+tearDown". */
 @property (copy) NSString *context;
+/*! The XCTContext activities the issue was recorded in, outermost first
+ * (those running on the recording thread when it was created); or nil. */
+@property (copy) NSArray *activityPath;
+/*! The message, after the activity path if there is one:
+ * "Log in > Enter password: message". */
+- (NSString *) displayMessage;
 @end
 
 /*! One performance measurement: the values of each run of the block. */
@@ -170,6 +177,9 @@ typedef enum {
 - (void) test: (GSXCTestCaseResult *)test didRecordFailureAfterFinishing: (GSXCTestIssue *)failure;
 - (void) test: (GSXCTestCaseResult *)test didRecordExpectedFailure: (GSXCTestIssue *)failure;
 - (void) test: (GSXCTestCaseResult *)test didMeasure: (GSXCTMeasurement *)measurement;
+/*! An XCTContext activity started, \a time seconds after the test did.
+ * \a activityPath is its name after those of the activities around it. */
+- (void) test: (GSXCTestCaseResult *)test didStartActivity: (NSArray *)activityPath atTime: (NSTimeInterval)time;
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure;
 - (void) testDidFinish: (GSXCTestCaseResult *)test;
 /*! A failed attempt that will be retried; it has been removed from its suite. */
