@@ -95,4 +95,29 @@ if [ "$invalid_status" -eq 0 ]; then
 fi
 assert_contains "$invalid_output" "Invalid test identifier"
 
+# Bundles named .xctest (as Xcode and buildtool make them) work, with
+# Apple's -XCTest selection syntax.
+xctest_dir=$(mktemp -d)
+cp -r "$source_root/Tests/FilterFixture/FilterFixture.bundle" "$xctest_dir/FilterFixture.xctest"
+run_xctest_bundle() {
+  set +e
+  output=$(LD_LIBRARY_PATH="$xctest_lib_dir${runtime_lib_dirs:+:$runtime_lib_dirs}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
+    "$xctest_bin" "$@" "$xctest_dir/FilterFixture.xctest" 2>&1)
+  status=$?
+  set -e
+}
+run_xctest_bundle -XCTest All -list-tests
+[ "$output" = $'FilterFixture/AlphaTests/testOne\nFilterFixture/AlphaTests/testTwo\nFilterFixture/BetaTests/testThree' ] \
+  || { echo "expected -XCTest All to list every test of the .xctest bundle: $output" >&2; exit 1; }
+run_xctest_bundle -XCTest AlphaTests/testTwo,BetaTests -list-tests
+[ "$output" = $'FilterFixture/AlphaTests/testTwo\nFilterFixture/BetaTests/testThree' ] \
+  || { echo "expected -XCTest to select Class/method and Class: $output" >&2; exit 1; }
+run_xctest_bundle -XCTest AlphaTests/testOne
+[ "$status" -eq 0 ] || { echo "expected -XCTest AlphaTests/testOne to pass: $output" >&2; exit 1; }
+assert_contains "$output" "AlphaTests: 1 tests PASSED"
+run_xctest_bundle -XCTest ""
+[ "$status" -eq 1 ] || { echo "expected -XCTest without tests to fail" >&2; exit 1; }
+assert_contains "$output" "missing tests for -XCTest"
+rm -rf "$xctest_dir"
+
 echo "CLI filter tests passed."

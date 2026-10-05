@@ -34,6 +34,7 @@ static void PrintUsage(FILE *stream)
     fprintf(stream, "Options:\n");
     fprintf(stream, "  -only-testing:<identifier>  Run only tests matching TestTarget[/TestClass[/TestMethod]]\n");
     fprintf(stream, "  -skip-testing:<identifier>  Skip tests matching TestTarget[/TestClass[/TestMethod]]\n");
+    fprintf(stream, "  -XCTest <tests>             Apple's xctest selection: All, or Class[/method],... (comma-separated)\n");
     fprintf(stream, "  -output-format <format>     Console output: 'classic' (default) or 'apple'\n");
     fprintf(stream, "  -junit-report <path>        Also write results to <path> as JUnit XML\n");
     fprintf(stream, "  -attachments-path <dir>     Save test attachments under <dir> (default: next to the\n");
@@ -298,6 +299,7 @@ int main(int argc, char *argv[]) {
     int exitCode = 1;
     NSMutableArray *onlyTestIdentifiers = [NSMutableArray array];
     NSMutableArray *skipTestIdentifiers = [NSMutableArray array];
+    NSMutableArray *appleSelections = nil;
     NSString *testBundlePath = nil;
     GSXCTestOutputFormat outputFormat = GSXCTestOutputFormatClassic;
     NSString *junitReportPath = nil;
@@ -361,6 +363,28 @@ int main(int argc, char *argv[]) {
             }
 
             [skipTestIdentifiers addObject:identifier];
+            continue;
+        }
+
+        // Apple's `xctest -XCTest Class/method,Class2 Bundle.xctest`, as
+        // Xcode runs it; the bundle's name is the target.
+        if ([argument isEqualToString:@"-XCTest"]) {
+            NSString *selection = (i + 1 < argc) ? [NSString stringWithUTF8String:argv[++i]] : nil;
+            if ([selection length] == 0) {
+                fprintf(stderr, "xctest: missing tests for -XCTest\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            if (![selection isEqualToString:@"All"]) {
+                if (appleSelections == nil) {
+                    appleSelections = [NSMutableArray array];
+                }
+                for (NSString *test in [selection componentsSeparatedByString:@","]) {
+                    if ([test length] > 0) {
+                        [appleSelections addObject:test];
+                    }
+                }
+            }
             continue;
         }
 
@@ -613,6 +637,12 @@ int main(int argc, char *argv[]) {
         fprintf(stderr, "xctest: missing test bundle path\n");
         PrintUsage(stderr);
         goto cleanup;
+    }
+
+    // -XCTest selections are TestTarget/... identifiers for this bundle.
+    for (NSString *test in appleSelections) {
+        NSString *target = TargetNameForBundlePath(testBundlePath);
+        [onlyTestIdentifiers addObject:[NSString stringWithFormat:@"%@/%@", target ? target : @"", test]];
     }
 
     // In a host application the bundle is loaded there, not here.
