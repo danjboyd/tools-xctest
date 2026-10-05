@@ -41,10 +41,22 @@ XCTEST_TEST_SCRIPTS = cli-filter \
 	attachment \
 	order \
 	metric \
-	parallel
+	parallel \
+	make-helper
 
 after-check:: all
 	@set -e; for name in $(XCTEST_TEST_SCRIPTS); do \
 	  echo "./Tests/run-$$name-tests.sh"; \
 	  ./Tests/run-$$name-tests.sh "$(CURDIR)/obj/xctest" "$(CURDIR)/XCTest/obj" "$(CURDIR)" "$(dir $(GNUSTEP_MAKEFILES))Libraries"; \
 	done
+
+# xctest.make, for projects' test bundles, and xctest-bundle, for other
+# build systems. (GNUSTEP_TOOLS already includes DESTDIR; GNUSTEP_MAKEFILES
+# doesn't.)
+after-install::
+	$(MKDIRS) "$(DESTDIR)$(GNUSTEP_MAKEFILES)/Auxiliary" "$(GNUSTEP_TOOLS)"
+	$(INSTALL_DATA) xctest.make "$(DESTDIR)$(GNUSTEP_MAKEFILES)/Auxiliary/xctest.make"
+	$(INSTALL_PROGRAM) xctest-bundle "$(GNUSTEP_TOOLS)/xctest-bundle"
+
+after-uninstall::
+	rm -f "$(DESTDIR)$(GNUSTEP_MAKEFILES)/Auxiliary/xctest.make" "$(GNUSTEP_TOOLS)/xctest-bundle"

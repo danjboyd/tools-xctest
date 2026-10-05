@@ -134,7 +134,26 @@ xctest_host_lib = library(
 # Build XCTest tool
 xctest_tool = executable('xctest', 'main.m', link_with: xctest_lib, install: true)
 
+# xctest-bundle wraps a shared library of tests as a bundle xctest can load
+# (see the README for using it from Meson).
+xctest_bundle_script = files('xctest-bundle')
+install_data('xctest-bundle', install_dir: get_option('bindir'), install_mode: 'rwxr-xr-x')
+
 if host_machine.system() != 'darwin'
+  # For gnustep-make projects: include $(GNUSTEP_MAKEFILES)/Auxiliary/xctest.make
+  install_data('xctest.make', install_dir: join_paths(gnustep_makefiles, 'Auxiliary'))
+
+  # A test bundle built the way the README shows for Meson projects.
+  meson_fixture_lib = shared_module('FilterFixture', 'Tests/FilterFixture/FilterFixture.m',
+                                    include_directories: include_directories('.'),
+                                    link_with: xctest_lib,
+                                    name_prefix: '')
+  meson_fixture_bundle = custom_target('FilterFixture.xctest',
+                                       input: meson_fixture_lib,
+                                       output: 'FilterFixture.xctest',
+                                       command: [xctest_bundle_script, '@OUTPUT@', '@INPUT@'],
+                                       build_by_default: true)
+
   xctest_test_env = environment()
   xctest_test_env.set('GNUSTEP_MAKEFILES', gnustep_makefiles)
 
@@ -159,8 +178,14 @@ if host_machine.system() != 'darwin'
     ['order', 'run-order-tests.sh'],
     ['metrics', 'run-metric-tests.sh'],
     ['parallel', 'run-parallel-tests.sh'],
+    ['make-helper', 'run-make-helper-tests.sh'],
     ['hosted', 'run-hosted-tests.sh'],
   ]
+
+  test('meson-bundle', xctest_tool,
+       args: [meson_fixture_bundle.full_path(), '-only-testing:FilterFixture/AlphaTests'],
+       depends: [meson_fixture_bundle],
+       is_parallel: false)
 
   foreach t : xctest_tests
     test(t[0],

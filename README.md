@@ -113,7 +113,40 @@ xctest -host MyApp.app MyAppTests.bundle
 
 `xctest` launches the app with `libXCTestHost` preloaded. Once the app has finished launching (after its own `applicationDidFinishLaunching:`), the test bundle is loaded and its tests run on the main thread inside the app, which then exits with the result. The app needs no changes. Filters, `-output-format` and `-junit-report` work as usual. If the app hasn't started the tests within 60 seconds (`-host-launch-timeout <seconds>`; 0 waits forever), `xctest` stops it and fails; the tests themselves have no time limit. On a headless machine, run it under `xvfb-run -a`. Tests that also run without a host can skip themselves with `XCTSkipUnless(NSApp != nil)`.
 
-You will need to compile the test cases into one or more bundles, as `xctest` expects `.bundle`'s. 
+## Building test bundles
+
+`xctest` runs test bundles. With gnustep-make, include the `xctest.make` that tools-xctest installs:
+
+```make
+include $(GNUSTEP_MAKEFILES)/common.make
+
+XCTEST_BUNDLE_NAME = MyTests
+MyTests_OBJC_FILES = FooTests.m BarTests.m
+
+include $(GNUSTEP_MAKEFILES)/Auxiliary/xctest.make
+```
+
+`make` builds `MyTests.xctest`, linked with XCTest, and `make check` runs it with `xctest`, failing if any test fails. Test bundles aren't installed. `XCTEST_BUNDLE_NAME` can list several bundles; the usual bundle variables (`MyTests_INCLUDE_DIRS`, `MyTests_BUNDLE_LIBS`, ...) still apply. Options for the run go in `XCTEST_FLAGS` (e.g. `make check XCTEST_FLAGS="-junit-report results.xml"`) or `MyTests_XCTEST_FLAGS`; `XCTEST_HOST=MyApp.app` runs the tests inside an application, and `XCTEST_LAUNCHER="xvfb-run -a"` runs `xctest` under another command. See the comments at the top of `xctest.make` for the rest.
+
+With Meson (or anything that can build a shared library), build the tests as a shared module and wrap it as a bundle with the installed `xctest-bundle` script:
+
+```meson
+xctest = find_program('xctest')
+xctest_bundle = find_program('xctest-bundle')
+
+my_tests_lib = shared_module('MyTests', 'FooTests.m', 'BarTests.m',
+                             dependencies: [gnustep_dep],
+                             link_args: ['-lXCTest'],
+                             name_prefix: '')
+my_tests = custom_target('MyTests.xctest',
+                         input: my_tests_lib,
+                         output: 'MyTests.xctest',
+                         command: [xctest_bundle, '@OUTPUT@', '@INPUT@'],
+                         build_by_default: true)
+test('MyTests', xctest, args: [my_tests.full_path()], depends: [my_tests])
+```
+
+
 
 ## Running Tests
 Tests can be run using the command line tool provided by `tools-xctest`. This can be done by navigating to the directory containing your test cases and executing:
