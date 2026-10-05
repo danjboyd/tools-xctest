@@ -74,6 +74,13 @@ run_hosted -host-launch-timeout 2 -only-testing:HostedFixture/HostedSlowTests
 assert_status 0
 assert_contains "HostedSlowTests: 1 tests PASSED"
 
+# Test time limits apply in the host; running out of time still reports.
+run_hosted -default-test-execution-time-allowance 1 -only-testing:HostedFixture/HostedSlowTests
+assert_status 1
+assert_contains "testSlow: Test exceeded execution time allowance of 1 second"
+assert_contains "exceeded its execution time allowance of 1 second; stopping the run"
+assert_not_contains "before running the tests"
+
 run_hosted -host-launch-timeout soon
 assert_status 1
 assert_contains "-host-launch-timeout needs a number of seconds"

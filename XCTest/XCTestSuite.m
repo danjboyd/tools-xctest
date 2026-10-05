@@ -168,6 +168,7 @@ NSArray *_GSXCTestCaseSubclasses(void)
 {
     [self _gsSetTestRun:run];
     [run start];
+    _GSXCTWatchdogSuiteWillStart(self);
     [self setUp];
     for (XCTest *test in _tests) {
         @autoreleasepool {
@@ -176,6 +177,7 @@ NSArray *_GSXCTestCaseSubclasses(void)
         }
     }
     [self tearDown];
+    _GSXCTWatchdogSuiteDidFinish(self);
     [run stop];
 }
 
@@ -335,6 +337,7 @@ static NSUInteger GSRepetitionIterations = 1;
     [self _gsSetTestRun:run];
     GSCurrentClassSuite = self;
     [run start];
+    _GSXCTWatchdogSuiteWillStart(self);
 
     if ([_tests count] > 0) {
         GSXCTestIssue *classSkip = nil;
@@ -369,6 +372,7 @@ static NSUInteger GSRepetitionIterations = 1;
         }
     }
 
+    _GSXCTWatchdogSuiteDidFinish(self);
     [run stop];
     GSCurrentClassSuite = previous;
 }

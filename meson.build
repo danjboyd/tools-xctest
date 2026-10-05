@@ -66,6 +66,7 @@ source = [
 	'XCTest/XCTIssue.m',
 	'XCTest/XCTExpectedFailure.m',
 	'XCTest/XCTestCase+Performance.m',
+	'XCTest/GSXCTestWatchdog.m',
 ]
 
 headers = [
@@ -144,6 +145,7 @@ if host_machine.system() != 'darwin'
     ['repetition', 'run-repetition-tests.sh'],
     ['out-of-test', 'run-out-of-test-tests.sh'],
     ['issues', 'run-issue-tests.sh'],
+    ['timeouts', 'run-timeout-tests.sh'],
     ['hosted', 'run-hosted-tests.sh'],
   ]
 
