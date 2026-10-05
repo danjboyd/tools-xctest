@@ -72,7 +72,8 @@ static void _XCTRecordFailureAt(id test, NSString *description, NSString *filePa
         return;
     }
 
-    [test recordFailureWithDescription:description inFile:filePath atLine:lineNumber expected:expected];
+    [test recordIssue:_GSXCTMakeIssue(expected ? XCTIssueTypeAssertionFailure : XCTIssueTypeUncaughtException,
+                                      description, filePath, lineNumber, nil)];
 }
 
 void _XCTFailureHandler(id test, BOOL expected, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...)

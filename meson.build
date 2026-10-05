@@ -143,6 +143,7 @@ if host_machine.system() != 'darwin'
     ['performance', 'run-performance-tests.sh'],
     ['repetition', 'run-repetition-tests.sh'],
     ['out-of-test', 'run-out-of-test-tests.sh'],
+    ['issues', 'run-issue-tests.sh'],
     ['hosted', 'run-hosted-tests.sh'],
   ]
 

@@ -21,6 +21,7 @@
 #import <Foundation/Foundation.h>
 
 @class XCTest;
+@class XCTIssue;
 
 /*!
  * The results of running a test: timing, failures and skips. Starting and
@@ -66,6 +67,12 @@
 @property (readonly) BOOL hasSucceeded;
 @property (readonly) BOOL hasBeenSkipped;
 
+/*! Counts \a issue (as an unexpected exception if it's an uncaught
+ * exception, otherwise as a failure) and tells observers about it. */
+- (void) recordIssue: (XCTIssue *)issue;
+
+/*! Records an assertion failure (\a expected YES) or an uncaught
+ * exception as an issue. Superseded by -recordIssue:. */
 - (void) recordFailureWithDescription: (NSString *)description
                                inFile: (NSString *)filePath
                                atLine: (NSUInteger)lineNumber

@@ -148,10 +148,13 @@ NSString *_GSXCTDescribeException(NSException *exception)
                                atLine: (NSUInteger)lineNumber
                              expected: (BOOL)expected
 {
-    [self _gsRecordIssue:[GSXCTestIssue issueWithMessage:description
-                                                filePath:filePath
-                                              lineNumber:lineNumber
-                                              unexpected:!expected]];
+    [self recordIssue:_GSXCTMakeIssue(expected ? XCTIssueTypeAssertionFailure : XCTIssueTypeUncaughtException,
+                                      description, filePath, lineNumber, nil)];
+}
+
+- (void) recordIssue: (XCTIssue *)issue
+{
+    [self _gsRecordIssue:[GSXCTestIssue issueWithXCTIssue:issue]];
 }
 
 - (void) _gsRecordIssue: (GSXCTestIssue *)issue
@@ -207,6 +210,9 @@ NSString *_GSXCTDescribeException(NSException *exception)
 
     [super _gsRecordIssue:issue];
     [[XCTestObservationCenter sharedTestObservationCenter] _gsNotifyObservers:^(id observer) {
+        if ([observer respondsToSelector:@selector(testCase:didRecordIssue:)]) {
+            [observer testCase:testCase didRecordIssue:[issue xctIssue]];
+        }
         if ([observer respondsToSelector:@selector(testCase:didFailWithDescription:inFile:atLine:)]) {
             [observer testCase:testCase didFailWithDescription:[issue message]
                         inFile:[issue filePath] atLine:[issue lineNumber]];
@@ -376,6 +382,9 @@ NSString *_GSXCTDescribeException(NSException *exception)
         [_ownIssues addObject:issue];
     }
     [[XCTestObservationCenter sharedTestObservationCenter] _gsNotifyObservers:^(id observer) {
+        if ([observer respondsToSelector:@selector(testSuite:didRecordIssue:)]) {
+            [observer testSuite:suite didRecordIssue:[issue xctIssue]];
+        }
         if ([observer respondsToSelector:@selector(testSuite:didFailWithDescription:inFile:atLine:)]) {
             [observer testSuite:suite didFailWithDescription:[issue message]
                          inFile:[issue filePath] atLine:[issue lineNumber]];

@@ -45,12 +45,45 @@
     return issue;
 }
 
++ (GSXCTestIssue *) issueWithXCTIssue: (XCTIssue *)xctIssue
+{
+    GSXCTestIssue *issue = [self issueWithMessage:[xctIssue compactDescription]
+                                         filePath:_GSXCTIssueFilePath(xctIssue)
+                                       lineNumber:_GSXCTIssueLineNumber(xctIssue)
+                                       unexpected:_GSXCTIssueIsUnexpected(xctIssue)];
+
+    [issue setXctIssue:xctIssue];
+    return issue;
+}
+
 - (void) dealloc
 {
     [_message release];
     [_filePath release];
     [_context release];
+    [_xctIssue release];
     [super dealloc];
+}
+
+- (XCTIssue *) xctIssue
+{
+    @synchronized (self) {
+        if (_xctIssue == nil) {
+            _xctIssue = [_GSXCTMakeIssue(_unexpected ? XCTIssueTypeUncaughtException : XCTIssueTypeAssertionFailure,
+                                         _message, _filePath, _lineNumber, nil) retain];
+        }
+        return [[_xctIssue retain] autorelease];
+    }
+}
+
+- (void) setXctIssue: (XCTIssue *)xctIssue
+{
+    @synchronized (self) {
+        if (xctIssue != _xctIssue) {
+            [_xctIssue release];
+            _xctIssue = [xctIssue retain];
+        }
+    }
 }
 
 @end

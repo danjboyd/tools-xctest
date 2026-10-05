@@ -30,6 +30,24 @@
 #import <XCTest/XCTWaiter.h>
 #import <XCTest/GSXCTestReporting.h>
 #import <XCTest/GSXCTestRunner.h>
+#import <XCTest/XCTIssue.h>
+
+@class XCTIssue;
+@class XCTSourceCodeLocation;
+
+// An issue at \a filePath:\a lineNumber (no location if filePath is nil).
+XCTIssue *_GSXCTMakeIssue(XCTIssueType type, NSString *description,
+                          NSString *filePath, NSUInteger lineNumber, NSError *error);
+// An issue's file path as recorded (e.g. __FILE__, not made absolute), or nil.
+NSString *_GSXCTIssueFilePath(XCTIssue *issue);
+NSUInteger _GSXCTIssueLineNumber(XCTIssue *issue);
+// YES for issues counted as unexpected (uncaught exceptions), as Apple's
+// XCTestRun counts them.
+BOOL _GSXCTIssueIsUnexpected(XCTIssue *issue);
+
+@interface XCTSourceCodeLocation (GSPrivate)
+- (NSString *) _gsFilePath;
+@end
 
 // Records a failure that has no source location (e.g. a failed wait)
 // against a test, or the running test if \a test is nil.

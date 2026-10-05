@@ -22,6 +22,7 @@
 
 @class XCTestSuite;
 @class XCTestCase;
+@class XCTIssue;
 
 /*!
  * Observers registered with XCTestObservationCenter receive these as tests
@@ -34,12 +35,18 @@
 - (void) testBundleWillStart: (NSBundle *)testBundle;
 - (void) testBundleDidFinish: (NSBundle *)testBundle;
 - (void) testSuiteWillStart: (XCTestSuite *)testSuite;
+/*! An issue recorded on the suite itself, e.g. in a class's +setUp. */
+- (void) testSuite: (XCTestSuite *)testSuite didRecordIssue: (XCTIssue *)issue;
+/*! Superseded by testSuite:didRecordIssue:; both are sent. */
 - (void) testSuite: (XCTestSuite *)testSuite
 didFailWithDescription: (NSString *)description
             inFile: (NSString *)filePath
             atLine: (NSUInteger)lineNumber;
 - (void) testSuiteDidFinish: (XCTestSuite *)testSuite;
 - (void) testCaseWillStart: (XCTestCase *)testCase;
+/*! An issue that fails the test (not one absorbed by XCTExpectFailure). */
+- (void) testCase: (XCTestCase *)testCase didRecordIssue: (XCTIssue *)issue;
+/*! Superseded by testCase:didRecordIssue:; both are sent. */
 - (void) testCase: (XCTestCase *)testCase
 didFailWithDescription: (NSString *)description
            inFile: (NSString *)filePath

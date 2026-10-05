@@ -126,7 +126,12 @@ static double GSMonotonicSeconds(void)
 
 - (void) _gsPerformanceFailure: (NSString *)description
 {
-    [self recordFailureWithDescription:description inFile:nil atLine:0 expected:YES];
+    [self recordIssue:_GSXCTMakeIssue(XCTIssueTypeAssertionFailure, description, nil, 0, nil)];
+}
+
+- (void) _gsPerformanceRegression: (NSString *)description
+{
+    [self recordIssue:_GSXCTMakeIssue(XCTIssueTypePerformanceRegression, description, nil, 0, nil)];
 }
 
 - (void) measureBlock: (void (^)(void))block
@@ -220,7 +225,7 @@ automaticallyStartMeasuring: (BOOL)automaticallyStartMeasuring
             : 0;
 
         if (percentWorse > [measurement maxPercentRegression]) {
-            [self _gsPerformanceFailure:[NSString stringWithFormat:
+            [self _gsPerformanceRegression:[NSString stringWithFormat:
                 @"[Time, seconds] average: %.6f, %.1f%% worse than baseline %.6f (max allowed regression %.1f%%)",
                 [measurement average], percentWorse, baselineAverage, [measurement maxPercentRegression]]];
         }

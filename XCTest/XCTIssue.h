@@ -29,23 +29,73 @@ typedef enum {
     XCTIssueTypeUnmatchedExpectedFailure = 5,
 } XCTIssueType;
 
+/*! A file and line in the source code. */
+@interface XCTSourceCodeLocation : NSObject {
+    NSString *_filePath;
+    NSInteger _lineNumber;
+}
+
+- (id) initWithFileURL: (NSURL *)fileURL lineNumber: (NSInteger)lineNumber;
+- (id) initWithFilePath: (NSString *)filePath lineNumber: (NSInteger)lineNumber;
+
+@property (readonly) NSURL *fileURL;
+@property (readonly) NSInteger lineNumber;
+
+@end
+
+/*! Where an issue was recorded. (Call stacks are not captured.) */
+@interface XCTSourceCodeContext : NSObject {
+    XCTSourceCodeLocation *_location;
+}
+
+- (id) initWithLocation: (XCTSourceCodeLocation *)location;
+
+/*! nil when the issue has no source location. */
+@property (readonly) XCTSourceCodeLocation *location;
+
+@end
+
 /*!
- * A problem recorded during a test. Passed to the issueMatcher of
- * XCTExpectedFailureOptions. (A subset of Apple's XCTIssue.)
+ * A problem recorded during a test: a failed assertion, a thrown error, an
+ * uncaught exception, a performance regression, and so on. Every failure
+ * is recorded with -[XCTestCase recordIssue:].
  */
-@interface XCTIssue : NSObject <NSCopying> {
+@interface XCTIssue : NSObject <NSCopying, NSMutableCopying> {
     XCTIssueType _type;
     NSString *_compactDescription;
     NSString *_detailedDescription;
+    XCTSourceCodeContext *_sourceCodeContext;
+    NSError *_associatedError;
 }
 
+- (id) initWithType: (XCTIssueType)type
+ compactDescription: (NSString *)compactDescription
+detailedDescription: (NSString *)detailedDescription
+  sourceCodeContext: (XCTSourceCodeContext *)sourceCodeContext
+    associatedError: (NSError *)associatedError;
 - (id) initWithType: (XCTIssueType)type compactDescription: (NSString *)compactDescription;
 - (id) initWithType: (XCTIssueType)type
  compactDescription: (NSString *)compactDescription
 detailedDescription: (NSString *)detailedDescription;
 
 @property (readonly) XCTIssueType type;
+/*! A one-line description of the issue. */
 @property (readonly, copy) NSString *compactDescription;
+/*! A longer description; the compact description when there is none. */
 @property (readonly, copy) NSString *detailedDescription;
+@property (readonly, retain) XCTSourceCodeContext *sourceCodeContext;
+/*! The error behind the issue, e.g. one returned by -setUpWithError:. */
+@property (readonly, retain) NSError *associatedError;
+
+@end
+
+/*! An XCTIssue that can be changed, e.g. by an override of -recordIssue:. */
+@interface XCTMutableIssue : XCTIssue
+
+@property (readwrite) XCTIssueType type;
+@property (readwrite, copy) NSString *compactDescription;
+@property (readwrite, copy) NSString *detailedDescription;
+@property (readwrite, retain) XCTSourceCodeContext *sourceCodeContext;
+@property (readwrite, retain) NSError *associatedError;
 
 @end
