@@ -36,6 +36,8 @@ static void PrintUsage(FILE *stream)
     fprintf(stream, "  -skip-testing:<identifier>  Skip tests matching TestTarget[/TestClass[/TestMethod]]\n");
     fprintf(stream, "  -output-format <format>     Console output: 'classic' (default) or 'apple'\n");
     fprintf(stream, "  -junit-report <path>        Also write results to <path> as JUnit XML\n");
+    fprintf(stream, "  -attachments-path <dir>     Save test attachments under <dir> (default: next to the\n");
+    fprintf(stream, "                              -junit-report, as <report>-attachments)\n");
     fprintf(stream, "  -list-tests                 List the selected tests, one identifier per line, without running them\n");
     fprintf(stream, "  -list-tests-json            List the selected tests as JSON, without running them\n");
     fprintf(stream, "  -host <app>                 Run the tests inside a running application (.app or executable)\n");
@@ -98,6 +100,7 @@ static NSString *HostLibraryPath(void)
 static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString *targetName,
                           NSArray *onlyTestIdentifiers, NSArray *skipTestIdentifiers,
                           GSXCTestOutputFormat outputFormat, NSString *junitReportPath,
+                          NSString *attachmentsPath,
                           NSString *performanceBaselinesPath, BOOL updatePerformanceBaselines,
                           GSXCTestRepetitionMode repetitionMode, NSInteger testIterations,
                           BOOL testTimeoutsEnabled, NSTimeInterval defaultAllowance,
@@ -151,6 +154,11 @@ static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString
                            : [[fileManager currentDirectoryPath] stringByAppendingPathComponent:performanceBaselinesPath])
                    forKey:@"performanceBaselines"];
         [config setObject:[NSNumber numberWithBool:updatePerformanceBaselines] forKey:@"updatePerformanceBaselines"];
+    }
+    if (attachmentsPath != nil) {
+        [config setObject:([attachmentsPath isAbsolutePath] ? attachmentsPath
+                           : [[fileManager currentDirectoryPath] stringByAppendingPathComponent:attachmentsPath])
+                   forKey:@"attachmentsPath"];
     }
     if (junitReportPath != nil) {
         NSString *absoluteReport = [junitReportPath isAbsolutePath] ? junitReportPath
@@ -284,6 +292,7 @@ int main(int argc, char *argv[]) {
     NSString *testBundlePath = nil;
     GSXCTestOutputFormat outputFormat = GSXCTestOutputFormatClassic;
     NSString *junitReportPath = nil;
+    NSString *attachmentsPath = nil;
     BOOL listTests = NO;
     BOOL listTestsAsJSON = NO;
     NSString *hostPath = nil;
@@ -452,6 +461,16 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        if ([argument isEqualToString:@"-attachments-path"]) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "xctest: missing directory for -attachments-path\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            attachmentsPath = [NSString stringWithUTF8String:argv[++i]];
+            continue;
+        }
+
         if ([argument isEqualToString:@"-junit-report"]) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "xctest: missing path for -junit-report\n");
@@ -511,6 +530,7 @@ int main(int argc, char *argv[]) {
     if (hostPath != nil && !listTests) {
         exitCode = RunTestsInHost(hostPath, testBundlePath, TargetNameForBundlePath(testBundlePath),
                                   onlyTestIdentifiers, skipTestIdentifiers, outputFormat, junitReportPath,
+                                  attachmentsPath,
                                   performanceBaselinesPath, updatePerformanceBaselines,
                                   repetitionMode, testIterations, testTimeoutsEnabled,
                                   defaultAllowance, maximumAllowance, hostLaunchTimeout);
@@ -546,6 +566,7 @@ int main(int argc, char *argv[]) {
     [runner setRepetitionMode:repetitionMode];
     [runner setTestIterations:(NSUInteger)testIterations];
     [runner setJunitReportPath:junitReportPath];
+    [runner setAttachmentsPath:attachmentsPath];
     [runner setTestTimeoutsEnabled:testTimeoutsEnabled];
     [runner setDefaultExecutionTimeAllowance:defaultAllowance];
     [runner setMaximumExecutionTimeAllowance:maximumAllowance];

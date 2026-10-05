@@ -62,6 +62,7 @@ typedef enum {
     NSTimeInterval defaultExecutionTimeAllowance;
     NSTimeInterval maximumExecutionTimeAllowance;
     void (^terminationHandler)(int exitCode);
+    NSString *attachmentsPath;
 }
 
 @property GSXCTestOutputFormat outputFormat;
@@ -96,6 +97,14 @@ typedef enum {
 @property GSXCTestRepetitionMode repetitionMode;
 /*! The number of runs (or maximum attempts) per test when repeating. */
 @property NSUInteger testIterations;
+
+/*!
+ * Where to save XCTAttachments, in <Class>/<test>/ folders. If not set
+ * but junitReportPath is, next to the report: "results.xml" saves them in
+ * "results-attachments". Attachments are kept for failed tests, and for
+ * any test if their lifetime is XCTAttachmentLifetimeKeepAlways.
+ */
+@property (copy) NSString *attachmentsPath;
 
 /*!
  * If YES, each test may run for at most its executionTimeAllowance

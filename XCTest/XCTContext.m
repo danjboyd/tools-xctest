@@ -86,6 +86,11 @@ NSArray *_GSXCTCurrentActivityPath(void)
     return _testCase;
 }
 
+- (void) addAttachment: (XCTAttachment *)attachment
+{
+    _GSXCTAddAttachment(_testCase, attachment, _path);
+}
+
 - (NSString *) description
 {
     return [_path componentsJoinedByString:@" > "];

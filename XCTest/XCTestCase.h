@@ -23,6 +23,7 @@
 
 @class XCTestSuite;
 @class XCTIssue;
+@class XCTAttachment;
 
 /*!
  * One test: an instance of a test class bound to one test method (its
@@ -130,6 +131,12 @@
  * Registers a block to run after the current test method, before tearDown.
  */
 - (void) addTeardownBlock: (void (^)(void))block;
+
+/*!
+ * Keeps \a attachment with the test's results (in the innermost
+ * XCTContext activity running on this thread, if any). See XCTAttachment.
+ */
+- (void) addAttachment: (XCTAttachment *)attachment;
 
 @end
 

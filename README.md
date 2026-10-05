@@ -53,6 +53,12 @@ Test classes support the same lifecycle as Apple's XCTest:
 
 `[XCTContext runActivityNamed:@"Log in" block:^(id<XCTActivity> activity) { ... }]` runs part of a test as a named step. Activities nest (on each thread), and failures recorded inside one are reported with its path, e.g. `Log in > Enter password: ((valid) is true) failed`, in the console, `-output-format apple` (which also prints Apple's `t = 0.01s Log in` lines) and JUnit reports.
 
+### Attachments
+
+Keep logs, files, images or archived objects with a test's results: `[self addAttachment:[XCTAttachment attachmentWithString:log]]`, or from an activity (`[activity addAttachment:...]`) or an issue (`XCTMutableIssue -addAttachment:`). `XCTAttachment` has Apple's constructors for data, files, strings, property lists, archivable objects and `NSImage` (saved as PNG, or JPEG for lower qualities; AppKit must be loaded, as in hosted tests).
+
+`xctest -attachments-path <dir>` saves them as `<dir>/<TestClass>/<testMethod>/<name>.<ext>`; with `-junit-report results.xml` and no `-attachments-path` they go in `results-attachments/`, and the report links each one with a `[[ATTACHMENT|path]]` line in the test's `<system-out>`, which Jenkins and GitLab pick up. As in Apple's XCTest, an attachment is only kept if its test fails, unless its `lifetime` is `XCTAttachmentLifetimeKeepAlways`.
+
 ### Asynchronous tests
 
 Code driven by the run loop (timers, notifications, `NSURLConnection`, `NSTask`, `performSelector:afterDelay:`) can be tested with expectations. Waiting runs the current run loop until the expectations are fulfilled or the timeout passes; a timeout is a test failure.

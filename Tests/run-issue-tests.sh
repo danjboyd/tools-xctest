@@ -35,13 +35,13 @@ expected+="|fixture: both recordFailure 'failed: from assertion'"
 expected+="|fixture: both recordFailure 'from legacy call'"
 expected+="|fixture: both recordIssue 'from legacy call (legacy edit)'"
 [ "$both" = "$expected" ] || fail "unexpected override calls: $both"
-assert_contains "Assertion FAILED at IssueFixture.m:135, failed: from assertion (legacy edit)"
+assert_contains "Assertion FAILED at IssueFixture.m:136, failed: from assertion (legacy edit)"
 assert_contains "Assertion FAILED at Legacy.m:3, from legacy call (legacy edit)"
 
 # XCTExpectFailure matchers see the issue's type and location; an
 # unmatched expectation is its own issue type.
-assert_contains "fixture: matcher type=0 at IssueFixture.m:158"
-assert_contains "Expected failure (known bug) at IssueFixture.m:158, failed: expected one"
+assert_contains "fixture: matcher type=0 at IssueFixture.m:159"
+assert_contains "Expected failure (known bug) at IssueFixture.m:159, failed: expected one"
 assert_contains "fixture: matcher-test recordIssue type=5 'Failed due to unmatched expected failure: never fails'"
 
 # Observers get testCase:didRecordIssue: for failures, but not for

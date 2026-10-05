@@ -105,6 +105,7 @@
 detailedDescription: (NSString *)detailedDescription
   sourceCodeContext: (XCTSourceCodeContext *)sourceCodeContext
     associatedError: (NSError *)associatedError
+        attachments: (NSArray *)attachments
 {
     self = [super init];
     if (self) {
@@ -113,6 +114,7 @@ detailedDescription: (NSString *)detailedDescription
         _detailedDescription = [detailedDescription copy];
         _sourceCodeContext = sourceCodeContext ? [sourceCodeContext retain] : [[XCTSourceCodeContext alloc] init];
         _associatedError = [associatedError retain];
+        _attachments = [(attachments ? attachments : [NSArray array]) copy];
     }
 
     return self;
@@ -131,7 +133,8 @@ detailedDescription: (NSString *)detailedDescription
            compactDescription:compactDescription
           detailedDescription:detailedDescription
             sourceCodeContext:nil
-              associatedError:nil];
+              associatedError:nil
+                  attachments:nil];
 }
 
 - (void) dealloc
@@ -140,6 +143,7 @@ detailedDescription: (NSString *)detailedDescription
     [_detailedDescription release];
     [_sourceCodeContext release];
     [_associatedError release];
+    [_attachments release];
     [super dealloc];
 }
 
@@ -149,7 +153,8 @@ detailedDescription: (NSString *)detailedDescription
                                compactDescription:_compactDescription
                               detailedDescription:_detailedDescription
                                 sourceCodeContext:_sourceCodeContext
-                                  associatedError:_associatedError];
+                                  associatedError:_associatedError
+                                      attachments:_attachments];
 }
 
 - (id) copyWithZone: (NSZone *)zone
@@ -187,6 +192,11 @@ detailedDescription: (NSString *)detailedDescription
     return _associatedError;
 }
 
+- (NSArray *) attachments
+{
+    return _attachments;
+}
+
 - (NSString *) description
 {
     return [self compactDescription];
@@ -201,6 +211,7 @@ detailedDescription: (NSString *)detailedDescription
 @dynamic detailedDescription;
 @dynamic sourceCodeContext;
 @dynamic associatedError;
+@dynamic attachments;
 
 - (id) copyWithZone: (NSZone *)zone
 {
@@ -236,6 +247,21 @@ detailedDescription: (NSString *)detailedDescription
     [old release];
 }
 
+- (void) setAttachments: (NSArray *)attachments
+{
+    NSArray *old = _attachments;
+
+    _attachments = [(attachments ? attachments : [NSArray array]) copy];
+    [old release];
+}
+
+- (void) addAttachment: (XCTAttachment *)attachment
+{
+    if (attachment != nil) {
+        [self setAttachments:[_attachments arrayByAddingObject:attachment]];
+    }
+}
+
 - (void) setAssociatedError: (NSError *)associatedError
 {
     NSError *old = _associatedError;
@@ -258,7 +284,8 @@ XCTIssue *_GSXCTMakeIssue(XCTIssueType type, NSString *description,
                         compactDescription:description
                        detailedDescription:nil
                          sourceCodeContext:context
-                           associatedError:error] autorelease];
+                           associatedError:error
+                               attachments:nil] autorelease];
 }
 
 NSString *_GSXCTIssueFilePath(XCTIssue *issue)
