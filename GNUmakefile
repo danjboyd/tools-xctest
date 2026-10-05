@@ -38,7 +38,8 @@ XCTEST_TEST_SCRIPTS = cli-filter \
 	issue \
 	timeout \
 	activity \
-	attachment
+	attachment \
+	order
 
 after-check:: all
 	@set -e; for name in $(XCTEST_TEST_SCRIPTS); do \

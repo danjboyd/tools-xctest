@@ -164,6 +164,7 @@ typedef enum {
     NSString *_name;
     NSString *_bundleName;
     BOOL _filtersActive;
+    unsigned long long _executionOrderSeed;
     NSMutableArray *_suiteResults;
     NSDate *_startDate;
     NSTimeInterval _duration;
@@ -173,6 +174,8 @@ typedef enum {
 @property (readonly, copy) NSString *name;
 @property (readonly, copy) NSString *bundleName;
 @property BOOL filtersActive;
+/*! The seed of a random execution order; 0 for alphabetical. */
+@property unsigned long long executionOrderSeed;
 @property (readonly) NSMutableArray *suiteResults;
 @property (retain) NSDate *startDate;
 @property NSTimeInterval duration;

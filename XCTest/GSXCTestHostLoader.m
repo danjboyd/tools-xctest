@@ -34,6 +34,7 @@
 // Settings from xctest, as JSON: bundlePath, targetName, bundleName, only,
 // skip, outputFormat, junitReport, attachmentsPath, performanceBaselines,
 // updatePerformanceBaselines, repetitionMode, testIterations,
+// randomizeExecutionOrder, executionOrderSeed,
 // testTimeoutsEnabled, defaultExecutionTimeAllowance,
 // maximumExecutionTimeAllowance, statusFile.
 // "<statusFile>.started" is created when the tests start, so xctest can
@@ -138,6 +139,8 @@ static void GSWriteStatusFile(int exitCode)
             }
             [runner setRepetitionMode:(GSXCTestRepetitionMode)[[GSHostConfig objectForKey:@"repetitionMode"] intValue]];
             [runner setTestIterations:[[GSHostConfig objectForKey:@"testIterations"] unsignedIntegerValue]];
+            [runner setRandomizeExecutionOrder:[[GSHostConfig objectForKey:@"randomizeExecutionOrder"] boolValue]];
+            [runner setExecutionOrderSeed:[[GSHostConfig objectForKey:@"executionOrderSeed"] unsignedLongLongValue]];
             [runner setTestTimeoutsEnabled:[[GSHostConfig objectForKey:@"testTimeoutsEnabled"] boolValue]];
             [runner setDefaultExecutionTimeAllowance:[[GSHostConfig objectForKey:@"defaultExecutionTimeAllowance"] doubleValue]];
             [runner setMaximumExecutionTimeAllowance:[[GSHostConfig objectForKey:@"maximumExecutionTimeAllowance"] doubleValue]];

@@ -49,6 +49,25 @@
               legacyTestNames:(NSArray *)legacyTestNames;
 @end
 
+// SplitMix64: a small generator that gives the same sequence for a seed on
+// every platform, so a random order can be repeated.
+static unsigned long long GSNextRandom(unsigned long long *state)
+{
+    unsigned long long z = (*state += 0x9E3779B97F4A7C15ULL);
+
+    z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+    z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+    return z ^ (z >> 31);
+}
+
+// Fisher-Yates shuffle.
+static void GSShuffle(NSMutableArray *array, unsigned long long *state)
+{
+    for (NSUInteger i = [array count]; i > 1; i--) {
+        [array exchangeObjectAtIndex:i - 1 withObjectAtIndex:(NSUInteger)(GSNextRandom(state) % i)];
+    }
+}
+
 static NSArray *GSParseAppleTestIdentifier(NSString *identifier)
 {
     NSArray *components = [identifier componentsSeparatedByString:@"/"];
@@ -141,6 +160,8 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 @synthesize maximumExecutionTimeAllowance;
 @synthesize terminationHandler;
 @synthesize attachmentsPath;
+@synthesize randomizeExecutionOrder;
+@synthesize executionOrderSeed;
 
 - (id)init
 {
@@ -252,6 +273,19 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
         *filtersActive = usingAnyFilters;
     }
 
+    unsigned long long randomState = 0;
+    if (randomizeExecutionOrder) {
+        if (executionOrderSeed == 0) {
+            unsigned long long entropy = ((unsigned long long)[[NSDate date] timeIntervalSince1970] * 1000000ULL)
+                ^ ((unsigned long long)getpid() << 32);
+            // Keep seeds short enough to type back in.
+            executionOrderSeed = (GSNextRandom(&entropy) % 1000000000ULL) + 1;
+        }
+        randomState = executionOrderSeed;
+        NSLog(@"XCTest: Running tests in random order (seed %llu; repeat with -test-execution-order-seed %llu)",
+            executionOrderSeed, executionOrderSeed);
+    }
+
     // Each class's tests come from its +defaultTestSuite, so a class can
     // override that (or +testInvocations) to change what runs.
     for (Class testCaseClass in _GSXCTestCaseSubclasses())
@@ -260,6 +294,9 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
         NSMutableArray *testCases = [NSMutableArray array];
 
         GSCollectTestCases([testCaseClass defaultTestSuite], testCases);
+        if (randomizeExecutionOrder) {
+            GSShuffle(testCases, &randomState);
+        }
         for (XCTestCase *testCase in testCases)
         {
             NSString *className = NSStringFromClass([testCase class]);
@@ -318,6 +355,10 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
         }
 
         [plan addObject:suite];
+    }
+
+    if (randomizeExecutionOrder) {
+        GSShuffle(plan, &randomState);
     }
 
     return plan;
@@ -403,6 +444,7 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     }
     [topSuite addTest:bundleSuite];
     [run setFiltersActive:filtersActive];
+    [run setExecutionOrderSeed:(randomizeExecutionOrder ? executionOrderSeed : 0)];
 
     [GSXCTestCaseSuite _gsSetRepetitionMode:repetitionMode iterations:testIterations];
     _GSXCTSetTimeouts(testTimeoutsEnabled, defaultExecutionTimeAllowance, maximumExecutionTimeAllowance);

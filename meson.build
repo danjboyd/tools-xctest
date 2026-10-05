@@ -153,6 +153,7 @@ if host_machine.system() != 'darwin'
     ['timeouts', 'run-timeout-tests.sh'],
     ['activities', 'run-activity-tests.sh'],
     ['attachments', 'run-attachment-tests.sh'],
+    ['order', 'run-order-tests.sh'],
     ['hosted', 'run-hosted-tests.sh'],
   ]
 
