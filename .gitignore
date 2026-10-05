@@ -34,3 +34,5 @@ Tests/OrderFixture/OrderFixture.bundle
 Tests/OrderFixture/obj
 Tests/MetricFixture/MetricFixture.bundle
 Tests/MetricFixture/obj
+Tests/ParallelFixture/ParallelFixture.bundle
+Tests/ParallelFixture/obj

@@ -51,6 +51,9 @@ static void PrintUsage(FILE *stream)
     fprintf(stream, "  -test-execution-order <order>  'alphabetical' (default) or 'random' (classes, and tests\n");
     fprintf(stream, "                              within each class, shuffled; the seed is logged)\n");
     fprintf(stream, "  -test-execution-order-seed <n>  Repeat a random order (implies -test-execution-order random)\n");
+    fprintf(stream, "  -parallel-testing-enabled YES|NO  Run test classes in parallel worker processes (default NO)\n");
+    fprintf(stream, "  -parallel-testing-worker-count <n>  How many at once (default: one per CPU;\n");
+    fprintf(stream, "                              implies -parallel-testing-enabled YES)\n");
     fprintf(stream, "  -test-timeouts-enabled YES|NO  Fail a test that runs longer than its execution time allowance,\n");
     fprintf(stream, "                              then stop the run (default NO)\n");
     fprintf(stream, "  -default-test-execution-time-allowance <s>  Each test's allowance unless it sets its own\n");
@@ -310,6 +313,10 @@ int main(int argc, char *argv[]) {
     BOOL retryOnFailure = NO;
     GSXCTestRepetitionMode repetitionMode = GSXCTestRepetitionNone;
     BOOL randomOrder = NO;
+    BOOL parallel = NO;
+    BOOL parallelOptionGiven = NO;
+    NSInteger workerCount = 0;
+    NSString *workerResultsPath = nil;
     unsigned long long orderSeed = 0;
     BOOL testTimeoutsEnabled = NO;
     BOOL testTimeoutsOptionGiven = NO;
@@ -409,6 +416,41 @@ int main(int argc, char *argv[]) {
 
         if ([argument isEqualToString:@"-retry-tests-on-failure"]) {
             retryOnFailure = YES;
+            continue;
+        }
+
+        if ([argument isEqualToString:@"-parallel-testing-enabled"]) {
+            NSString *value = (i + 1 < argc) ? [NSString stringWithUTF8String:argv[++i]] : nil;
+            if ([value caseInsensitiveCompare:@"YES"] == NSOrderedSame) {
+                parallel = YES;
+            } else if ([value caseInsensitiveCompare:@"NO"] == NSOrderedSame) {
+                parallel = NO;
+            } else {
+                fprintf(stderr, "xctest: -parallel-testing-enabled must be YES or NO\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            parallelOptionGiven = YES;
+            continue;
+        }
+
+        if ([argument isEqualToString:@"-parallel-testing-worker-count"]) {
+            workerCount = (i + 1 < argc) ? atoi(argv[++i]) : 0;
+            if (workerCount < 1) {
+                fprintf(stderr, "xctest: -parallel-testing-worker-count needs a number of at least 1\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            continue;
+        }
+
+        // Internal: run as a parallel run's worker (see GSXCTestRunner).
+        if ([argument isEqualToString:@"-gs-parallel-worker-results"]) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "xctest: missing path for -gs-parallel-worker-results\n");
+                goto cleanup;
+            }
+            workerResultsPath = [NSString stringWithUTF8String:argv[++i]];
             continue;
         }
 
@@ -545,6 +587,18 @@ int main(int argc, char *argv[]) {
         repetitionMode = GSXCTestRepetitionFixed;
     }
 
+    if (!parallelOptionGiven && workerCount > 0) {
+        parallel = YES;
+    }
+    if (parallel && hostPath != nil && !listTests) {
+        fprintf(stderr, "xctest: -parallel-testing-enabled can't be used with -host\n");
+        goto cleanup;
+    }
+    if (parallel && updatePerformanceBaselines) {
+        fprintf(stderr, "xctest: -update-performance-baselines can't be used with -parallel-testing-enabled\n");
+        goto cleanup;
+    }
+
     // Giving an allowance turns time limits on, unless they were turned off.
     if (!testTimeoutsOptionGiven && (defaultAllowance > 0 || maximumAllowance > 0)) {
         testTimeoutsEnabled = YES;
@@ -609,6 +663,14 @@ int main(int argc, char *argv[]) {
     [runner setTestTimeoutsEnabled:testTimeoutsEnabled];
     [runner setDefaultExecutionTimeAllowance:defaultAllowance];
     [runner setMaximumExecutionTimeAllowance:maximumAllowance];
+    [runner setWorkerResultsPath:workerResultsPath];
+    if (parallel && workerResultsPath == nil) {
+        exitCode = [runner runTestsInParallelForTargetName:targetName
+                                       onlyTestIdentifiers:onlyTestIdentifiers
+                                       skipTestIdentifiers:skipTestIdentifiers
+                                               workerCount:(NSUInteger)workerCount] ? 0 : 1;
+        goto cleanup;
+    }
     BOOL result = [runner runTestsForTargetName:targetName
                             onlyTestIdentifiers:onlyTestIdentifiers
                             skipTestIdentifiers:skipTestIdentifiers];

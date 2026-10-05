@@ -70,6 +70,7 @@ source = [
 	'XCTest/XCTContext.m',
 	'XCTest/XCTAttachment.m',
 	'XCTest/XCTMetric.m',
+	'XCTest/GSXCTestParallel.m',
 ]
 
 headers = [
@@ -157,6 +158,7 @@ if host_machine.system() != 'darwin'
     ['attachments', 'run-attachment-tests.sh'],
     ['order', 'run-order-tests.sh'],
     ['metrics', 'run-metric-tests.sh'],
+    ['parallel', 'run-parallel-tests.sh'],
     ['hosted', 'run-hosted-tests.sh'],
   ]
 
