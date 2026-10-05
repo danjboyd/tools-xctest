@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# xctest-bundle: wraps a shared library of tests as an XCTest bundle that
+# xctest can load, for build systems other than gnustep-make (e.g. Meson):
+#
+#   xctest-bundle MyTests.xctest libMyTests.so [PrincipalClass]
+#
+# creates MyTests.xctest/MyTests (a copy of the library) and
+# MyTests.xctest/Resources/Info-gnustep.plist, replacing any existing bundle.
+
+set -e
+
+if [ "$#" -lt 2 ] || [ "$#" -gt 3 ]; then
+  echo "usage: $0 <Name.xctest> <shared library> [principal class]" >&2
+  exit 2
+fi
+
+bundle=$1
+library=$2
+principal=${3:-}
+name=$(basename "$bundle")
+name=${name%.*}
+
+if [ ! -f "$library" ]; then
+  echo "$0: no such library: $library" >&2
+  exit 1
+fi
+
+rm -rf "$bundle"
+mkdir -p "$bundle/Resources"
+cp "$library" "$bundle/$name"
+{
+  echo "{"
+  echo "  NSExecutable = \"$name\";"
+  echo "  CFBundleExecutable = \"$name\";"
+  if [ -n "$principal" ]; then
+    echo "  NSPrincipalClass = \"$principal\";"
+  fi
+  echo "}"
+} > "$bundle/Resources/Info-gnustep.plist"

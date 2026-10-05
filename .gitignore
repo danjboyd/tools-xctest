@@ -36,3 +36,5 @@ Tests/MetricFixture/MetricFixture.bundle
 Tests/MetricFixture/obj
 Tests/ParallelFixture/ParallelFixture.bundle
 Tests/ParallelFixture/obj
+Tests/MakeHelperFixture/*.xctest
+Tests/MakeHelperFixture/obj
