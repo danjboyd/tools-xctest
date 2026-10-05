@@ -3,6 +3,22 @@
 Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 `vX.Y.Z`; 0.1.x are upstream's (gnustep/tools-xctest).
 
+## 0.4.0
+
+- Randomized execution order: `-test-execution-order random`, with the
+  seed logged and recorded in JUnit reports, and
+  `-test-execution-order-seed <n>` to repeat an order.
+- The `XCTMetric` performance API: `measureWithMetrics:options:block:`,
+  `XCTMeasureOptions`, and the clock, CPU, memory and storage metrics;
+  baselines per metric.
+- Parallel execution: `-parallel-testing-enabled YES` and
+  `-parallel-testing-worker-count <n>` run each test class in a worker
+  process; a crashed or hung worker only affects its own class.
+- Apple's `-XCTest <tests>` selection syntax; `.xctest` bundles.
+- Build-system helpers: `xctest.make` for gnustep-make projects
+  (`include $(GNUSTEP_MAKEFILES)/Auxiliary/xctest.make`, `make check`)
+  and the `xctest-bundle` script for Meson and other build systems.
+
 ## 0.3.0
 
 - Every failure is an `XCTIssue` recorded with `-[XCTestCase recordIssue:]`,
