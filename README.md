@@ -129,7 +129,9 @@ xctest MyTests.bundle -only-testing:MyTests/FooTests/testBar
 xctest MyTests.bundle -skip-testing:MyTests/SlowTests
 ```
 
-Test identifiers use the form `TestTarget[/TestClass[/TestMethod]]`, where `TestTarget` is the bundle name without the `.bundle` extension.
+Test identifiers use the form `TestTarget[/TestClass[/TestMethod]]`, where `TestTarget` is the bundle name without its `.bundle` or `.xctest` extension. Apple's own `xctest` selection also works: `xctest -XCTest FooTests/testBar,SlowTests MyTests.xctest` (or `-XCTest All`).
+
+To build and run the test targets of an Xcode project, use `buildtool test` from [libs-xcode](https://github.com/gnustep/libs-xcode) (with `-target`, `-scheme`, `-only-testing:` and `-skip-testing:`, like `xcodebuild test`); it runs each `.xctest` bundle with `xctest`, inside the app named by the target's `TEST_HOST` if it has one.
 
 By default results are logged as `XCTest: ...` lines. Pass `-output-format apple` to print them on stdout in the same format as Apple's `xctest`, including per-test timings, so tools that parse Apple's output (xcpretty, xcbeautify, editor integrations) work too:
 
