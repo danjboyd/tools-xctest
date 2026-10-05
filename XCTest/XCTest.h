@@ -30,6 +30,7 @@
 #import <XCTest/XCTActivity.h>
 #import <XCTest/XCTContext.h>
 #import <XCTest/XCTAttachment.h>
+#import <XCTest/XCTMetric.h>
 #import <XCTest/XCTExpectedFailure.h>
 #import <XCTest/XCTestExpectation.h>
 #import <XCTest/XCTWaiter.h>

@@ -97,6 +97,12 @@ To catch regressions, keep baselines in a JSON file keyed by `TestClass/testMeth
 
 `xctest -performance-baselines baselines.json ...` fails a measured test whose average is worse than its baseline by more than `maxPercentRegression` (default 10%). Add `-update-performance-baselines` to record the current averages into the file instead (keeping each entry's settings). Apple keeps baselines in the Xcode project; this file is the GNUstep equivalent.
 
+Apple's newer API measures more than time: `measureWithMetrics:options:block:` (and `measureWithMetrics:block:`, `measureWithOptions:block:`) runs the block `iterationCount` times (default 5) with any `XCTMetric`s: `XCTClockMetric` (the default), `XCTCPUMetric` (CPU time, for the process or the current thread), `XCTMemoryMetric` (resident memory change and peak, in kB) and `XCTStorageMetric` (logical writes, in kB), all read from `getrusage` and `/proc`, or your own class conforming to `XCTMetric`. `XCTMeasureOptions` can leave starting or stopping to the block (`-startMeasuring`/`-stopMeasuring`). Apple's CPU cycle and instruction counts aren't reported. Baselines for these go under the test's `"metrics"`, by measurement identifier, and a measurement's polarity says whether larger or smaller is worse:
+
+```json
+{ "ParserTests/testParse": { "metrics": { "com.apple.dt.XCTMetric_CPU.time": { "average": 0.05, "maxPercentRegression": 20 } } } }
+```
+
 ### Hosted tests (running inside your application)
 
 To test code that needs a running `NSApplication` (controllers, windows, nib/gorm loading, the responder chain), run the bundle inside your app:

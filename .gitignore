@@ -32,3 +32,5 @@ Tests/AttachmentFixture/AttachmentFixture.bundle
 Tests/AttachmentFixture/obj
 Tests/OrderFixture/OrderFixture.bundle
 Tests/OrderFixture/obj
+Tests/MetricFixture/MetricFixture.bundle
+Tests/MetricFixture/obj

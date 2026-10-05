@@ -69,11 +69,20 @@ typedef enum {
 /*! One performance measurement: the values of each run of the block. */
 @interface GSXCTMeasurement : NSObject {
     NSString *_metricIdentifier;
+    NSString *_displayName;
+    NSString *_unitSymbol;
+    int _polarity;
     NSArray *_values;
     NSNumber *_baselineAverage;
     double _maxPercentRegression;
 }
 @property (copy) NSString *metricIdentifier;
+/*! "Time", "Clock Monotonic Time", ... */
+@property (copy) NSString *displayName;
+/*! "seconds", "s", "kB", ... */
+@property (copy) NSString *unitSymbol;
+/*! An XCTPerformanceMeasurementPolarity. */
+@property int polarity;
 @property (copy) NSArray *values;
 /*! nil when the test has no baseline. */
 @property (retain) NSNumber *baselineAverage;
@@ -83,6 +92,10 @@ typedef enum {
 - (double) relativeStandardDeviation;
 /*! "[0.001000, 0.001100, ...]" */
 - (NSString *) valuesDescription;
+/*! "[Time, seconds]" */
+- (NSString *) metricDescription;
+/*! "prefers smaller", as Apple prints it. */
+- (NSString *) polarityDescription;
 @end
 
 @class XCTAttachment;
