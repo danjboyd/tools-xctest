@@ -65,6 +65,7 @@ typedef enum {
     NSString *attachmentsPath;
     BOOL randomizeExecutionOrder;
     unsigned long long executionOrderSeed;
+    NSString *workerResultsPath;
 }
 
 @property GSXCTestOutputFormat outputFormat;
@@ -154,8 +155,33 @@ typedef enum {
                       onlyTestIdentifiers:(NSArray *)onlyTestIdentifiers
                       skipTestIdentifiers:(NSArray *)skipTestIdentifiers;
 
+/*!
+ * Set in a parallel run's worker processes: the console output leaves out
+ * the run's opening and closing lines, no JUnit report is written, and the
+ * results go to this file (JSON) for the coordinator.
+ */
+@property (copy) NSString *workerResultsPath;
+
 - (void)waitForCompletion;
 
 + (GSXCTestRunner *)sharedRunner;
+
+@end
+
+@interface GSXCTestRunner (GSParallel)
+
+/*!
+ * Runs the selected tests in up to \a workerCount processes at once (0 for
+ * one per CPU), one test class per process, by starting this program as a
+ * worker for each class. Each class's output is printed as a block when it
+ * finishes, then the merged results are reported (console summary, JUnit
+ * report). A crashed worker fails its class's tests; the other classes
+ * still run. The test bundle must be set; host applications aren't
+ * supported, nor is updatePerformanceBaselines.
+ */
+- (BOOL)runTestsInParallelForTargetName:(NSString *)targetName
+                    onlyTestIdentifiers:(NSArray *)onlyTestIdentifiers
+                    skipTestIdentifiers:(NSArray *)skipTestIdentifiers
+                            workerCount:(NSUInteger)workerCount;
 
 @end

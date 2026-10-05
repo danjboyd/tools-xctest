@@ -249,6 +249,22 @@ typedef enum {
 @property (readonly) BOOL wroteReport;
 @end
 
+/*! In a parallel worker: writes the run's results, as JSON, to a file for
+ * the coordinator when the run finishes. */
+@interface GSXCTestWorkerResultsReporter : NSObject <GSXCTestReporter> {
+    NSString *_path;
+}
+- (id) initWithPath: (NSString *)path;
+@end
+
+/*! In a parallel worker: passes everything to a console reporter except
+ * the run's opening and closing lines, which the coordinator prints. */
+@interface GSXCTestWorkerConsoleReporter : NSObject {
+    id<GSXCTestReporter> _reporter;
+}
+- (id) initWithReporter: (id<GSXCTestReporter>)reporter;
+@end
+
 @class XCTestSuite;
 
 /*!

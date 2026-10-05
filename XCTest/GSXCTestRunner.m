@@ -162,6 +162,7 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 @synthesize attachmentsPath;
 @synthesize randomizeExecutionOrder;
 @synthesize executionOrderSeed;
+@synthesize workerResultsPath;
 
 - (id)init
 {
@@ -184,6 +185,7 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     [junitReportPath release];
     [terminationHandler release];
     [attachmentsPath release];
+    [workerResultsPath release];
     [super dealloc];
 }
 
@@ -282,8 +284,11 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
             executionOrderSeed = (GSNextRandom(&entropy) % 1000000000ULL) + 1;
         }
         randomState = executionOrderSeed;
-        NSLog(@"XCTest: Running tests in random order (seed %llu; repeat with -test-execution-order-seed %llu)",
-            executionOrderSeed, executionOrderSeed);
+        // A parallel run's coordinator logs it, not each worker.
+        if (workerResultsPath == nil) {
+            NSLog(@"XCTest: Running tests in random order (seed %llu; repeat with -test-execution-order-seed %llu)",
+                executionOrderSeed, executionOrderSeed);
+        }
     }
 
     // Each class's tests come from its +defaultTestSuite, so a class can
@@ -425,6 +430,15 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
         ? [[[GSXCTestJUnitReporter alloc] initWithPath:junitReportPath] autorelease]
         : nil;
     NSArray *reporters = [NSArray arrayWithObjects:consoleReporter, junitReporter, nil];
+
+    // A parallel worker reports to its coordinator.
+    if (workerResultsPath != nil) {
+        junitReporter = nil;
+        reporters = [NSArray arrayWithObjects:
+            [[[GSXCTestWorkerConsoleReporter alloc] initWithReporter:consoleReporter] autorelease],
+            [[[GSXCTestWorkerResultsReporter alloc] initWithPath:workerResultsPath] autorelease],
+            nil];
+    }
     GSXCTestReportingObserver *reportingObserver = [[[GSXCTestReportingObserver alloc]
         initWithReporters:reporters run:run topSuite:topSuite] autorelease];
     XCTestObservationCenter *center = [XCTestObservationCenter sharedTestObservationCenter];
