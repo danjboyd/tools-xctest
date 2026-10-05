@@ -22,3 +22,5 @@ Tests/RepetitionFixture/RepetitionFixture.bundle
 Tests/RepetitionFixture/obj
 Tests/OutOfTestFixture/OutOfTestFixture.bundle
 Tests/OutOfTestFixture/obj
+Tests/IssueFixture/IssueFixture.bundle
+Tests/IssueFixture/obj

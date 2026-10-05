@@ -22,6 +22,7 @@
 #import <XCTest/XCAbstractTest.h>
 
 @class XCTestSuite;
+@class XCTIssue;
 
 /*!
  * One test: an instance of a test class bound to one test method (its
@@ -70,9 +71,20 @@
 - (void) invokeTest;
 
 /*!
- * Records a failure in the current test. The assertion macros call this,
- * so it can be overridden to observe or filter failures. With
- * continueAfterFailure NO, it stops the test (on the main thread).
+ * Records an issue in the test: every failure (assertions, uncaught
+ * exceptions, errors from -setUpWithError:, failed waits, performance
+ * regressions) goes through here. Override it to observe, change or drop
+ * issues; call super to record them. An issue matched by XCTExpectFailure
+ * is reported as expected; any other fails the test and, with
+ * continueAfterFailure NO, stops it (on the main thread).
+ */
+- (void) recordIssue: (XCTIssue *)issue;
+
+/*!
+ * Superseded by -recordIssue:. Records an assertion failure (\a expected
+ * YES) or an uncaught exception as an issue. For compatibility, a subclass
+ * that overrides this method still sees every issue here first; calling
+ * super goes on to record it.
  */
 - (void) recordFailureWithDescription: (NSString *)description
                                inFile: (NSString *)filePath

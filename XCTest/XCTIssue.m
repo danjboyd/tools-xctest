@@ -19,8 +19,104 @@
 */
 
 #import <XCTest/XCTIssue.h>
+#import <XCTest/XCTestPrivate.h>
+
+@implementation XCTSourceCodeLocation
+
+- (id) initWithFileURL: (NSURL *)fileURL lineNumber: (NSInteger)lineNumber
+{
+    return [self initWithFilePath:[fileURL path] lineNumber:lineNumber];
+}
+
+- (id) initWithFilePath: (NSString *)filePath lineNumber: (NSInteger)lineNumber
+{
+    self = [super init];
+    if (self) {
+        _filePath = [filePath copy];
+        _lineNumber = lineNumber;
+    }
+
+    return self;
+}
+
+- (void) dealloc
+{
+    [_filePath release];
+    [super dealloc];
+}
+
+- (NSURL *) fileURL
+{
+    return _filePath ? [NSURL fileURLWithPath:_filePath] : nil;
+}
+
+- (NSInteger) lineNumber
+{
+    return _lineNumber;
+}
+
+// The path as given (e.g. __FILE__), which fileURL would make absolute.
+- (NSString *) _gsFilePath
+{
+    return _filePath;
+}
+
+- (NSString *) description
+{
+    return [NSString stringWithFormat:@"%@:%ld", _filePath, (long)_lineNumber];
+}
+
+@end
+
+@implementation XCTSourceCodeContext
+
+- (id) init
+{
+    return [self initWithLocation:nil];
+}
+
+- (id) initWithLocation: (XCTSourceCodeLocation *)location
+{
+    self = [super init];
+    if (self) {
+        _location = [location retain];
+    }
+
+    return self;
+}
+
+- (void) dealloc
+{
+    [_location release];
+    [super dealloc];
+}
+
+- (XCTSourceCodeLocation *) location
+{
+    return _location;
+}
+
+@end
 
 @implementation XCTIssue
+
+- (id) initWithType: (XCTIssueType)type
+ compactDescription: (NSString *)compactDescription
+detailedDescription: (NSString *)detailedDescription
+  sourceCodeContext: (XCTSourceCodeContext *)sourceCodeContext
+    associatedError: (NSError *)associatedError
+{
+    self = [super init];
+    if (self) {
+        _type = type;
+        _compactDescription = [compactDescription copy];
+        _detailedDescription = [detailedDescription copy];
+        _sourceCodeContext = sourceCodeContext ? [sourceCodeContext retain] : [[XCTSourceCodeContext alloc] init];
+        _associatedError = [associatedError retain];
+    }
+
+    return self;
+}
 
 - (id) initWithType: (XCTIssueType)type compactDescription: (NSString *)compactDescription
 {
@@ -31,26 +127,39 @@
  compactDescription: (NSString *)compactDescription
 detailedDescription: (NSString *)detailedDescription
 {
-    self = [super init];
-    if (self) {
-        _type = type;
-        _compactDescription = [compactDescription copy];
-        _detailedDescription = [detailedDescription copy];
-    }
-
-    return self;
+    return [self initWithType:type
+           compactDescription:compactDescription
+          detailedDescription:detailedDescription
+            sourceCodeContext:nil
+              associatedError:nil];
 }
 
 - (void) dealloc
 {
     [_compactDescription release];
     [_detailedDescription release];
+    [_sourceCodeContext release];
+    [_associatedError release];
     [super dealloc];
+}
+
+- (id) _gsCopyAsClass: (Class)cls zone: (NSZone *)zone
+{
+    return [[cls allocWithZone:zone] initWithType:_type
+                               compactDescription:_compactDescription
+                              detailedDescription:_detailedDescription
+                                sourceCodeContext:_sourceCodeContext
+                                  associatedError:_associatedError];
 }
 
 - (id) copyWithZone: (NSZone *)zone
 {
     return [self retain];
+}
+
+- (id) mutableCopyWithZone: (NSZone *)zone
+{
+    return [self _gsCopyAsClass:[XCTMutableIssue class] zone:zone];
 }
 
 - (XCTIssueType) type
@@ -68,9 +177,103 @@ detailedDescription: (NSString *)detailedDescription
     return _detailedDescription ? _detailedDescription : _compactDescription;
 }
 
+- (XCTSourceCodeContext *) sourceCodeContext
+{
+    return _sourceCodeContext;
+}
+
+- (NSError *) associatedError
+{
+    return _associatedError;
+}
+
 - (NSString *) description
 {
     return [self compactDescription];
 }
 
 @end
+
+@implementation XCTMutableIssue
+
+@dynamic type;
+@dynamic compactDescription;
+@dynamic detailedDescription;
+@dynamic sourceCodeContext;
+@dynamic associatedError;
+
+- (id) copyWithZone: (NSZone *)zone
+{
+    return [self _gsCopyAsClass:[XCTIssue class] zone:zone];
+}
+
+- (void) setType: (XCTIssueType)type
+{
+    _type = type;
+}
+
+- (void) setCompactDescription: (NSString *)compactDescription
+{
+    NSString *old = _compactDescription;
+
+    _compactDescription = [compactDescription copy];
+    [old release];
+}
+
+- (void) setDetailedDescription: (NSString *)detailedDescription
+{
+    NSString *old = _detailedDescription;
+
+    _detailedDescription = [detailedDescription copy];
+    [old release];
+}
+
+- (void) setSourceCodeContext: (XCTSourceCodeContext *)sourceCodeContext
+{
+    XCTSourceCodeContext *old = _sourceCodeContext;
+
+    _sourceCodeContext = sourceCodeContext ? [sourceCodeContext retain] : [[XCTSourceCodeContext alloc] init];
+    [old release];
+}
+
+- (void) setAssociatedError: (NSError *)associatedError
+{
+    NSError *old = _associatedError;
+
+    _associatedError = [associatedError retain];
+    [old release];
+}
+
+@end
+
+XCTIssue *_GSXCTMakeIssue(XCTIssueType type, NSString *description,
+                          NSString *filePath, NSUInteger lineNumber, NSError *error)
+{
+    XCTSourceCodeLocation *location = filePath
+        ? [[[XCTSourceCodeLocation alloc] initWithFilePath:filePath lineNumber:lineNumber] autorelease]
+        : nil;
+    XCTSourceCodeContext *context = [[[XCTSourceCodeContext alloc] initWithLocation:location] autorelease];
+
+    return [[[XCTIssue alloc] initWithType:type
+                        compactDescription:description
+                       detailedDescription:nil
+                         sourceCodeContext:context
+                           associatedError:error] autorelease];
+}
+
+NSString *_GSXCTIssueFilePath(XCTIssue *issue)
+{
+    return [[[issue sourceCodeContext] location] _gsFilePath];
+}
+
+NSUInteger _GSXCTIssueLineNumber(XCTIssue *issue)
+{
+    XCTSourceCodeLocation *location = [[issue sourceCodeContext] location];
+
+    return location ? (NSUInteger)[location lineNumber] : 0;
+}
+
+BOOL _GSXCTIssueIsUnexpected(XCTIssue *issue)
+{
+    return [issue type] == XCTIssueTypeUncaughtException;
+}

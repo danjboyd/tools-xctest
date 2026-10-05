@@ -206,15 +206,93 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     return [XCTestCaseRun class];
 }
 
+// While an issue is passed through an override of the legacy
+// -recordFailureWithDescription:..., the test and issue involved, so the
+// two methods don't call each other in a loop.
+static __thread XCTestCase *GSLegacyRecordingTest = nil;
+static __thread XCTIssue *GSLegacyRecordingIssue = nil;
+
+- (BOOL) _gsOverridesLegacyRecordFailure
+{
+    SEL selector = @selector(recordFailureWithDescription:inFile:atLine:expected:);
+
+    return [self methodForSelector:selector] != [XCTestCase instanceMethodForSelector:selector];
+}
+
+- (void) recordIssue: (XCTIssue *)issue
+{
+    if (GSLegacyRecordingTest != self && [self _gsOverridesLegacyRecordFailure]) {
+        XCTestCase *previousTest = GSLegacyRecordingTest;
+        XCTIssue *previousIssue = GSLegacyRecordingIssue;
+
+        GSLegacyRecordingTest = self;
+        GSLegacyRecordingIssue = issue;
+        @try {
+            [self recordFailureWithDescription:[issue compactDescription]
+                                        inFile:_GSXCTIssueFilePath(issue)
+                                        atLine:_GSXCTIssueLineNumber(issue)
+                                      expected:!_GSXCTIssueIsUnexpected(issue)];
+        }
+        @finally {
+            GSLegacyRecordingTest = previousTest;
+            GSLegacyRecordingIssue = previousIssue;
+        }
+        return;
+    }
+
+    [self _gsRecordIssue:issue];
+}
+
 - (void) recordFailureWithDescription: (NSString *)description
                                inFile: (NSString *)filePath
                                atLine: (NSUInteger)lineNumber
                              expected: (BOOL)expected
 {
-    GSXCTestIssue *failure = [GSXCTestIssue issueWithMessage:description
-                                                    filePath:filePath
-                                                  lineNumber:lineNumber
-                                                  unexpected:!expected];
+    XCTestCase *previousTest = GSLegacyRecordingTest;
+    XCTIssue *previousIssue = GSLegacyRecordingIssue;
+    XCTIssue *issue = nil;
+
+    if (GSLegacyRecordingTest == self && GSLegacyRecordingIssue != nil) {
+        // Called by an override that -recordIssue: went through: record
+        // the original issue, with any changes the override made.
+        XCTMutableIssue *changed = [[GSLegacyRecordingIssue mutableCopy] autorelease];
+
+        if (![description isEqualToString:[changed compactDescription]]) {
+            [changed setCompactDescription:description];
+            [changed setDetailedDescription:nil];
+        }
+        if (filePath != _GSXCTIssueFilePath(changed) || lineNumber != _GSXCTIssueLineNumber(changed)) {
+            [changed setSourceCodeContext:[_GSXCTMakeIssue([changed type], description, filePath, lineNumber, nil)
+                                              sourceCodeContext]];
+        }
+        if (expected == _GSXCTIssueIsUnexpected(changed)) {
+            [changed setType:expected ? XCTIssueTypeAssertionFailure : XCTIssueTypeUncaughtException];
+        }
+        // Once only: a second call from the same override is a new issue.
+        GSLegacyRecordingIssue = nil;
+        [self _gsRecordIssue:changed];
+        return;
+    }
+
+    issue = _GSXCTMakeIssue(expected ? XCTIssueTypeAssertionFailure : XCTIssueTypeUncaughtException,
+                            description, filePath, lineNumber, nil);
+    // An override of this method has already seen the issue.
+    GSLegacyRecordingTest = self;
+    GSLegacyRecordingIssue = nil;
+    @try {
+        [self recordIssue:issue];
+    }
+    @finally {
+        GSLegacyRecordingTest = previousTest;
+        GSLegacyRecordingIssue = previousIssue;
+    }
+}
+
+// Where -recordIssue: ends up: reports the issue as expected, or records
+// it in the run and stops the test if it shouldn't continue.
+- (void) _gsRecordIssue: (XCTIssue *)issue
+{
+    GSXCTestIssue *failure = [GSXCTestIssue issueWithXCTIssue:issue];
 
     // Failures inside XCTExpectFailure are reported, but neither fail nor
     // stop the test.
@@ -223,26 +301,31 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     }
 
     if ([self testRun] != nil) {
-        [[self testRun] recordFailureWithDescription:description
-                                              inFile:filePath
-                                              atLine:lineNumber
-                                            expected:expected];
+        [[self testRun] recordIssue:issue];
     } else {
-        NSLog(@"XCTest: Failure in %@, which is not running: %@", [self name], description);
+        NSLog(@"XCTest: Failure in %@, which is not running: %@", [self name], [issue compactDescription]);
     }
 
     _XCTInterruptIfNeeded(self);
 }
 
-// Records a failure without letting continueAfterFailure = NO stop the
+// Records an issue without letting continueAfterFailure = NO stop the
 // test, for failures found while already handling an exception.
-- (void) _gsRecordFailure: (NSString *)description expected: (BOOL)expected
+- (void) _gsRecordIssueWithoutInterrupting: (XCTIssue *)issue
 {
     @try {
-        [self recordFailureWithDescription:description inFile:nil atLine:0 expected:expected];
+        [self recordIssue:issue];
     }
     @catch (_XCTestCaseInterruptionException *interruption) {
     }
+}
+
+- (void) _gsRecordException: (NSException *)exception where: (NSString *)where
+{
+    [self _gsRecordIssueWithoutInterrupting:
+        _GSXCTMakeIssue(XCTIssueTypeUncaughtException,
+                        [NSString stringWithFormat:@"threw exception%@: %@", where, _GSXCTDescribeException(exception)],
+                        nil, 0, nil)];
 }
 
 - (void) _gsRecordSkip: (_XCTSkipFailureException *)skip
@@ -261,9 +344,11 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     @try {
         succeeded = block(&error);
         if (!succeeded) {
-            [self _gsRecordFailure:[NSString stringWithFormat:@"failed%@ - %@", where,
-                                       error ? [error localizedDescription] : @"returned NO without an error"]
-                          expected:YES];
+            [self _gsRecordIssueWithoutInterrupting:
+                _GSXCTMakeIssue(XCTIssueTypeThrownError,
+                                [NSString stringWithFormat:@"failed%@ - %@", where,
+                                    error ? [error localizedDescription] : @"returned NO without an error"],
+                                nil, 0, error)];
         }
     }
     @catch (_XCTSkipFailureException *skip) {
@@ -274,9 +359,7 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
         // continueAfterFailure is NO; the failure has already been recorded.
     }
     @catch (NSException *exception) {
-        [self _gsRecordFailure:[NSString stringWithFormat:@"threw exception%@: %@", where,
-                                   _GSXCTDescribeException(exception)]
-                      expected:NO];
+        [self _gsRecordException:exception where:where];
     }
 
     return succeeded;
@@ -367,9 +450,7 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
         @catch (_XCTestCaseInterruptionException *interruption) {
         }
         @catch (NSException *exception) {
-            [self _gsRecordFailure:[NSString stringWithFormat:@"threw exception: %@",
-                                       _GSXCTDescribeException(exception)]
-                          expected:NO];
+            [self _gsRecordException:exception where:@""];
         }
 
         @try {

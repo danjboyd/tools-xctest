@@ -29,6 +29,8 @@ typedef enum {
     GSXCTestStatusSkipped,
 } GSXCTestStatus;
 
+@class XCTIssue;
+
 /*! A recorded failure, or the location and reason of a skip. */
 @interface GSXCTestIssue : NSObject {
     NSString *_message;
@@ -36,11 +38,17 @@ typedef enum {
     NSUInteger _lineNumber;
     BOOL _unexpected;
     NSString *_context;
+    XCTIssue *_xctIssue;
 }
 + (GSXCTestIssue *) issueWithMessage: (NSString *)message
                             filePath: (NSString *)filePath
                           lineNumber: (NSUInteger)lineNumber
                           unexpected: (BOOL)unexpected;
+/*! A failure recorded as \a issue. */
++ (GSXCTestIssue *) issueWithXCTIssue: (XCTIssue *)issue;
+/*! The XCTIssue the failure was recorded as; for failures that weren't
+ * (e.g. in +setUp), one made from the other properties. */
+@property (retain) XCTIssue *xctIssue;
 @property (copy) NSString *message;
 /*! nil when the issue has no source location. */
 @property (copy) NSString *filePath;

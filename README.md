@@ -71,9 +71,9 @@ Also available: `waitForExpectations:timeout:enforceOrder:`, inverted expectatio
 Tests are run through Apple's object model. Each test is an `XCTestCase` instance bound to one test method, grouped in `XCTestSuite`s, and its results are kept in an `XCTestRun` (`XCTestCaseRun`, `XCTestSuiteRun`). This means you can:
 
 - Override `+defaultTestSuite` or `+testInvocations` to change which tests a class has. For example, an abstract base class can return an empty suite so its tests only run in subclasses.
-- Override `-invokeTest` to wrap each test, or `-recordFailureWithDescription:inFile:atLine:expected:` to see or filter failures.
+- Override `-invokeTest` to wrap each test, or `-recordIssue:` to see, change or drop failures. Every failure is an `XCTIssue` with a type (assertion failure, thrown error, uncaught exception, performance regression, ...), a source location and, for errors from `-setUpWithError:`, the `associatedError`; `XCTMutableIssue` lets an override change one. Overrides of the older `-recordFailureWithDescription:inFile:atLine:expected:` still work.
 - Build and run suites yourself, and check the run's counts (`failureCount`, `skipCount`, `hasSucceeded`, ...).
-- Register an `XCTestObservation` observer with `XCTestObservationCenter` to follow progress. To register one before any test runs, do it in the `-init` of the bundle's principal class (with gnustep-make, `MyTests_PRINCIPAL_CLASS = MyObserverRegistrar`); `xctest` creates it before running tests.
+- Register an `XCTestObservation` observer (it gets `testCase:didRecordIssue:` for each failure) with `XCTestObservationCenter` to follow progress. To register one before any test runs, do it in the `-init` of the bundle's principal class (with gnustep-make, `MyTests_PRINCIPAL_CLASS = MyObserverRegistrar`); `xctest` creates it before running tests.
 
 ### Performance tests
 

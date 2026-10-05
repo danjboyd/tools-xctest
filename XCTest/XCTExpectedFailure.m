@@ -188,9 +188,7 @@ void XCTExpectFailureWithOptionsInBlock(NSString *failureReason, XCTExpectedFail
         return NO;
     }
 
-    issue = [[[XCTIssue alloc] initWithType:([failure unexpected] ? XCTIssueTypeUncaughtException
-                                                                 : XCTIssueTypeAssertionFailure)
-                         compactDescription:[failure message]] autorelease];
+    issue = [failure xctIssue];
 
     // The innermost enabled scope whose matcher accepts the issue wins.
     for (GSXCTExpectedFailureScope *scope in [[_expectedFailureScopes reverseObjectEnumerator] allObjects]) {
@@ -217,11 +215,9 @@ void XCTExpectFailureWithOptionsInBlock(NSString *failureReason, XCTExpectedFail
 {
     _gsRecordingUnmatched = YES;
     @try {
-        [self recordFailureWithDescription:[NSString stringWithFormat:
-                                               @"Failed due to unmatched expected failure: %@", reason]
-                                    inFile:nil
-                                    atLine:0
-                                  expected:YES];
+        [self recordIssue:_GSXCTMakeIssue(XCTIssueTypeUnmatchedExpectedFailure,
+                                          [NSString stringWithFormat:@"Failed due to unmatched expected failure: %@", reason],
+                                          nil, 0, nil)];
     }
     @catch (_XCTestCaseInterruptionException *interruption) {
     }

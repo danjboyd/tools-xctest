@@ -34,7 +34,8 @@ XCTEST_TEST_SCRIPTS = cli-filter \
 	expected-failure \
 	performance \
 	repetition \
-	out-of-test
+	out-of-test \
+	issue
 
 after-check:: all
 	@set -e; for name in $(XCTEST_TEST_SCRIPTS); do \
