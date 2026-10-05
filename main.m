@@ -48,6 +48,9 @@ static void PrintUsage(FILE *stream)
     fprintf(stream, "  -test-iterations <n>        Run each test n times (the maximum, with the two options below)\n");
     fprintf(stream, "  -run-tests-until-failure    Repeat each test until it fails (at most 100 times by default)\n");
     fprintf(stream, "  -retry-tests-on-failure     Retry a failing test until it passes (at most 3 times by default)\n");
+    fprintf(stream, "  -test-execution-order <order>  'alphabetical' (default) or 'random' (classes, and tests\n");
+    fprintf(stream, "                              within each class, shuffled; the seed is logged)\n");
+    fprintf(stream, "  -test-execution-order-seed <n>  Repeat a random order (implies -test-execution-order random)\n");
     fprintf(stream, "  -test-timeouts-enabled YES|NO  Fail a test that runs longer than its execution time allowance,\n");
     fprintf(stream, "                              then stop the run (default NO)\n");
     fprintf(stream, "  -default-test-execution-time-allowance <s>  Each test's allowance unless it sets its own\n");
@@ -103,6 +106,7 @@ static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString
                           NSString *attachmentsPath,
                           NSString *performanceBaselinesPath, BOOL updatePerformanceBaselines,
                           GSXCTestRepetitionMode repetitionMode, NSInteger testIterations,
+                          BOOL randomOrder, unsigned long long orderSeed,
                           BOOL testTimeoutsEnabled, NSTimeInterval defaultAllowance,
                           NSTimeInterval maximumAllowance, NSTimeInterval launchTimeout)
 {
@@ -146,6 +150,8 @@ static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString
     [config setObject:statusFile forKey:@"statusFile"];
     [config setObject:[NSNumber numberWithInt:repetitionMode] forKey:@"repetitionMode"];
     [config setObject:[NSNumber numberWithInteger:testIterations] forKey:@"testIterations"];
+    [config setObject:[NSNumber numberWithBool:randomOrder] forKey:@"randomizeExecutionOrder"];
+    [config setObject:[NSNumber numberWithUnsignedLongLong:orderSeed] forKey:@"executionOrderSeed"];
     [config setObject:[NSNumber numberWithBool:testTimeoutsEnabled] forKey:@"testTimeoutsEnabled"];
     [config setObject:[NSNumber numberWithDouble:defaultAllowance] forKey:@"defaultExecutionTimeAllowance"];
     [config setObject:[NSNumber numberWithDouble:maximumAllowance] forKey:@"maximumExecutionTimeAllowance"];
@@ -303,6 +309,8 @@ int main(int argc, char *argv[]) {
     BOOL runUntilFailure = NO;
     BOOL retryOnFailure = NO;
     GSXCTestRepetitionMode repetitionMode = GSXCTestRepetitionNone;
+    BOOL randomOrder = NO;
+    unsigned long long orderSeed = 0;
     BOOL testTimeoutsEnabled = NO;
     BOOL testTimeoutsOptionGiven = NO;
     NSTimeInterval defaultAllowance = 0;
@@ -401,6 +409,33 @@ int main(int argc, char *argv[]) {
 
         if ([argument isEqualToString:@"-retry-tests-on-failure"]) {
             retryOnFailure = YES;
+            continue;
+        }
+
+        if ([argument isEqualToString:@"-test-execution-order"]) {
+            NSString *order = (i + 1 < argc) ? [NSString stringWithUTF8String:argv[++i]] : nil;
+            if ([order isEqualToString:@"random"]) {
+                randomOrder = YES;
+            } else if ([order isEqualToString:@"alphabetical"]) {
+                randomOrder = NO;
+            } else {
+                fprintf(stderr, "xctest: -test-execution-order must be 'alphabetical' or 'random'\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            continue;
+        }
+
+        if ([argument isEqualToString:@"-test-execution-order-seed"]) {
+            char *end = NULL;
+            const char *value = (i + 1 < argc) ? argv[++i] : "";
+            orderSeed = strtoull(value, &end, 10);
+            if (*value == '\0' || *value == '-' || end == NULL || *end != '\0' || orderSeed == 0) {
+                fprintf(stderr, "xctest: -test-execution-order-seed needs a whole number greater than 0\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            randomOrder = YES;
             continue;
         }
 
@@ -532,7 +567,8 @@ int main(int argc, char *argv[]) {
                                   onlyTestIdentifiers, skipTestIdentifiers, outputFormat, junitReportPath,
                                   attachmentsPath,
                                   performanceBaselinesPath, updatePerformanceBaselines,
-                                  repetitionMode, testIterations, testTimeoutsEnabled,
+                                  repetitionMode, testIterations, randomOrder, orderSeed,
+                                  testTimeoutsEnabled,
                                   defaultAllowance, maximumAllowance, hostLaunchTimeout);
         goto cleanup;
     }
@@ -551,6 +587,9 @@ int main(int argc, char *argv[]) {
 
     NSString *targetName = TargetNameForBundlePath(testBundlePath);
     GSXCTestRunner *runner = [GSXCTestRunner sharedRunner];
+
+    [runner setRandomizeExecutionOrder:randomOrder];
+    [runner setExecutionOrderSeed:orderSeed];
 
     if (listTests) {
         exitCode = ListTests(runner, testBundlePath, targetName,

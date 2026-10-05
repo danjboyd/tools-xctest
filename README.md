@@ -143,6 +143,8 @@ xctest MyTests.bundle -list-tests -only-testing:MyTests/FooTests
 
 To find flaky tests, `-test-iterations <n>` runs each test n times. With `-run-tests-until-failure` a test repeats until it fails (at most 100 times, or n), and with `-retry-tests-on-failure` a failing test is retried until it passes (at most 3 times, or n); failed attempts followed by a pass don't count. Each run uses a fresh test case; class `+setUp`/`+tearDown` still run once.
 
+Tests run in alphabetical order. To catch tests that only pass because of what ran before them, `-test-execution-order random` shuffles the test classes, and the tests within each class (a class's tests still run together, between its `+setUp` and `+tearDown`). The seed is logged and recorded in the JUnit report; `-test-execution-order-seed <n>` repeats that order exactly, and `-list-tests` shows it.
+
 To keep a hung test from hanging CI, give tests a time limit: with `-test-timeouts-enabled YES`, each test (including its set up and teardown) may run for its `executionTimeAllowance`, 600 seconds unless `-default-test-execution-time-allowance <seconds>` says otherwise. A test can change its own allowance (e.g. `self.executionTimeAllowance = 120` in `-setUp`), and `-maximum-test-execution-time-allowance <seconds>` caps it. Either allowance option turns time limits on. A test that runs out of time fails; the console output, JUnit report and observers are finished for the tests that ran, and `xctest` exits with a failure without running the remaining tests (Apple's XCTest restarts the process instead, and rounds allowances up to whole minutes, which this doesn't). This works with `-host` too.
 
 Automated CLI regression tests can be run with `make check` or `meson test -C build`.

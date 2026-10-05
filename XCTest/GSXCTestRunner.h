@@ -63,6 +63,8 @@ typedef enum {
     NSTimeInterval maximumExecutionTimeAllowance;
     void (^terminationHandler)(int exitCode);
     NSString *attachmentsPath;
+    BOOL randomizeExecutionOrder;
+    unsigned long long executionOrderSeed;
 }
 
 @property GSXCTestOutputFormat outputFormat;
@@ -97,6 +99,17 @@ typedef enum {
 @property GSXCTestRepetitionMode repetitionMode;
 /*! The number of runs (or maximum attempts) per test when repeating. */
 @property NSUInteger testIterations;
+
+/*!
+ * If YES, test classes run in a random order, as do the tests within each
+ * class (a class's tests still run together, between its +setUp and
+ * +tearDown). The order comes from executionOrderSeed, so a run can be
+ * repeated exactly; listing tests uses the same order.
+ */
+@property BOOL randomizeExecutionOrder;
+/*! The seed for a random order; 0 (the default) picks one, which is
+ * logged and then kept here. */
+@property unsigned long long executionOrderSeed;
 
 /*!
  * Where to save XCTAttachments, in <Class>/<test>/ folders. If not set

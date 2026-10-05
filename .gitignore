@@ -30,3 +30,5 @@ Tests/ActivityFixture/ActivityFixture.bundle
 Tests/ActivityFixture/obj
 Tests/AttachmentFixture/AttachmentFixture.bundle
 Tests/AttachmentFixture/obj
+Tests/OrderFixture/OrderFixture.bundle
+Tests/OrderFixture/obj

@@ -280,6 +280,7 @@
 @synthesize name = _name;
 @synthesize bundleName = _bundleName;
 @synthesize filtersActive = _filtersActive;
+@synthesize executionOrderSeed = _executionOrderSeed;
 @synthesize suiteResults = _suiteResults;
 @synthesize startDate = _startDate;
 @synthesize duration = _duration;
@@ -985,10 +986,15 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
             [casesXML appendString:@"    </testcase>\n"];
         }
 
-        [suitesXML appendFormat:@"  <testsuite name=\"%@\" tests=\"%lu\" failures=\"%lu\" errors=\"%lu\" skipped=\"%lu\" time=\"%.3f\" timestamp=\"%@\">\n%@  </testsuite>\n",
+        // A random order's seed, so the run can be repeated.
+        NSString *properties = [run executionOrderSeed] == 0 ? @""
+            : [NSString stringWithFormat:@"    <properties>\n      <property name=\"executionOrderSeed\" value=\"%llu\"/>\n    </properties>\n",
+                [run executionOrderSeed]];
+
+        [suitesXML appendFormat:@"  <testsuite name=\"%@\" tests=\"%lu\" failures=\"%lu\" errors=\"%lu\" skipped=\"%lu\" time=\"%.3f\" timestamp=\"%@\">\n%@%@  </testsuite>\n",
             GSXMLEscape([suite name]), (unsigned long)tests, (unsigned long)failures,
             (unsigned long)errors, (unsigned long)skipped, [suite duration],
-            GSJUnitTimestamp([suite startDate]), casesXML];
+            GSJUnitTimestamp([suite startDate]), properties, casesXML];
 
         totalTests += tests;
         totalFailures += failures;
