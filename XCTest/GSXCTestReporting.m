@@ -30,6 +30,7 @@
 @synthesize lineNumber = _lineNumber;
 @synthesize unexpected = _unexpected;
 @synthesize context = _context;
+@synthesize activityPath = _activityPath;
 
 + (GSXCTestIssue *) issueWithMessage: (NSString *)message
                             filePath: (NSString *)filePath
@@ -42,7 +43,17 @@
     [issue setFilePath:filePath];
     [issue setLineNumber:lineNumber];
     [issue setUnexpected:unexpected];
+    [issue setActivityPath:_GSXCTCurrentActivityPath()];
     return issue;
+}
+
+- (NSString *) displayMessage
+{
+    if ([_activityPath count] == 0) {
+        return _message;
+    }
+
+    return [NSString stringWithFormat:@"%@: %@", [_activityPath componentsJoinedByString:@" > "], _message];
 }
 
 + (GSXCTestIssue *) issueWithXCTIssue: (XCTIssue *)xctIssue
@@ -62,6 +73,7 @@
     [_filePath release];
     [_context release];
     [_xctIssue release];
+    [_activityPath release];
     [super dealloc];
 }
 
@@ -328,13 +340,13 @@ static NSArray *GSFailedTestLines(GSXCTestRunResult *run, NSString *(^testName)(
                     ? [NSString stringWithFormat:@"%@:%lu: ", [first filePath], (unsigned long)[first lineNumber]]
                     : @"";
                 [lines addObject:[NSString stringWithFormat:@"%@: %@%@",
-                    testName([test className], [test displayName]), location, [first message]]];
+                    testName([test className], [test displayName]), location, [first displayMessage]]];
             }
         }
         for (GSXCTestIssue *failure in [suite classFailures]) {
             if ([[failure context] isEqualToString:@"+tearDown"]) {
                 [lines addObject:[NSString stringWithFormat:@"%@: %@",
-                    testName([suite name], @"+tearDown"), [failure message]]];
+                    testName([suite name], @"+tearDown"), [failure displayMessage]]];
                 break;
             }
         }
@@ -392,9 +404,9 @@ static NSString *GSSkippedSummary(NSUInteger skipCount)
 {
     if ([failure filePath] != nil) {
         NSLog(@"XCTest:     Assertion FAILED at %@:%lu, %@",
-            [failure filePath], (unsigned long)[failure lineNumber], [failure message]);
+            [failure filePath], (unsigned long)[failure lineNumber], [failure displayMessage]);
     } else {
-        NSLog(@"XCTest:     %@: %@", [test methodName], [failure message]);
+        NSLog(@"XCTest:     %@: %@", [test methodName], [failure displayMessage]);
     }
 }
 
@@ -402,16 +414,16 @@ static NSString *GSSkippedSummary(NSUInteger skipCount)
 {
     NSLog(@"XCTest:   %@.%@ FAILED after it finished: %@%@", [test className], [test displayName],
         [failure filePath] ? [NSString stringWithFormat:@"%@:%lu: ", [failure filePath], (unsigned long)[failure lineNumber]] : @"",
-        [failure message]);
+        [failure displayMessage]);
 }
 
 - (void) test: (GSXCTestCaseResult *)test didRecordExpectedFailure: (GSXCTestIssue *)failure
 {
     if ([failure filePath] != nil) {
         NSLog(@"XCTest:     Expected failure (%@) at %@:%lu, %@", [failure context],
-            [failure filePath], (unsigned long)[failure lineNumber], [failure message]);
+            [failure filePath], (unsigned long)[failure lineNumber], [failure displayMessage]);
     } else {
-        NSLog(@"XCTest:     Expected failure (%@): %@", [failure context], [failure message]);
+        NSLog(@"XCTest:     Expected failure (%@): %@", [failure context], [failure displayMessage]);
     }
 }
 
@@ -427,13 +439,18 @@ static NSString *GSSkippedSummary(NSUInteger skipCount)
         [measurement valuesDescription]);
 }
 
+- (void) test: (GSXCTestCaseResult *)test didStartActivity: (NSArray *)activityPath atTime: (NSTimeInterval)time
+{
+    NSLog(@"XCTest:     Activity: %@", [activityPath componentsJoinedByString:@" > "]);
+}
+
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure
 {
     if ([failure filePath] != nil) {
         NSLog(@"XCTest:   %@ %@ assertion FAILED at %@:%lu, %@", [suite name], [failure context],
-            [failure filePath], (unsigned long)[failure lineNumber], [failure message]);
+            [failure filePath], (unsigned long)[failure lineNumber], [failure displayMessage]);
     } else {
-        NSLog(@"XCTest:   %@ %@ FAILED: %@", [suite name], [failure context], [failure message]);
+        NSLog(@"XCTest:   %@ %@ FAILED: %@", [suite name], [failure context], [failure displayMessage]);
     }
 }
 
@@ -582,19 +599,19 @@ static NSString *GSAppleLocation(GSXCTestIssue *issue)
 - (void) test: (GSXCTestCaseResult *)test didRecordFailure: (GSXCTestIssue *)failure
 {
     GSPrintLine([NSString stringWithFormat:@"%@: error: %@ : %@",
-        GSAppleLocation(failure), GSAppleTestName(test), [failure message]]);
+        GSAppleLocation(failure), GSAppleTestName(test), [failure displayMessage]]);
 }
 
 - (void) test: (GSXCTestCaseResult *)test didRecordFailureAfterFinishing: (GSXCTestIssue *)failure
 {
     GSPrintLine([NSString stringWithFormat:@"%@: error: %@ : (after the test finished) %@",
-        GSAppleLocation(failure), GSAppleTestName(test), [failure message]]);
+        GSAppleLocation(failure), GSAppleTestName(test), [failure displayMessage]]);
 }
 
 - (void) test: (GSXCTestCaseResult *)test didRecordExpectedFailure: (GSXCTestIssue *)failure
 {
     GSPrintLine([NSString stringWithFormat:@"%@: %@ : Expected failure: %@: %@",
-        GSAppleLocation(failure), GSAppleTestName(test), [failure context], [failure message]]);
+        GSAppleLocation(failure), GSAppleTestName(test), [failure context], [failure displayMessage]]);
 }
 
 - (void) test: (GSXCTestCaseResult *)test didMeasure: (GSXCTMeasurement *)measurement
@@ -609,6 +626,13 @@ static NSString *GSAppleLocation(GSXCTestIssue *issue)
         [measurement maxPercentRegression]]);
 }
 
+- (void) test: (GSXCTestCaseResult *)test didStartActivity: (NSArray *)activityPath atTime: (NSTimeInterval)time
+{
+    NSString *indent = [@"" stringByPaddingToLength:4 * ([activityPath count] - 1) withString:@" " startingAtIndex:0];
+
+    GSPrintLine([NSString stringWithFormat:@"    t = %8.2fs %@%@", time, indent, [activityPath lastObject]]);
+}
+
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure
 {
     // "+setUp" -> "+[Class setUp]"
@@ -617,7 +641,7 @@ static NSString *GSAppleLocation(GSXCTestIssue *issue)
         [context substringToIndex:1], [suite name], [context substringFromIndex:1]];
 
     GSPrintLine([NSString stringWithFormat:@"%@: error: %@ : %@",
-        GSAppleLocation(failure), name, [failure message]]);
+        GSAppleLocation(failure), name, [failure displayMessage]]);
 }
 
 - (void) testDidFinish: (GSXCTestCaseResult *)test
@@ -719,11 +743,11 @@ static NSString *GSXMLEscape(NSString *string)
 static NSString *GSJUnitIssueLine(GSXCTestIssue *issue)
 {
     if ([issue filePath] == nil) {
-        return [issue message];
+        return [issue displayMessage];
     }
 
     return [NSString stringWithFormat:@"%@:%lu: %@",
-        [issue filePath], (unsigned long)[issue lineNumber], [issue message]];
+        [issue filePath], (unsigned long)[issue lineNumber], [issue displayMessage]];
 }
 
 static NSString *GSJUnitTimestamp(NSDate *date)
@@ -758,7 +782,7 @@ static void GSAppendJUnitFailures(NSMutableString *xml, NSArray *failures)
 
     [xml appendFormat:@"      <%@ message=\"%@\" type=\"%@\">%@</%@>\n",
         unexpected ? @"error" : @"failure",
-        GSXMLEscape([first message]),
+        GSXMLEscape([first displayMessage]),
         unexpected ? @"UncaughtException" : @"XCTestFailure",
         GSXMLEscape([lines componentsJoinedByString:@"\n"]),
         unexpected ? @"error" : @"failure"];
@@ -803,6 +827,7 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
 - (void) test: (GSXCTestCaseResult *)test didRecordFailureAfterFinishing: (GSXCTestIssue *)failure {}
 - (void) test: (GSXCTestCaseResult *)test didRecordExpectedFailure: (GSXCTestIssue *)failure {}
 - (void) test: (GSXCTestCaseResult *)test didMeasure: (GSXCTMeasurement *)measurement {}
+- (void) test: (GSXCTestCaseResult *)test didStartActivity: (NSArray *)activityPath atTime: (NSTimeInterval)time {}
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure {}
 - (void) testDidFinish: (GSXCTestCaseResult *)test {}
 - (void) testWillBeRetried: (GSXCTestCaseResult *)test {}
@@ -1068,6 +1093,19 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
 
         [[_currentTest measurements] addObject:measurement];
         GS_REPORT(test:_currentTest didMeasure:measurement)
+    }
+}
+
+- (void) _gsTestCase: (XCTestCase *)testCase activityDidStart: (GSXCTActivity *)activity
+{
+    // Events can come from other threads (late failures).
+    @synchronized (self) {
+        if (testCase != _currentTestCase || _currentTest == nil) {
+            return;
+        }
+
+        GS_REPORT(test:_currentTest didStartActivity:[activity path]
+                  atTime:[[activity startDate] timeIntervalSinceDate:[_currentTest startDate]])
     }
 }
 

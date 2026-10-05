@@ -67,6 +67,7 @@ source = [
 	'XCTest/XCTExpectedFailure.m',
 	'XCTest/XCTestCase+Performance.m',
 	'XCTest/GSXCTestWatchdog.m',
+	'XCTest/XCTContext.m',
 ]
 
 headers = [
@@ -86,6 +87,8 @@ headers = [
 	'XCTest/XCTestObservationCenter.h',
 	'XCTest/XCTIssue.h',
 	'XCTest/XCTExpectedFailure.h',
+	'XCTest/XCTActivity.h',
+	'XCTest/XCTContext.h',
 ]
 
 include_dirs = include_directories(
@@ -146,6 +149,7 @@ if host_machine.system() != 'darwin'
     ['out-of-test', 'run-out-of-test-tests.sh'],
     ['issues', 'run-issue-tests.sh'],
     ['timeouts', 'run-timeout-tests.sh'],
+    ['activities', 'run-activity-tests.sh'],
     ['hosted', 'run-hosted-tests.sh'],
   ]
 

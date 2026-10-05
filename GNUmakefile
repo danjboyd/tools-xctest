@@ -36,7 +36,8 @@ XCTEST_TEST_SCRIPTS = cli-filter \
 	repetition \
 	out-of-test \
 	issue \
-	timeout
+	timeout \
+	activity
 
 after-check:: all
 	@set -e; for name in $(XCTEST_TEST_SCRIPTS); do \

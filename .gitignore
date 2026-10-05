@@ -26,3 +26,5 @@ Tests/IssueFixture/IssueFixture.bundle
 Tests/IssueFixture/obj
 Tests/TimeoutFixture/TimeoutFixture.bundle
 Tests/TimeoutFixture/obj
+Tests/ActivityFixture/ActivityFixture.bundle
+Tests/ActivityFixture/obj

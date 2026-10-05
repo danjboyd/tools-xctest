@@ -31,6 +31,7 @@
 #import <XCTest/GSXCTestReporting.h>
 #import <XCTest/GSXCTestRunner.h>
 #import <XCTest/XCTIssue.h>
+#import <XCTest/XCTActivity.h>
 
 @class XCTIssue;
 @class XCTSourceCodeLocation;
@@ -67,6 +68,24 @@ void _GSXCTWatchdogTestDidFinish(XCTestCase *test);
 void _GSXCTWatchdogAllowanceDidChange(void);
 void _GSXCTWatchdogSuiteWillStart(XCTestSuite *suite);
 void _GSXCTWatchdogSuiteDidFinish(XCTestSuite *suite);
+
+// A running XCTContext activity.
+@interface GSXCTActivity : NSObject <XCTActivity> {
+    NSString *_name;
+    NSArray *_path;
+    NSDate *_startDate;
+    XCTestCase *_testCase;
+}
+- (id) initWithName: (NSString *)name parent: (GSXCTActivity *)parent testCase: (XCTestCase *)testCase;
+// Its name, after those of the activities around it.
+- (NSArray *) path;
+- (NSDate *) startDate;
+// The test it ran in (not retained), or nil.
+- (XCTestCase *) testCase;
+@end
+
+// The path of the innermost activity running on this thread, or nil.
+NSArray *_GSXCTCurrentActivityPath(void);
 
 // Every XCTestCase subclass, sorted by name.
 NSArray *_GSXCTestCaseSubclasses(void);
@@ -135,6 +154,7 @@ NSString *_GSXCTDescribeException(NSException *exception);
 // A failure absorbed by XCTExpectFailure; its context is the reason.
 - (void) _gsTestCase: (XCTestCase *)testCase didRecordExpectedFailure: (GSXCTestIssue *)issue;
 - (void) _gsTestCase: (XCTestCase *)testCase didMeasure: (GSXCTMeasurement *)measurement;
+- (void) _gsTestCase: (XCTestCase *)testCase activityDidStart: (GSXCTActivity *)activity;
 // A failure recorded after the test's run stopped (e.g. from a callback).
 - (void) _gsTestCase: (XCTestCase *)testCase didRecordIssueAfterFinishing: (GSXCTestIssue *)issue;
 // A failed attempt that will be retried, and so no longer counts.

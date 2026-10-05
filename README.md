@@ -49,6 +49,10 @@ Test classes support the same lifecycle as Apple's XCTest:
 - Call `XCTExpectFailure(@"reason")` (or `XCTExpectFailureInBlock`) to mark known failures: they are reported as expected and don't fail the test, and a strict expectation fails the test if nothing failed. `XCTExpectedFailureOptions` makes it non-strict, disables it, or matches only some issues.
 - Call `XCTSkip(...)`, `XCTSkipIf(condition, ...)` or `XCTSkipUnless(condition, ...)` to skip the rest of a test, for example when it needs a display or a platform feature that isn't available. Skipped tests are reported separately and don't fail the run; teardown still runs.
 
+### Activities
+
+`[XCTContext runActivityNamed:@"Log in" block:^(id<XCTActivity> activity) { ... }]` runs part of a test as a named step. Activities nest (on each thread), and failures recorded inside one are reported with its path, e.g. `Log in > Enter password: ((valid) is true) failed`, in the console, `-output-format apple` (which also prints Apple's `t = 0.01s Log in` lines) and JUnit reports.
+
 ### Asynchronous tests
 
 Code driven by the run loop (timers, notifications, `NSURLConnection`, `NSTask`, `performSelector:afterDelay:`) can be tested with expectations. Waiting runs the current run loop until the expectations are fulfilled or the timeout passes; a timeout is a test failure.
