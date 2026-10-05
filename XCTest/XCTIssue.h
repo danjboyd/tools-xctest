@@ -20,6 +20,8 @@
 
 #import <Foundation/Foundation.h>
 
+@class XCTAttachment;
+
 typedef enum {
     XCTIssueTypeAssertionFailure = 0,
     XCTIssueTypeThrownError = 1,
@@ -66,13 +68,15 @@ typedef enum {
     NSString *_detailedDescription;
     XCTSourceCodeContext *_sourceCodeContext;
     NSError *_associatedError;
+    NSArray *_attachments;
 }
 
 - (id) initWithType: (XCTIssueType)type
  compactDescription: (NSString *)compactDescription
 detailedDescription: (NSString *)detailedDescription
   sourceCodeContext: (XCTSourceCodeContext *)sourceCodeContext
-    associatedError: (NSError *)associatedError;
+    associatedError: (NSError *)associatedError
+        attachments: (NSArray *)attachments;
 - (id) initWithType: (XCTIssueType)type compactDescription: (NSString *)compactDescription;
 - (id) initWithType: (XCTIssueType)type
  compactDescription: (NSString *)compactDescription
@@ -86,6 +90,8 @@ detailedDescription: (NSString *)detailedDescription;
 @property (readonly, retain) XCTSourceCodeContext *sourceCodeContext;
 /*! The error behind the issue, e.g. one returned by -setUpWithError:. */
 @property (readonly, retain) NSError *associatedError;
+/*! XCTAttachments kept with the test's results when the issue is recorded. */
+@property (readonly, copy) NSArray *attachments;
 
 @end
 
@@ -97,5 +103,8 @@ detailedDescription: (NSString *)detailedDescription;
 @property (readwrite, copy) NSString *detailedDescription;
 @property (readwrite, retain) XCTSourceCodeContext *sourceCodeContext;
 @property (readwrite, retain) NSError *associatedError;
+@property (readwrite, copy) NSArray *attachments;
+
+- (void) addAttachment: (XCTAttachment *)attachment;
 
 @end

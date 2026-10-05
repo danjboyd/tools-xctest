@@ -82,7 +82,8 @@ static NSString *FixtureLocation(XCTIssue *issue)
                                    compactDescription:@"recorded directly"
                                   detailedDescription:@"recorded directly, in detail"
                                     sourceCodeContext:context
-                                      associatedError:nil] autorelease];
+                                      associatedError:nil
+                                          attachments:nil] autorelease];
     [self recordIssue:issue];
 }
 

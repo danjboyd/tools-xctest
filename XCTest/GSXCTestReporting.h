@@ -85,6 +85,24 @@ typedef enum {
 - (NSString *) valuesDescription;
 @end
 
+@class XCTAttachment;
+
+/*! An attachment added to a test, and where it was saved. */
+@interface GSXCTAttachmentRecord : NSObject {
+    XCTAttachment *_attachment;
+    NSArray *_activityPath;
+    NSString *_savedPath;
+}
+- (id) initWithAttachment: (XCTAttachment *)attachment activityPath: (NSArray *)activityPath;
+@property (readonly) XCTAttachment *attachment;
+/*! The XCTContext activity it was added in, outermost first; or nil. */
+@property (readonly) NSArray *activityPath;
+/*! The absolute path of the saved file; nil if it wasn't saved. */
+@property (copy) NSString *savedPath;
+/*! The attachment's name, or a default. */
+- (NSString *) displayName;
+@end
+
 @interface GSXCTestCaseResult : NSObject {
     NSString *_className;
     NSString *_methodName;
@@ -92,6 +110,7 @@ typedef enum {
     NSMutableArray *_failures;
     NSMutableArray *_expectedFailures;
     NSMutableArray *_measurements;
+    NSMutableArray *_attachments;
     GSXCTestIssue *_skip;
     NSDate *_startDate;
     NSTimeInterval _duration;
@@ -111,6 +130,8 @@ typedef enum {
 /*! Failures absorbed by XCTExpectFailure; each issue's context is the reason. */
 @property (readonly) NSMutableArray *expectedFailures;
 @property (readonly) NSMutableArray *measurements;
+/*! GSXCTAttachmentRecords, in the order they were added. */
+@property (readonly) NSMutableArray *attachments;
 @property (retain) GSXCTestIssue *skip;
 @property (retain) NSDate *startDate;
 @property NSTimeInterval duration;
@@ -181,6 +202,8 @@ typedef enum {
  * \a activityPath is its name after those of the activities around it. */
 - (void) test: (GSXCTestCaseResult *)test didStartActivity: (NSArray *)activityPath atTime: (NSTimeInterval)time;
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure;
+/*! An attachment was saved, as the test finished (before testDidFinish:). */
+- (void) test: (GSXCTestCaseResult *)test didSaveAttachment: (GSXCTAttachmentRecord *)attachment;
 - (void) testDidFinish: (GSXCTestCaseResult *)test;
 /*! A failed attempt that will be retried; it has been removed from its suite. */
 - (void) testWillBeRetried: (GSXCTestCaseResult *)test;
@@ -215,9 +238,11 @@ typedef enum {
 /*!
  * An XCTestObservation observer that turns test events into results and
  * reporter calls. topSuite is the suite the run starts with; each
- * GSXCTestCaseSuite inside it is reported as one class.
+ * GSXCTestCaseSuite inside it is reported as one class. Attachments are
+ * saved under attachmentsDirectory as each test finishes, if it's set.
  */
 @interface GSXCTestReportingObserver : NSObject {
+    NSString *_attachmentsDirectory;
     NSArray *_reporters;
     GSXCTestRunResult *_run;
     XCTestSuite *_topSuite;
@@ -230,4 +255,6 @@ typedef enum {
 - (id) initWithReporters: (NSArray *)reporters
                      run: (GSXCTestRunResult *)run
                 topSuite: (XCTestSuite *)topSuite;
+/*! An absolute path, or nil not to save attachments. */
+@property (copy) NSString *attachmentsDirectory;
 @end

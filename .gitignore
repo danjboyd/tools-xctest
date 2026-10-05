@@ -28,3 +28,5 @@ Tests/TimeoutFixture/TimeoutFixture.bundle
 Tests/TimeoutFixture/obj
 Tests/ActivityFixture/ActivityFixture.bundle
 Tests/ActivityFixture/obj
+Tests/AttachmentFixture/AttachmentFixture.bundle
+Tests/AttachmentFixture/obj

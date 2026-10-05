@@ -305,6 +305,10 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
 {
     GSXCTestIssue *failure = [GSXCTestIssue issueWithXCTIssue:issue];
 
+    for (XCTAttachment *attachment in [issue attachments]) {
+        _GSXCTAddAttachment(self, attachment, [failure activityPath]);
+    }
+
     // Failures inside XCTExpectFailure are reported, but neither fail nor
     // stop the test.
     if ([self _gsAbsorbExpectedFailure:failure]) {
@@ -476,6 +480,11 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
     _GSXCTWatchdogTestDidFinish(self);
     [run stop];
     GSCurrentTestCase = previous;
+}
+
+- (void) addAttachment: (XCTAttachment *)attachment
+{
+    _GSXCTAddAttachment(self, attachment, _GSXCTCurrentActivityPath());
 }
 
 - (void) addTeardownBlock: (void (^)(void))block

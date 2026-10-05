@@ -20,9 +20,14 @@
 
 #import <Foundation/Foundation.h>
 
+@class XCTAttachment;
+
 /*! A named step of a test, created by +[XCTContext runActivityNamed:block:]. */
 @protocol XCTActivity <NSObject>
 
 @property (readonly, copy) NSString *name;
+
+/*! Keeps \a attachment with the test's results, as part of this activity. */
+- (void) addAttachment: (XCTAttachment *)attachment;
 
 @end

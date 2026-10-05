@@ -140,6 +140,7 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 @synthesize defaultExecutionTimeAllowance;
 @synthesize maximumExecutionTimeAllowance;
 @synthesize terminationHandler;
+@synthesize attachmentsPath;
 
 - (id)init
 {
@@ -161,6 +162,7 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     [bundleName release];
     [junitReportPath release];
     [terminationHandler release];
+    [attachmentsPath release];
     [super dealloc];
 }
 
@@ -385,6 +387,16 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     GSXCTestReportingObserver *reportingObserver = [[[GSXCTestReportingObserver alloc]
         initWithReporters:reporters run:run topSuite:topSuite] autorelease];
     XCTestObservationCenter *center = [XCTestObservationCenter sharedTestObservationCenter];
+    NSString *attachmentsDirectory = attachmentsPath;
+
+    if (attachmentsDirectory == nil && junitReportPath != nil) {
+        attachmentsDirectory = [[junitReportPath stringByDeletingPathExtension] stringByAppendingString:@"-attachments"];
+    }
+    if (attachmentsDirectory != nil && ![attachmentsDirectory isAbsolutePath]) {
+        attachmentsDirectory = [[[NSFileManager defaultManager] currentDirectoryPath]
+            stringByAppendingPathComponent:attachmentsDirectory];
+    }
+    [reportingObserver setAttachmentsDirectory:[attachmentsDirectory stringByStandardizingPath]];
 
     for (XCTestSuite *suite in plan) {
         [bundleSuite addTest:suite];

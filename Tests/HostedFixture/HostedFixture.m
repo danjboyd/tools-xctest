@@ -85,3 +85,28 @@
 }
 
 @end
+
+// Attaches an image drawn in the host.
+@interface HostedAttachmentTests : XCTestCase
+@end
+
+@implementation HostedAttachmentTests
+
+- (void)testAttachesImage
+{
+    XCTSkipUnless(NSApp != nil);
+    NSImage *image = [[[NSImage alloc] initWithSize:NSMakeSize(4, 4)] autorelease];
+
+    [image lockFocus];
+    [[NSColor redColor] set];
+    NSRectFill(NSMakeRect(0, 0, 4, 4));
+    [image unlockFocus];
+
+    XCTAttachment *attachment = [XCTAttachment attachmentWithImage:image];
+    [attachment setName:@"swatch"];
+    [attachment setLifetime:XCTAttachmentLifetimeKeepAlways];
+    XCTAssertEqualObjects([attachment uniformTypeIdentifier], @"public.png");
+    [self addAttachment:attachment];
+}
+
+@end

@@ -100,6 +100,40 @@
 
 @end
 
+@implementation GSXCTAttachmentRecord
+
+@synthesize attachment = _attachment;
+@synthesize activityPath = _activityPath;
+@synthesize savedPath = _savedPath;
+
+- (id) initWithAttachment: (XCTAttachment *)attachment activityPath: (NSArray *)activityPath
+{
+    self = [super init];
+    if (self) {
+        _attachment = [attachment retain];
+        _activityPath = [activityPath copy];
+    }
+
+    return self;
+}
+
+- (void) dealloc
+{
+    [_attachment release];
+    [_activityPath release];
+    [_savedPath release];
+    [super dealloc];
+}
+
+- (NSString *) displayName
+{
+    NSString *name = [_attachment name];
+
+    return [name length] > 0 ? name : @"Attachment";
+}
+
+@end
+
 @implementation GSXCTestCaseResult
 
 @synthesize className = _className;
@@ -108,6 +142,7 @@
 @synthesize failures = _failures;
 @synthesize expectedFailures = _expectedFailures;
 @synthesize measurements = _measurements;
+@synthesize attachments = _attachments;
 @synthesize skip = _skip;
 @synthesize startDate = _startDate;
 @synthesize duration = _duration;
@@ -132,6 +167,7 @@
         _failures = [[NSMutableArray alloc] init];
         _expectedFailures = [[NSMutableArray alloc] init];
         _measurements = [[NSMutableArray alloc] init];
+        _attachments = [[NSMutableArray alloc] init];
     }
 
     return self;
@@ -144,6 +180,7 @@
     [_failures release];
     [_expectedFailures release];
     [_measurements release];
+    [_attachments release];
     [_skip release];
     [_startDate release];
     [super dealloc];
@@ -454,6 +491,15 @@ static NSString *GSSkippedSummary(NSUInteger skipCount)
     }
 }
 
+- (void) test: (GSXCTestCaseResult *)test didSaveAttachment: (GSXCTAttachmentRecord *)attachment
+{
+    NSString *activity = [[attachment activityPath] count] > 0
+        ? [NSString stringWithFormat:@" (in %@)", [[attachment activityPath] componentsJoinedByString:@" > "]]
+        : @"";
+
+    NSLog(@"XCTest:     Attachment '%@'%@ saved to %@", [attachment displayName], activity, [attachment savedPath]);
+}
+
 - (void) testDidFinish: (GSXCTestCaseResult *)test
 {
     GSXCTestIssue *skip = [test skip];
@@ -644,6 +690,10 @@ static NSString *GSAppleLocation(GSXCTestIssue *issue)
         GSAppleLocation(failure), name, [failure displayMessage]]);
 }
 
+- (void) test: (GSXCTestCaseResult *)test didSaveAttachment: (GSXCTAttachmentRecord *)attachment
+{
+}
+
 - (void) testDidFinish: (GSXCTestCaseResult *)test
 {
     NSString *status = @"passed";
@@ -788,6 +838,19 @@ static void GSAppendJUnitFailures(NSMutableString *xml, NSArray *failures)
         unexpected ? @"error" : @"failure"];
 }
 
+// The test's attachments that were saved.
+static NSArray *GSSavedAttachments(GSXCTestCaseResult *test)
+{
+    NSMutableArray *saved = [NSMutableArray array];
+
+    for (GSXCTAttachmentRecord *attachment in [test attachments]) {
+        if ([attachment savedPath] != nil) {
+            [saved addObject:attachment];
+        }
+    }
+    return saved;
+}
+
 static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
 {
     for (GSXCTestIssue *issue in issues) {
@@ -829,6 +892,7 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
 - (void) test: (GSXCTestCaseResult *)test didMeasure: (GSXCTMeasurement *)measurement {}
 - (void) test: (GSXCTestCaseResult *)test didStartActivity: (NSArray *)activityPath atTime: (NSTimeInterval)time {}
 - (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure {}
+- (void) test: (GSXCTestCaseResult *)test didSaveAttachment: (GSXCTAttachmentRecord *)attachment {}
 - (void) testDidFinish: (GSXCTestCaseResult *)test {}
 - (void) testWillBeRetried: (GSXCTestCaseResult *)test {}
 - (void) suiteDidFinish: (GSXCTestSuiteResult *)suite {}
@@ -846,6 +910,10 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
         NSUInteger tests = 0, failures = 0, errors = 0, skipped = 0;
 
         for (GSXCTestCaseResult *test in [suite testResults]) {
+            NSArray *savedAttachments = GSSavedAttachments(test);
+            BOOL hasOutput = [[test expectedFailures] count] > 0 || [[test measurements] count] > 0
+                || [savedAttachments count] > 0;
+
             tests++;
             [casesXML appendFormat:@"    <testcase classname=\"%@\" name=\"%@\" time=\"%.3f\"",
                 GSXMLEscape([test className]), GSXMLEscape([test displayName]), [test duration]];
@@ -863,14 +931,15 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
                 skipped++;
                 [casesXML appendFormat:@">\n      <skipped message=\"%@\"/>\n    </testcase>\n",
                     GSXMLEscape(GSJUnitIssueLine([test skip]))];
-            } else if ([[test expectedFailures] count] > 0 || [[test measurements] count] > 0) {
+            } else if (hasOutput) {
                 [casesXML appendString:@">\n"];
             } else {
                 [casesXML appendString:@"/>\n"];
             }
 
-            // Expected failures and measurements go in the test's output.
-            if ([[test expectedFailures] count] > 0 || [[test measurements] count] > 0) {
+            // Expected failures, measurements and attachments go in the
+            // test's output; Jenkins and GitLab pick up [[ATTACHMENT|path]].
+            if (hasOutput) {
                 NSMutableArray *lines = [NSMutableArray array];
                 for (GSXCTestIssue *expected in [test expectedFailures]) {
                     [lines addObject:[NSString stringWithFormat:@"Expected failure (%@): %@",
@@ -881,6 +950,9 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
                         @"measured [Time, seconds] average: %.6f, relative standard deviation: %.3f%%, values: %@",
                         [measurement average], [measurement relativeStandardDeviation],
                         [measurement valuesDescription]]];
+                }
+                for (GSXCTAttachmentRecord *attachment in savedAttachments) {
+                    [lines addObject:[NSString stringWithFormat:@"[[ATTACHMENT|%@]]", [attachment savedPath]]];
                 }
                 if ([test status] == GSXCTestStatusPassed) {
                     [casesXML appendFormat:@"      <system-out>%@</system-out>\n    </testcase>\n",
@@ -947,7 +1019,25 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
 @interface GSXCTestReportingObserver () <XCTestObservation, GSXCTestObservationPrivate>
 @end
 
+// A file name for an attachment: its name (with any '/' replaced), with an
+// extension for its type unless the name already has it.
+static NSString *GSAttachmentFileName(GSXCTAttachmentRecord *record)
+{
+    NSString *base = [[[record displayName] componentsSeparatedByString:@"/"] componentsJoinedByString:@"_"];
+    NSString *extension = [[record attachment] _gsFileExtension];
+
+    if ([base hasPrefix:@"."]) {
+        base = [@"_" stringByAppendingString:base];
+    }
+    if ([[base pathExtension] caseInsensitiveCompare:extension] == NSOrderedSame) {
+        return base;
+    }
+    return [base stringByAppendingPathExtension:extension];
+}
+
 @implementation GSXCTestReportingObserver
+
+@synthesize attachmentsDirectory = _attachmentsDirectory;
 
 - (id) initWithReporters: (NSArray *)reporters
                      run: (GSXCTestRunResult *)run
@@ -965,6 +1055,7 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
 
 - (void) dealloc
 {
+    [_attachmentsDirectory release];
     [_reporters release];
     [_run release];
     [_topSuite release];
@@ -1109,6 +1200,79 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
     }
 }
 
+- (void) _gsTestCase: (XCTestCase *)testCase didAddAttachment: (GSXCTAttachmentRecord *)record
+{
+    // Events can come from other threads (late failures).
+    @synchronized (self) {
+        if (testCase != _currentTestCase || _currentTest == nil) {
+            return;
+        }
+
+        [[_currentTest attachments] addObject:record];
+    }
+}
+
+// Writes the attachments the test keeps (all for a failed test, otherwise
+// those with XCTAttachmentLifetimeKeepAlways) to
+// <attachmentsDirectory>/<Class>/<test>/, replacing what was there.
+- (void) _gsSaveAttachmentsOfTest: (GSXCTestCaseResult *)test
+{
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSString *testDirectory = nil;
+    BOOL cleared = NO;
+
+    if (_attachmentsDirectory == nil) {
+        return;
+    }
+
+    testDirectory = [[_attachmentsDirectory stringByAppendingPathComponent:[test className]]
+        stringByAppendingPathComponent:([test iteration] > 0
+            ? [NSString stringWithFormat:@"%@-iteration-%lu", [test methodName], (unsigned long)[test iteration]]
+            : [test methodName])];
+
+    for (GSXCTAttachmentRecord *record in [test attachments]) {
+        XCTAttachment *attachment = [record attachment];
+        NSData *payload = [attachment _gsPayload];
+        NSString *fileName = GSAttachmentFileName(record);
+        NSString *path = nil;
+        NSError *error = nil;
+
+        if ([attachment lifetime] != XCTAttachmentLifetimeKeepAlways && [test status] != GSXCTestStatusFailed) {
+            continue;
+        }
+        if (payload == nil) {
+            NSLog(@"XCTest: Attachment '%@' of %@.%@ has no data; not saved",
+                [record displayName], [test className], [test displayName]);
+            continue;
+        }
+
+        if (!cleared) {
+            [fileManager removeItemAtPath:testDirectory error:NULL];
+            cleared = YES;
+            if (![fileManager createDirectoryAtPath:testDirectory withIntermediateDirectories:YES
+                                         attributes:nil error:&error]) {
+                NSLog(@"XCTest: Could not create attachments directory '%@': %@", testDirectory,
+                    error ? [error localizedDescription] : @"unknown error");
+                return;
+            }
+        }
+
+        // Two attachments with the same name: "name-2.ext", "name-3.ext", ...
+        path = [testDirectory stringByAppendingPathComponent:fileName];
+        for (NSUInteger copy = 2; [fileManager fileExistsAtPath:path]; copy++) {
+            NSString *numbered = [NSString stringWithFormat:@"%@-%lu", [fileName stringByDeletingPathExtension], (unsigned long)copy];
+            path = [testDirectory stringByAppendingPathComponent:[numbered stringByAppendingPathExtension:[fileName pathExtension]]];
+        }
+
+        if (![payload writeToFile:path atomically:YES]) {
+            NSLog(@"XCTest: Could not save attachment '%@' to '%@'", [record displayName], path);
+            continue;
+        }
+        [record setSavedPath:path];
+        GS_REPORT(test:test didSaveAttachment:record)
+    }
+}
+
 - (void) _gsTestCase: (XCTestCase *)testCase didRecordIssueAfterFinishing: (GSXCTestIssue *)issue
 {
     // Events can come from other threads (late failures).
@@ -1190,6 +1354,7 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
         }
         [test setDuration:[run testDuration]];
 
+        [self _gsSaveAttachmentsOfTest:test];
         GS_REPORT(testDidFinish:test)
     }
 }

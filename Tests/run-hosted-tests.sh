@@ -74,6 +74,12 @@ run_hosted -host-launch-timeout 2 -only-testing:HostedFixture/HostedSlowTests
 assert_status 0
 assert_contains "HostedSlowTests: 1 tests PASSED"
 
+# Attachments are saved from the host; images are encoded as PNG.
+run_hosted -attachments-path "$report_dir/hosted-attachments" -only-testing:HostedFixture/HostedAttachmentTests
+assert_status 0
+[ "$(head -c 8 "$report_dir/hosted-attachments/HostedAttachmentTests/testAttachesImage/swatch.png" | od -An -tx1 | tr -d ' \n')" = "89504e470d0a1a0a" ] \
+  || fail "expected a PNG attachment from the host"
+
 # Test time limits apply in the host; running out of time still reports.
 run_hosted -default-test-execution-time-allowance 1 -only-testing:HostedFixture/HostedSlowTests
 assert_status 1

@@ -32,7 +32,7 @@
 #include <unistd.h>
 
 // Settings from xctest, as JSON: bundlePath, targetName, bundleName, only,
-// skip, outputFormat, junitReport, performanceBaselines,
+// skip, outputFormat, junitReport, attachmentsPath, performanceBaselines,
 // updatePerformanceBaselines, repetitionMode, testIterations,
 // testTimeoutsEnabled, defaultExecutionTimeAllowance,
 // maximumExecutionTimeAllowance, statusFile.
@@ -132,6 +132,9 @@ static void GSWriteStatusFile(int exitCode)
                 ? GSXCTestOutputFormatApple : GSXCTestOutputFormatClassic];
             if ([junitReport isKindOfClass:[NSString class]]) {
                 [runner setJunitReportPath:junitReport];
+            }
+            if ([[GSHostConfig objectForKey:@"attachmentsPath"] isKindOfClass:[NSString class]]) {
+                [runner setAttachmentsPath:[GSHostConfig objectForKey:@"attachmentsPath"]];
             }
             [runner setRepetitionMode:(GSXCTestRepetitionMode)[[GSHostConfig objectForKey:@"repetitionMode"] intValue]];
             [runner setTestIterations:[[GSHostConfig objectForKey:@"testIterations"] unsignedIntegerValue]];

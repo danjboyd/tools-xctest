@@ -32,6 +32,7 @@
 #import <XCTest/GSXCTestRunner.h>
 #import <XCTest/XCTIssue.h>
 #import <XCTest/XCTActivity.h>
+#import <XCTest/XCTAttachment.h>
 
 @class XCTIssue;
 @class XCTSourceCodeLocation;
@@ -83,6 +84,18 @@ void _GSXCTWatchdogSuiteDidFinish(XCTestSuite *suite);
 // The test it ran in (not retained), or nil.
 - (XCTestCase *) testCase;
 @end
+
+@class XCTAttachment;
+
+@interface XCTAttachment (GSPrivate)
+- (NSData *) _gsPayload;
+// For the saved file: the original file's extension, or one for the type.
+- (NSString *) _gsFileExtension;
+@end
+
+// Keeps an attachment with a test's results (the running test if \a test
+// is nil), as part of the activity at \a activityPath (nil for none).
+void _GSXCTAddAttachment(XCTestCase *test, XCTAttachment *attachment, NSArray *activityPath);
 
 // The path of the innermost activity running on this thread, or nil.
 NSArray *_GSXCTCurrentActivityPath(void);
@@ -155,6 +168,7 @@ NSString *_GSXCTDescribeException(NSException *exception);
 - (void) _gsTestCase: (XCTestCase *)testCase didRecordExpectedFailure: (GSXCTestIssue *)issue;
 - (void) _gsTestCase: (XCTestCase *)testCase didMeasure: (GSXCTMeasurement *)measurement;
 - (void) _gsTestCase: (XCTestCase *)testCase activityDidStart: (GSXCTActivity *)activity;
+- (void) _gsTestCase: (XCTestCase *)testCase didAddAttachment: (GSXCTAttachmentRecord *)record;
 // A failure recorded after the test's run stopped (e.g. from a callback).
 - (void) _gsTestCase: (XCTestCase *)testCase didRecordIssueAfterFinishing: (GSXCTestIssue *)issue;
 // A failed attempt that will be retried, and so no longer counts.
