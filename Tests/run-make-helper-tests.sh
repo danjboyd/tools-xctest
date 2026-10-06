@@ -27,7 +27,7 @@ echo "Running build-system helper regressions..."
 make_fixture clean all
 assert_status 0
 for bundle in HelperTests OtherTests; do
-  [ -f "$fixture/$bundle.xctest/$bundle" ] || fail "expected $bundle.xctest to be built"
+  [ -f "$(bundle_binary "$fixture/$bundle.xctest" "$bundle")" ] || fail "expected $bundle.xctest to be built"
 done
 
 # make check runs every bundle.
@@ -72,7 +72,7 @@ set -e
 assert_contains "set XCTEST_BUNDLE_NAME to the test bundles to build"
 
 # xctest-bundle wraps a shared library as a bundle xctest can load.
-"$source_root/xctest-bundle" "$work_dir/Wrapped.xctest" "$fixture/OtherTests.xctest/OtherTests"
+"$source_root/xctest-bundle" "$work_dir/Wrapped.xctest" "$(bundle_binary "$fixture/OtherTests.xctest" OtherTests)"
 grep -q 'NSExecutable = "Wrapped";' "$work_dir/Wrapped.xctest/Resources/Info-gnustep.plist" \
   || fail "expected the wrapped bundle's plist to name its executable"
 set +e

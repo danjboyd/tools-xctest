@@ -2,7 +2,11 @@ include $(GNUSTEP_MAKEFILES)/common.make
 
 PACKAGE_NAME = XCTest
 
-LIBRARY_NAME = XCTest XCTestHost
+LIBRARY_NAME = XCTest
+# libXCTestHost works through LD_PRELOAD, so there is no -host on Windows.
+ifeq (,$(findstring mingw,$(GNUSTEP_HOST_OS))$(findstring windows,$(GNUSTEP_HOST_OS)))
+LIBRARY_NAME += XCTestHost
+endif
 XCTest_HEADER_FILES = XCTest.h XCTestAssertions.h XCTestAssertionsImpl.h XCTestCase.h \
 	XCTestExpectation.h XCTWaiter.h XCTestErrors.h XCTestCase+AsynchronousTesting.h \
 	XCAbstractTest.h XCTestSuite.h XCTestRun.h XCTestObservation.h XCTestObservationCenter.h \

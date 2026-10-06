@@ -3,6 +3,17 @@
 Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 `vX.Y.Z`; 0.1.x are upstream's (gnustep/tools-xctest).
 
+## Unreleased
+
+- Builds and runs on Windows (MSYS2 clang64): the CPU, memory and
+  storage metrics use the Windows process APIs, parallel workers find
+  `xctest` without `/proc`, and a crashed worker's status is shown in
+  hex (`status 0xC0000409`). `xctest` writes `\n` line endings there
+  too. `-host` and `libXCTestHost` are left out, since they need
+  `LD_PRELOAD`. `xctest-bundle` names a DLL's copy `<Name>.dll`.
+- The time-limit watchdog creates its lock in `+initialize` instead of
+  with `pthread_once`.
+
 ## 0.4.0
 
 - Randomized execution order: `-test-execution-order random`, with the

@@ -23,6 +23,8 @@ assert_contains "XCTest:   AttachmentTests: 3/5 tests FAILED"
 run_fixture AttachmentFixture -junit-report "$report_dir/results.xml"
 assert_status 1
 dir="$report_dir/results-attachments/AttachmentTests"
+# The same directory as xctest prints it.
+printed_dir=$(native_path "$dir")
 
 # A passing test keeps only KeepAlways attachments.
 [ "$(cat "$dir/testPassingKeepsOnlyKeepAlways/notes.txt")" = "kept text" ] || fail "expected the kept attachment"
@@ -39,13 +41,13 @@ grep -q "<key>key</key>" "$dir/testFailingKeepsAll/settings.plist" || fail "expe
 
 # Attachments from activities and issues.
 [ "$(cat "$dir/testActivityAttachment/inside.txt")" = "from activity" ] || fail "expected the activity's attachment"
-assert_contains "Attachment 'inside' (in Capture) saved to $dir/testActivityAttachment/inside.txt"
+assert_contains "Attachment 'inside' (in Capture) saved to $printed_dir/testActivityAttachment/inside.txt"
 [ "$(cat "$dir/testIssueAttachment/evidence.txt")" = "issue data" ] || fail "expected the issue's attachment"
 
 # The JUnit report links them.
-grep -q "\[\[ATTACHMENT|$dir/testFailingKeepsAll/blob.bin\]\]" "$report_dir/results.xml" \
+grep -q "\[\[ATTACHMENT|$printed_dir/testFailingKeepsAll/blob.bin\]\]" "$report_dir/results.xml" \
   || fail "expected attachment links in the JUnit report"
-grep -q "\[\[ATTACHMENT|$dir/testPassingKeepsOnlyKeepAlways/notes.txt\]\]" "$report_dir/results.xml" \
+grep -q "\[\[ATTACHMENT|$printed_dir/testPassingKeepsOnlyKeepAlways/notes.txt\]\]" "$report_dir/results.xml" \
   || fail "expected a passing test's kept attachment in the JUnit report"
 
 # -attachments-path chooses the directory; a rerun replaces a test's files.

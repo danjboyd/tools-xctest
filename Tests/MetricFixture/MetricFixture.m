@@ -65,7 +65,12 @@
         NSDate *until = [NSDate dateWithTimeIntervalSinceNow:0.02];
         volatile unsigned long spin = 0;
         while ([until timeIntervalSinceNow] > 0) { spin++; }
+#if defined(_WIN32)
+        // The file system representation is UTF-16 there.
+        FILE *file = _wfopen((const wchar_t *)[path fileSystemRepresentation], L"w");
+#else
         FILE *file = fopen([path fileSystemRepresentation], "w");
+#endif
         char chunk[1024];
         memset(chunk, 'x', sizeof(chunk));
         for (int i = 0; i < 100; i++) { fwrite(chunk, 1, sizeof(chunk), file); fflush(file); }

@@ -121,15 +121,20 @@ pkg.generate(libraries : xctest_lib,
              description : 'Reimplementation of XCTest for GNUstep',
 )
 
-# Preloaded into host applications by `xctest -host`
-xctest_host_lib = library(
-  'XCTestHost',
-  'XCTest/GSXCTestHostLoader.m',
-  dependencies: dependencies_to_link,
-  include_directories: include_dirs,
-  link_with: xctest_lib,
-  install: true,
-)
+# Preloaded into host applications by `xctest -host`. It works through
+# LD_PRELOAD, so there is no -host on Windows.
+xctest_test_depends = [xctest_lib]
+if host_machine.system() != 'windows'
+  xctest_host_lib = library(
+    'XCTestHost',
+    'XCTest/GSXCTestHostLoader.m',
+    dependencies: dependencies_to_link,
+    include_directories: include_dirs,
+    link_with: xctest_lib,
+    install: true,
+  )
+  xctest_test_depends += xctest_host_lib
+endif
 
 # Build XCTest tool
 xctest_tool = executable('xctest', 'main.m', link_with: xctest_lib, install: true)
@@ -179,8 +184,10 @@ if host_machine.system() != 'darwin'
     ['metrics', 'run-metric-tests.sh'],
     ['parallel', 'run-parallel-tests.sh'],
     ['make-helper', 'run-make-helper-tests.sh'],
-    ['hosted', 'run-hosted-tests.sh'],
   ]
+  if host_machine.system() != 'windows'
+    xctest_tests += [['hosted', 'run-hosted-tests.sh']]
+  endif
 
   test('meson-bundle', xctest_tool,
        args: [meson_fixture_bundle.full_path(), '-only-testing:FilterFixture/AlphaTests'],
@@ -197,7 +204,7 @@ if host_machine.system() != 'darwin'
            ':'.join(gnustep_runtime_lib_dirs),
          ],
          env: xctest_test_env,
-         depends: [xctest_tool, xctest_lib, xctest_host_lib],
+         depends: [xctest_tool] + xctest_test_depends,
          # The scripts rebuild shared fixture bundles in the source tree.
          is_parallel: false)
   endforeach
