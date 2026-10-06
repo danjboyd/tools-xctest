@@ -6,7 +6,7 @@ SUBPROJECTS = XCTest
 
 xctest_HEADER_FILES = GSXCTestRunner.h
 xctest_OBJC_FILES = main.m GSXCTestRunner.m
-ADDITIONAL_TOOL_LIBS = -lxctest
+ADDITIONAL_TOOL_LIBS = -lXCTest
 ADDITIONAL_LIB_DIRS = -L./XCTest/obj
 
 -include GNUmakefile.preamble

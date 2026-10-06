@@ -9,7 +9,6 @@
 #import <Foundation/Foundation.h>
 
 @interface GSXCTestRunner : NSObject {
-    NSUInteger assertionFailureCount;
     NSLock *runLock;
 }
 

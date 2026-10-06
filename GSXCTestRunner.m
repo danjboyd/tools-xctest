@@ -8,210 +8,122 @@
 
 #import <GSXCTestRunner.h>
 #import <XCTest/XCTestCase.h>
-
 #import <objc/runtime.h>
 
-// From: https://www.cocoawithlove.com/2010/01/getting-subclasses-of-objective-c-class.html
-NSArray *ClassGetSubclasses(Class parentClass)
+static NSArray *TestClassNames(void)
 {
-    int numClasses = objc_getClassList(NULL, 0);
+    int capacity = 0, count = 0;
     Class *classes = NULL;
-
-    classes = malloc(sizeof(Class) * numClasses);
-    numClasses = objc_getClassList(classes, numClasses);
-    
-    NSMutableArray *result = [NSMutableArray array];
-    for (NSInteger i = 0; i < numClasses; i++)
-    {
-        Class superClass = classes[i];
-        do
-        {
-            superClass = class_getSuperclass(superClass);
-        } while(superClass && superClass != parentClass);
-        
-        if (superClass == nil)
-        {
-            continue;
+    do {
+        capacity = objc_getClassList(NULL, 0);
+        free(classes);
+        classes = calloc(MAX(capacity, 1), sizeof(Class));
+        if (!classes) [NSException raise:NSMallocException format:@"Cannot enumerate test classes"];
+        count = objc_getClassList(classes, capacity);
+    } while (count > capacity);
+    NSMutableArray *names = [NSMutableArray array];
+    for (int i = 0; i < count; i++) {
+        for (Class parent = class_getSuperclass(classes[i]); parent; parent = class_getSuperclass(parent)) {
+            if (parent == [XCTestCase class]) {
+                [names addObject:NSStringFromClass(classes[i])];
+                break;
+            }
         }
-        
-        [result addObject:classes[i]];
     }
-
     free(classes);
-    
-    return result;
+    return [names sortedArrayUsingSelector:@selector(compare:)];
 }
 
 @implementation GSXCTestRunner
-
 - (id)init
 {
-    self = [super init];
-    if (self) {
-        runLock = [[NSLock alloc] init];
-    }
-    
+    if ((self = [super init])) runLock = [[NSLock alloc] init];
     return self;
 }
-
 - (void)dealloc
 {
     [runLock release];
     [super dealloc];
 }
-
-- (BOOL)runAll
-{
-    return [self runTestsNamed:nil];
-}
+- (BOOL)runAll { return [self runTestsNamed:nil]; }
 
 - (BOOL)runTestsNamed:(NSArray *)testNames
 {
     [runLock lock];
-    
-    NSLog(@"XCTest: Running Unit Tests");
-    NSUInteger testCaseFailureCount = 0;
-    NSUInteger testCaseSuccessCount = 0;
-    
-    NSArray *testCaseClasses = ClassGetSubclasses([XCTestCase class]);
-    for (Class testCaseClass in testCaseClasses)
-    {
-        @autoreleasepool {
-            BOOL classNamePrinted = NO;
-            NSString *className = NSStringFromClass(testCaseClass);
-            
-            unsigned int methodCount = 0;
-            NSUInteger methodFailureCount = 0;
-            NSUInteger methodSuccessCount = 0;
-            Method *methods = class_copyMethodList(testCaseClass, &methodCount);
-        
-            for (unsigned int i = 0; i < methodCount; i++) {
-                Method method = methods[i];
-        
-                SEL selector = method_getName(method);
-                NSString *methodName = [NSString stringWithUTF8String:sel_getName(selector)];
-                
-                BOOL testIsEnabled = YES;
-                if (testNames) {
-                    testIsEnabled = NO; // default to disabled when tests are specified
-                    for (NSString *s in testNames)
-                    {
-                        NSArray *tuple = [s componentsSeparatedByString:@"."];
-                        
-                        // match ClassName.methodName
-                        if (tuple.count == 2) {
-                            if ([className isEqualToString:[tuple objectAtIndex:0]] &&
-                                [methodName isEqualToString:[tuple objectAtIndex:1]])
-                            {
-                                testIsEnabled = YES;
-                                break;
-                            }
-                            
-                            // match ClassName (run all tests in the class)
-                        } else if (tuple.count == 1) {
-                            if ([className isEqualToString:[tuple objectAtIndex:0]])
-                            {
-                                testIsEnabled = YES;
-                                break;
-                            }
+    NSUInteger successes = 0, failures = 0, suiteFailures = 0;
+    NSMutableSet *matched = [NSMutableSet set];
+    @try {
+        NSLog(@"XCTest: Running Unit Tests");
+        for (NSString *className in TestClassNames()) {
+            @autoreleasepool {
+                Class cls = NSClassFromString(className);
+                NSMutableArray *selected = [NSMutableArray array];
+                for (NSInvocation *invocation in [cls testInvocations]) {
+                    NSString *fullName = [NSString stringWithFormat:@"%@.%@", className,
+                        NSStringFromSelector([invocation selector])];
+                    BOOL enabled = testNames == nil;
+                    for (NSString *filter in testNames) {
+                        if ([filter isEqual:className] || [filter isEqual:fullName]) {
+                            enabled = YES;
+                            [matched addObject:filter];
+                        }
+                    }
+                    if (enabled) [selected addObject:invocation];
+                }
+                if (![selected count]) continue;
+                NSLog(@"XCTest:   Running %@", className);
+                @try {
+                    [cls setUp];
+                    for (NSInvocation *invocation in selected) {
+                        @autoreleasepool {
+                            XCTestCase *test = [cls testCaseWithInvocation:invocation];
+                            [test invokeTest];
+                            if ([test failureCount]) failures++; else successes++;
+                            NSLog(@"XCTest:     %@ %@", [test name], [test failureCount] ? @"FAILED" : @"PASSED");
                         }
                     }
                 }
-                
-                if ([methodName hasPrefix:@"test"]
-                    && method_getNumberOfArguments(method) == 2
-                    && testIsEnabled)
-                {
-                    IMP testFunction = method_getImplementation(method);
-                    if (testFunction) {
-                        BOOL testSucceeded = YES;
-                        
-                        if (!classNamePrinted) {
-                            NSLog(@"XCTest:   Running %@", className);
-                            classNamePrinted = YES;
-                        }
-                        
-                        NSLog(@"XCTest:     %@...", methodName);
-                        
-                        NS_DURING {
-                            @autoreleasepool {
-                                XCTestCase *testCase = [[[testCaseClass alloc] init] autorelease];
-                                assertionFailureCount = 0;
-                                [testCase setUp];
-                                testFunction(testCase, selector);
-                                [testCase tearDown];
-                                if (assertionFailureCount > 0) {
-                                    testSucceeded = NO;
-                                    NSLog(@"XCTest:     %@ FAILED", methodName);
-                                }
-                            }
-                        }
-                        NS_HANDLER {
-                            testSucceeded = NO;
-                            NSLog(@"XCTest:     %@ FAILED, threw exception: %@", methodName, localException);
-                        }
-                        NS_ENDHANDLER
-                        
-                        if (testSucceeded)
-                            methodSuccessCount++;
-                        else
-                            methodFailureCount++;
+                @catch (id exception) {
+                    suiteFailures++;
+                    NSLog(@"XCTest:   %@ FAILED, threw %@", className, exception);
+                }
+                @finally {
+                    @try { [cls tearDown]; }
+                    @catch (id exception) {
+                        suiteFailures++;
+                        NSLog(@"XCTest:   %@ tearDown FAILED, threw %@", className, exception);
                     }
                 }
             }
-        
-            free(methods);
-            
-            if (methodFailureCount == 0 && methodSuccessCount == 0) {
-                NSLog(@"XCTest:   %@ SKIPPED", className);
+        }
+        for (NSString *filter in testNames) {
+            if (![matched containsObject:filter]) {
+                suiteFailures++;
+                NSLog(@"XCTest: No tests matched %@", filter);
             }
-            else if (methodFailureCount > 0) {
-                testCaseFailureCount++;
-                NSLog(@"XCTest:   %@: %d/%d tests FAILED", className, methodFailureCount, methodFailureCount + methodSuccessCount);
-            } else {
-                testCaseSuccessCount++;
-                if (methodSuccessCount > 0) {
-                    NSLog(@"XCTest:   %@: %d tests PASSED", className, methodSuccessCount);
-                }
-            }
-        } // @autoreleasepool
+        }
     }
-    
-    if (testCaseSuccessCount == 0 && testCaseFailureCount == 0) {
-        NSLog(@"XCTest: No tests found.");
+    @catch (id exception) {
+        suiteFailures++;
+        NSLog(@"XCTest: Test discovery or execution FAILED: %@", exception);
     }
-    else if (testCaseFailureCount > 0) {
-        NSLog(@"XCTest: %d/%d test cases FAILED", testCaseFailureCount, testCaseFailureCount + testCaseSuccessCount);
-    } else {
-        NSLog(@"XCTest: %d tests PASSED", testCaseSuccessCount);
-    }
-    
-    [runLock unlock];
-    
-    return testCaseFailureCount == 0;
+    @finally { [runLock unlock]; }
+    NSLog(@"XCTest: %lu tests executed, %lu failed, %lu suite errors",
+        (unsigned long)(successes + failures), (unsigned long)failures, (unsigned long)suiteFailures);
+    if (successes + failures == 0) NSLog(@"XCTest: No tests executed.");
+    return successes + failures > 0 && failures == 0 && suiteFailures == 0;
 }
-
 - (void)waitForCompletion
 {
     [runLock lock];
     [runLock unlock];
 }
-
-- (void)registerAssertionFailed
-{
-    @synchronized (self) {
-        assertionFailureCount++;
-    }
-}
-
 + (GSXCTestRunner *)sharedRunner
 {
     static GSXCTestRunner *runner = nil;
-    if (!runner) {
-        runner = [[GSXCTestRunner alloc] init];
+    @synchronized (self) {
+        if (!runner) runner = [[GSXCTestRunner alloc] init];
     }
-    
     return runner;
 }
-
 @end
