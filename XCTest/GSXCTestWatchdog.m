@@ -27,8 +27,8 @@
 
 #import <XCTest/XCTestPrivate.h>
 
-#include <pthread.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 static BOOL GSTimeoutsEnabled = NO;
@@ -47,17 +47,28 @@ static NSDate *GSWatchedTestStart = nil;
 static NSMutableArray *GSRunningSuites = nil;
 static NSUInteger GSEnclosingSuiteCount = 0;
 
-static void GSCreateCondition(void)
+// Creates the condition, once: the runtime sends +initialize exactly once,
+// on the first thread to message the class, and other threads wait for it.
+// (Not pthread_once: on Windows pthread.h clashes with libdispatch's
+// os/generic_win_base.h, which Foundation includes.)
+@interface GSXCTestWatchdogState : NSObject
+@end
+
+@implementation GSXCTestWatchdogState
+
++ (void) initialize
 {
-    GSWatchdogCondition = [[NSCondition alloc] init];
-    GSRunningSuites = [[NSMutableArray alloc] init];
+    if (self == [GSXCTestWatchdogState class]) {
+        GSWatchdogCondition = [[NSCondition alloc] init];
+        GSRunningSuites = [[NSMutableArray alloc] init];
+    }
 }
+
+@end
 
 static NSCondition *GSCondition(void)
 {
-    static pthread_once_t once = PTHREAD_ONCE_INIT;
-
-    pthread_once(&once, GSCreateCondition);
+    [GSXCTestWatchdogState class];
     return GSWatchdogCondition;
 }
 

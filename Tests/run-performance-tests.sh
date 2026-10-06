@@ -33,8 +33,10 @@ values=$(printf '%s\n' "$output" | grep -o 'testMeasureBlock measured.*values: \
 # Each run slept 2ms.
 awk -v a="$(measured_average testMeasureBlock)" 'BEGIN { exit !(a >= 0.0019 && a < 0.05) }' \
   || fail "unexpected testMeasureBlock average"
-# Only the time between start/stopMeasuring counts (1ms of each 21ms run).
-awk -v a="$(measured_average testManualMeasuring)" 'BEGIN { exit !(a >= 0.0009 && a < 0.015) }' \
+# Only the time between start/stopMeasuring counts (1ms of each 21ms run),
+# so it stays under the 20ms not measured. (Windows sleeps in 15.6ms ticks,
+# so its 1ms is about 15.6ms.)
+awk -v a="$(measured_average testManualMeasuring)" 'BEGIN { exit !(a >= 0.0009 && a < 0.02) }' \
   || fail "manual measuring should exclude unmeasured time"
 assert_contains "testWithinBaseline measured [Time, seconds] average: "
 assert_contains ", baseline average: 1.000000 (max regression 10.0%)"
@@ -55,7 +57,7 @@ assert_status 0
 # Apple-format measurement line.
 run_fixture PerformanceFixture -output-format apple -only-testing:PerformanceFixture/PerfPassingTests/testMeasureBlock
 assert_status 0
-assert_contains "Test Case '-[PerfPassingTests testMeasureBlock]' measured [Time, seconds] average: 0.00"
+assert_contains "Test Case '-[PerfPassingTests testMeasureBlock]' measured [Time, seconds] average: 0."
 assert_contains "performanceMetricID:com.apple.XCTPerformanceMetric_WallClockTime"
 
 # Recording baselines creates or updates the file, keeping settings.

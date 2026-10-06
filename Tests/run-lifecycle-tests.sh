@@ -20,6 +20,11 @@ if [ -z "$runtime_lib_dirs" ] && [ -n "${GNUSTEP_MAKEFILES:-}" ]; then
   runtime_lib_dirs="$(dirname "$GNUSTEP_MAKEFILES")/Libraries"
 fi
 
+# Windows finds DLLs on PATH, not LD_LIBRARY_PATH.
+case "$(uname -s)" in
+  MINGW*|MSYS*|CYGWIN*) export PATH="$xctest_lib_dir:$PATH" ;;
+esac
+
 fail() {
   echo "$1" >&2
   echo "$output" >&2

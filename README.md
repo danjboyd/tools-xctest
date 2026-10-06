@@ -21,6 +21,10 @@
 1. Run `make` to build the project.
 2. Run `make install` to install `tools-xctest` on your system.
 
+### Windows
+
+It builds and runs on Windows with MSYS2 (clang64) and GNUstep Make. Everything works except hosted tests (`-host`), which need `LD_PRELOAD`; `libXCTestHost` isn't built there. Test bundles' executables are `<Name>.dll`, and `xctest` writes plain `\n` line endings, as elsewhere. `make check` runs the regression scripts from an MSYS2 shell.
+
 ## Usage
 To use `tools-xctest`, include the header files in your test classes and link against the `tools-xctest` library. The usage is similar to Apple's XCTest:
 
@@ -97,7 +101,7 @@ To catch regressions, keep baselines in a JSON file keyed by `TestClass/testMeth
 
 `xctest -performance-baselines baselines.json ...` fails a measured test whose average is worse than its baseline by more than `maxPercentRegression` (default 10%). Add `-update-performance-baselines` to record the current averages into the file instead (keeping each entry's settings). Apple keeps baselines in the Xcode project; this file is the GNUstep equivalent.
 
-Apple's newer API measures more than time: `measureWithMetrics:options:block:` (and `measureWithMetrics:block:`, `measureWithOptions:block:`) runs the block `iterationCount` times (default 5) with any `XCTMetric`s: `XCTClockMetric` (the default), `XCTCPUMetric` (CPU time, for the process or the current thread), `XCTMemoryMetric` (resident memory change and peak, in kB) and `XCTStorageMetric` (logical writes, in kB), all read from `getrusage` and `/proc`, or your own class conforming to `XCTMetric`. `XCTMeasureOptions` can leave starting or stopping to the block (`-startMeasuring`/`-stopMeasuring`). Apple's CPU cycle and instruction counts aren't reported. Baselines for these go under the test's `"metrics"`, by measurement identifier, and a measurement's polarity says whether larger or smaller is worse:
+Apple's newer API measures more than time: `measureWithMetrics:options:block:` (and `measureWithMetrics:block:`, `measureWithOptions:block:`) runs the block `iterationCount` times (default 5) with any `XCTMetric`s: `XCTClockMetric` (the default), `XCTCPUMetric` (CPU time, for the process or the current thread), `XCTMemoryMetric` (resident memory change and peak, in kB) and `XCTStorageMetric` (logical writes, in kB), read from `getrusage` and `/proc` (on Windows, from the process and thread APIs, where the memory peak is the process's peak so far), or your own class conforming to `XCTMetric`. `XCTMeasureOptions` can leave starting or stopping to the block (`-startMeasuring`/`-stopMeasuring`). Apple's CPU cycle and instruction counts aren't reported. Baselines for these go under the test's `"metrics"`, by measurement identifier, and a measurement's polarity says whether larger or smaller is worse:
 
 ```json
 { "ParserTests/testParse": { "metrics": { "com.apple.dt.XCTMetric_CPU.time": { "average": 0.05, "maxPercentRegression": 20 } } } }
@@ -111,7 +115,7 @@ To test code that needs a running `NSApplication` (controllers, windows, nib/gor
 xctest -host MyApp.app MyAppTests.bundle
 ```
 
-`xctest` launches the app with `libXCTestHost` preloaded. Once the app has finished launching (after its own `applicationDidFinishLaunching:`), the test bundle is loaded and its tests run on the main thread inside the app, which then exits with the result. The app needs no changes. Filters, `-output-format` and `-junit-report` work as usual. If the app hasn't started the tests within 60 seconds (`-host-launch-timeout <seconds>`; 0 waits forever), `xctest` stops it and fails; the tests themselves have no time limit. On a headless machine, run it under `xvfb-run -a`. Tests that also run without a host can skip themselves with `XCTSkipUnless(NSApp != nil)`.
+`xctest` launches the app with `libXCTestHost` preloaded. Once the app has finished launching (after its own `applicationDidFinishLaunching:`), the test bundle is loaded and its tests run on the main thread inside the app, which then exits with the result. The app needs no changes. (Not on Windows, which has no `LD_PRELOAD`.) Filters, `-output-format` and `-junit-report` work as usual. If the app hasn't started the tests within 60 seconds (`-host-launch-timeout <seconds>`; 0 waits forever), `xctest` stops it and fails; the tests themselves have no time limit. On a headless machine, run it under `xvfb-run -a`. Tests that also run without a host can skip themselves with `XCTSkipUnless(NSApp != nil)`.
 
 ## Building test bundles
 

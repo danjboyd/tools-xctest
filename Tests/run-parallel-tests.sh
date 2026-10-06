@@ -37,8 +37,13 @@ grep -q 'measured \[Time, seconds\]' "$report_dir/parallel.xml" || fail "expecte
 PARALLEL_FIXTURE_CRASH=1 run_fixture ParallelFixture -parallel-testing-enabled YES \
   -only-testing:ParallelFixture/TroubleTests -only-testing:ParallelFixture/FailingTests
 assert_status 1
-assert_contains "xctest: the process running TroubleTests exited (signal 6) without reporting its results"
-assert_contains "TroubleTests.testCrashes: The test process exited (signal 6) before reporting this test's result"
+# abort() is signal 6, or on Windows the fast-fail status 0xC0000409.
+crash="signal 6"
+if is_windows; then
+  crash="status 0xC0000409"
+fi
+assert_contains "xctest: the process running TroubleTests exited ($crash) without reporting its results"
+assert_contains "TroubleTests.testCrashes: The test process exited ($crash) before reporting this test's result"
 assert_contains "XCTest:   FailingTests: 1/4 tests FAILED, 1 skipped"
 
 # With time limits, a hung test stops only its own worker.
@@ -69,7 +74,7 @@ run_fixture AttachmentFixture -parallel-testing-enabled YES -junit-report "$repo
 assert_status 1
 [ -e "$report_dir/attachments-attachments/AttachmentTests/testFailingKeepsAll/blob.bin" ] \
   || fail "expected workers to save attachments next to the report"
-grep -q "\[\[ATTACHMENT|$report_dir/attachments-attachments/AttachmentTests/testIssueAttachment/evidence.txt\]\]" "$report_dir/attachments.xml" \
+grep -q "\[\[ATTACHMENT|$(native_path "$report_dir")/attachments-attachments/AttachmentTests/testIssueAttachment/evidence.txt\]\]" "$report_dir/attachments.xml" \
   || fail "expected attachments in the merged JUnit report"
 
 # Combinations that aren't supported.

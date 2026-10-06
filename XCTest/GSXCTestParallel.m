@@ -309,6 +309,12 @@ static GSXCTestSuiteResult *GSSuiteFromPlist(NSDictionary *plist)
 // This program, to start workers with.
 static NSString *GSExecutablePath(void)
 {
+#if defined(_WIN32)
+    // No /proc; GNUstep asks Windows (GetModuleFileNameW).
+    NSString *executable = [[NSBundle mainBundle] executablePath];
+
+    return executable != nil ? executable : [[[NSProcessInfo processInfo] arguments] objectAtIndex:0];
+#else
     char path[PATH_MAX];
     ssize_t length = readlink("/proc/self/exe", path, sizeof(path) - 1);
 
@@ -317,6 +323,7 @@ static NSString *GSExecutablePath(void)
     }
     path[length] = '\0';
     return [NSString stringWithUTF8String:path];
+#endif
 }
 
 static NSString *GSAbsolutePath(NSString *path)
@@ -522,8 +529,15 @@ static NSString *GSAbsolutePath(NSString *path)
             // unknown, so they count as failed.
             {
                 BOOL signaled = [worker->task terminationReason] == NSTaskTerminationReasonUncaughtSignal;
-                NSString *how = [NSString stringWithFormat:@"%@ %d", signaled ? @"signal" : @"status",
-                    [worker->task terminationStatus]];
+                int code = [worker->task terminationStatus];
+                NSString *how = [NSString stringWithFormat:@"%@ %d", signaled ? @"signal" : @"status", code];
+#if defined(_WIN32)
+                // A crash ends a Windows process with an NTSTATUS code, such as
+                // 0xC0000409 for abort(), which reads better in hex.
+                if (code < 0) {
+                    how = [NSString stringWithFormat:@"status 0x%08X", (unsigned int)code];
+                }
+#endif
                 GSXCTestSuiteResult *suite = [[[GSXCTestSuiteResult alloc] initWithName:worker->className] autorelease];
 
                 workerFailed = YES;

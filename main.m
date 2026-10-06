@@ -19,8 +19,13 @@
 */
 
 #define _GNU_SOURCE
+#if defined(_WIN32)
+#include <fcntl.h>
+#include <io.h>
+#else
 #include <dlfcn.h>
 #include <signal.h>
+#endif
 #include <stdio.h>
 
 #import <Foundation/Foundation.h>
@@ -83,6 +88,23 @@ static NSString *TargetNameForBundlePath(NSString *testBundlePath)
     return [bundleName length] > 0 ? bundleName : nil;
 }
 
+#if defined(_WIN32)
+// -host preloads libXCTestHost into the application with LD_PRELOAD, which
+// Windows has no equivalent of.
+static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString *targetName,
+                          NSArray *onlyTestIdentifiers, NSArray *skipTestIdentifiers,
+                          GSXCTestOutputFormat outputFormat, NSString *junitReportPath,
+                          NSString *attachmentsPath,
+                          NSString *performanceBaselinesPath, BOOL updatePerformanceBaselines,
+                          GSXCTestRepetitionMode repetitionMode, NSInteger testIterations,
+                          BOOL randomOrder, unsigned long long orderSeed,
+                          BOOL testTimeoutsEnabled, NSTimeInterval defaultAllowance,
+                          NSTimeInterval maximumAllowance, NSTimeInterval launchTimeout)
+{
+    fprintf(stderr, "xctest: -host is not supported on Windows\n");
+    return 1;
+}
+#else
 // libXCTestHost sits next to libXCTest; XCTEST_HOST_LIBRARY overrides it.
 static NSString *HostLibraryPath(void)
 {
@@ -243,6 +265,7 @@ static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString
 
     return [task terminationStatus] == 0 ? 0 : 1;
 }
+#endif
 
 // Prints the tests a run would select. Returns NO if a filter is invalid.
 static BOOL ListTests(GSXCTestRunner *runner, NSString *testBundlePath, NSString *targetName,
@@ -295,6 +318,12 @@ static BOOL ListTests(GSXCTestRunner *runner, NSString *testBundlePath, NSString
 }
 
 int main(int argc, char *argv[]) {
+#if defined(_WIN32)
+    // "\n" stays "\n", as on other systems: test lists and JSON are read by
+    // scripts, and Windows consoles show it as a line break.
+    _setmode(_fileno(stdout), _O_BINARY);
+    _setmode(_fileno(stderr), _O_BINARY);
+#endif
     NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
     int exitCode = 1;
     NSMutableArray *onlyTestIdentifiers = [NSMutableArray array];

@@ -5,8 +5,9 @@
 #
 #   xctest-bundle MyTests.xctest libMyTests.so [PrincipalClass]
 #
-# creates MyTests.xctest/MyTests (a copy of the library) and
-# MyTests.xctest/Resources/Info-gnustep.plist, replacing any existing bundle.
+# creates MyTests.xctest/MyTests (a copy of the library; MyTests.dll for a
+# Windows DLL) and MyTests.xctest/Resources/Info-gnustep.plist, replacing
+# any existing bundle.
 
 set -e
 
@@ -28,7 +29,11 @@ fi
 
 rm -rf "$bundle"
 mkdir -p "$bundle/Resources"
-cp "$library" "$bundle/$name"
+# On Windows, NSBundle looks for <name>.dll.
+case "$library" in
+  *.dll|*.DLL) cp "$library" "$bundle/$name.dll" ;;
+  *) cp "$library" "$bundle/$name" ;;
+esac
 {
   echo "{"
   echo "  NSExecutable = \"$name\";"
