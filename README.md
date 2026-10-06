@@ -19,6 +19,20 @@ xctest -XCTest ExampleTests.testAddition,OtherTests.testParsing path/to/Tests.bu
 one test executes and every selected test succeeds. Invalid bundles, unmatched
 filters, empty runs, assertion failures, and uncaught exceptions return nonzero.
 
+## Building with Meson
+
+As an alternative to GNUstep Make, use Meson with Clang and a configured
+GNUstep environment:
+
+```sh
+OBJC=clang meson setup build
+meson compile -C build
+meson install -C build
+```
+
+The runner is part of `libXCTest`; its public header is
+`<XCTest/GSXCTestRunner.h>`.
+
 ## Supported behavior
 
 - Discovery of `void` instance methods whose names start with `test` and which
