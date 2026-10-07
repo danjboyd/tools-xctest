@@ -515,8 +515,10 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 
     [runLock unlock];
 
-    return [[topSuite testRun] hasSucceeded] && savedBaselines
-        && (junitReporter == nil || [junitReporter wroteReport]);
+    // A run that executes no tests fails: it almost always means the
+    // bundle or the selection isn't what was intended.
+    return [[topSuite testRun] hasSucceeded] && [[topSuite testRun] executionCount] > 0
+        && savedBaselines && (junitReporter == nil || [junitReporter wroteReport]);
 }
 
 // Reads performanceBaselinesPath. A missing file is fine when updating

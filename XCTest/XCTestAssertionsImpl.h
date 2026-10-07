@@ -31,6 +31,8 @@
 
 #import <XCTest/XCTestCase.h>
 
+#include <math.h>
+
 @interface _XCTestCaseInterruptionException : NSException
 @end
 
@@ -48,9 +50,18 @@ void _XCTFailureHandler(id test, BOOL expected, const char *filePath, NSUInteger
 
 void _XCTPreformattedFailureHandler(id test, BOOL expected, NSString *filePath, NSUInteger lineNumber, NSString *condition, NSString *message);
 
+// The optional message format needn't be a literal; nil ends the
+// arguments when there is none.
 #define _XCTRegisterFailure(test, condition, ...) \
 ({ \
-    _XCTFailureHandler(test, YES, __FILE__, __LINE__, condition, @"" __VA_ARGS__); \
+    _XCTFailureHandler(test, YES, __FILE__, __LINE__, condition, ##__VA_ARGS__, nil); \
+})
+
+// For an exception thrown while evaluating an assertion's arguments: the
+// assertion didn't fail, so the failure is unexpected.
+#define _XCTRegisterUnexpectedFailure(test, condition, ...) \
+({ \
+    _XCTFailureHandler(test, NO, __FILE__, __LINE__, condition, ##__VA_ARGS__, nil); \
 })
 
 typedef enum _XCTAssertionType : NSUInteger {
@@ -93,7 +104,7 @@ NSString * _XCTDescriptionForValue (NSValue *value);
 
 #define _XCTPrimitiveFail(test, ...) \
 ({ \
-    _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_Fail, 0), __VA_ARGS__); \
+    _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_Fail, 0), ##__VA_ARGS__); \
 })
 
 #define _XCTPrimitiveAssertNil(test, expression, expressionStr, ...) \
@@ -101,15 +112,15 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     @try { \
         id __xctValue = (expression); \
         if (__xctValue != nil) { \
-            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_Nil, 0, expressionStr, __xctValue), __VA_ARGS__); \
+            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_Nil, 0, expressionStr, __xctValue), ##__VA_ARGS__); \
         } \
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_Nil, 1, expressionStr, [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_Nil, 1, expressionStr, [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_Nil, 2, expressionStr), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_Nil, 2, expressionStr), ##__VA_ARGS__); \
     } \
 })
 
@@ -118,15 +129,15 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     @try { \
         id __xctValue = (expression); \
         if (__xctValue == nil) { \
-            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NotNil, 0, expressionStr), __VA_ARGS__); \
+            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NotNil, 0, expressionStr), ##__VA_ARGS__); \
         } \
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NotNil, 1, expressionStr, [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_NotNil, 1, expressionStr, [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NotNil, 2, expressionStr), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_NotNil, 2, expressionStr), ##__VA_ARGS__); \
     } \
 })
 
@@ -135,15 +146,15 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     @try { \
         BOOL __xctValue = !!(expression); \
         if (!__xctValue) { \
-            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_True, 0, expressionStr), __VA_ARGS__); \
+            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_True, 0, expressionStr), ##__VA_ARGS__); \
         } \
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_True, 1, expressionStr, [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_True, 1, expressionStr, [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_True, 2, expressionStr), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_True, 2, expressionStr), ##__VA_ARGS__); \
     } \
 })
 
@@ -152,15 +163,15 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     @try { \
         BOOL __xctValue = !!(expression); \
         if (__xctValue) { \
-            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_False, 0, expressionStr), __VA_ARGS__); \
+            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_False, 0, expressionStr), ##__VA_ARGS__); \
         } \
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_False, 1, expressionStr, [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_False, 1, expressionStr, [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_False, 2, expressionStr), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_False, 2, expressionStr), ##__VA_ARGS__); \
     } \
 })
 
@@ -170,15 +181,15 @@ NSString * _XCTDescriptionForValue (NSValue *value);
         id __xctValue1 = (expression1); \
         id __xctValue2 = (expression2); \
         if ((__xctValue1 == __xctValue2) != (isIdentical)) { \
-            _XCTRegisterFailure(test, _XCTFailureDescription((isIdentical) ? _XCTAssertion_Identical : _XCTAssertion_NotIdentical, 0, expressionStr1, expressionStr2, __xctValue1, __xctValue2), __VA_ARGS__); \
+            _XCTRegisterFailure(test, _XCTFailureDescription((isIdentical) ? _XCTAssertion_Identical : _XCTAssertion_NotIdentical, 0, expressionStr1, expressionStr2, __xctValue1, __xctValue2), ##__VA_ARGS__); \
         } \
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription((isIdentical) ? _XCTAssertion_Identical : _XCTAssertion_NotIdentical, 1, expressionStr1, expressionStr2, [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription((isIdentical) ? _XCTAssertion_Identical : _XCTAssertion_NotIdentical, 1, expressionStr1, expressionStr2, [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription((isIdentical) ? _XCTAssertion_Identical : _XCTAssertion_NotIdentical, 2, expressionStr1, expressionStr2), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription((isIdentical) ? _XCTAssertion_Identical : _XCTAssertion_NotIdentical, 2, expressionStr1, expressionStr2), ##__VA_ARGS__); \
     } \
 })
 
@@ -188,15 +199,15 @@ NSString * _XCTDescriptionForValue (NSValue *value);
         id __xctValue1 = (expression1); \
         id __xctValue2 = (expression2); \
         if ((__xctValue1 != __xctValue2) && ![__xctValue1 isEqual:__xctValue2]) { \
-            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_EqualObjects, 0, expressionStr1, expressionStr2, __xctValue1, __xctValue2), __VA_ARGS__); \
+            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_EqualObjects, 0, expressionStr1, expressionStr2, __xctValue1, __xctValue2), ##__VA_ARGS__); \
         } \
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_EqualObjects, 1, expressionStr1, expressionStr2, [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_EqualObjects, 1, expressionStr1, expressionStr2, [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_EqualObjects, 2, expressionStr1, expressionStr2), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_EqualObjects, 2, expressionStr1, expressionStr2), ##__VA_ARGS__); \
     } \
 })
 
@@ -206,15 +217,15 @@ NSString * _XCTDescriptionForValue (NSValue *value);
         id __xctValue1 = (expression1); \
         id __xctValue2 = (expression2); \
         if ((__xctValue1 == __xctValue2) || [__xctValue1 isEqual:__xctValue2]) { \
-            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqualObjects, 0, expressionStr1, expressionStr2, __xctValue1, __xctValue2), __VA_ARGS__); \
+            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqualObjects, 0, expressionStr1, expressionStr2, __xctValue1, __xctValue2), ##__VA_ARGS__); \
         } \
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqualObjects, 1, expressionStr1, expressionStr2, [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqualObjects, 1, expressionStr1, expressionStr2, [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqualObjects, 2, expressionStr1, expressionStr2), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqualObjects, 2, expressionStr1, expressionStr2), ##__VA_ARGS__); \
     } \
 })
 
@@ -226,15 +237,15 @@ NSString * _XCTDescriptionForValue (NSValue *value);
         if (__xctValue1 != __xctValue2) { \
             NSValue *__xctBox1 = [NSValue value:&__xctValue1 withObjCType:@encode(__typeof__(expression1))]; \
             NSValue *__xctBox2 = [NSValue value:&__xctValue2 withObjCType:@encode(__typeof__(expression2))]; \
-            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_Equal, 0, expressionStr1, expressionStr2, _XCTDescriptionForValue(__xctBox1), _XCTDescriptionForValue(__xctBox2)), __VA_ARGS__); \
+            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_Equal, 0, expressionStr1, expressionStr2, _XCTDescriptionForValue(__xctBox1), _XCTDescriptionForValue(__xctBox2)), ##__VA_ARGS__); \
         } \
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_Equal, 1, expressionStr1, expressionStr2, [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_Equal, 1, expressionStr1, expressionStr2, [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_Equal, 2, expressionStr1, expressionStr2), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_Equal, 2, expressionStr1, expressionStr2), ##__VA_ARGS__); \
     } \
 })
 
@@ -246,17 +257,26 @@ NSString * _XCTDescriptionForValue (NSValue *value);
         if (__xctValue1 == __xctValue2) { \
             NSValue *__xctBox1 = [NSValue value:&__xctValue1 withObjCType:@encode(__typeof__(expression1))]; \
             NSValue *__xctBox2 = [NSValue value:&__xctValue2 withObjCType:@encode(__typeof__(expression2))]; \
-            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqual, 0, expressionStr1, expressionStr2, _XCTDescriptionForValue(__xctBox1), _XCTDescriptionForValue(__xctBox2)), __VA_ARGS__); \
+            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqual, 0, expressionStr1, expressionStr2, _XCTDescriptionForValue(__xctBox1), _XCTDescriptionForValue(__xctBox2)), ##__VA_ARGS__); \
         } \
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqual, 1, expressionStr1, expressionStr2, [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqual, 1, expressionStr1, expressionStr2, [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqual, 2, expressionStr1, expressionStr2), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqual, 2, expressionStr1, expressionStr2), ##__VA_ARGS__); \
     } \
 })
+
+// Accuracy comparisons in long double, so integers work and can't
+// overflow. NaN operands, and a negative or NaN accuracy, never compare
+// equal.
+static inline BOOL _XCTValuesEqualWithAccuracy(long double a, long double b, long double accuracy)
+{
+    return !isnan(a) && !isnan(b) && !isnan(accuracy) && accuracy >= 0
+        && (a == b || fabsl(a - b) <= accuracy);
+}
 
 #define _XCTPrimitiveAssertEqualWithAccuracy(test, expression1, expressionStr1, expression2, expressionStr2, accuracy, accuracyStr, ...) \
 ({ \
@@ -264,19 +284,19 @@ NSString * _XCTDescriptionForValue (NSValue *value);
         __typeof__(expression1) __xctValue1 = (expression1); \
         __typeof__(expression2) __xctValue2 = (expression2); \
         __typeof__(accuracy) __xctAccuracy = (accuracy); \
-        if (isnan(__xctValue1) || isnan(__xctValue2) || ((MAX(__xctValue1, __xctValue2) - MIN(__xctValue1, __xctValue2)) > __xctAccuracy)) { \
+        if (!_XCTValuesEqualWithAccuracy(__xctValue1, __xctValue2, __xctAccuracy)) { \
             NSValue *__xctBox1 = [NSValue value:&__xctValue1 withObjCType:@encode(__typeof__(expression1))]; \
             NSValue *__xctBox2 = [NSValue value:&__xctValue2 withObjCType:@encode(__typeof__(expression2))]; \
             NSValue *__xctAccuracyBox = [NSValue value:&__xctAccuracy withObjCType:@encode(__typeof__(accuracy))]; \
-            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_EqualWithAccuracy, 0, expressionStr1, expressionStr2, accuracyStr, _XCTDescriptionForValue(__xctBox1), _XCTDescriptionForValue(__xctBox2), _XCTDescriptionForValue(__xctAccuracyBox)), __VA_ARGS__); \
+            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_EqualWithAccuracy, 0, expressionStr1, expressionStr2, accuracyStr, _XCTDescriptionForValue(__xctBox1), _XCTDescriptionForValue(__xctBox2), _XCTDescriptionForValue(__xctAccuracyBox)), ##__VA_ARGS__); \
         } \
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_EqualWithAccuracy, 1, expressionStr1, expressionStr2, accuracyStr, [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_EqualWithAccuracy, 1, expressionStr1, expressionStr2, accuracyStr, [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_EqualWithAccuracy, 2, expressionStr1, expressionStr2, accuracyStr), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_EqualWithAccuracy, 2, expressionStr1, expressionStr2, accuracyStr), ##__VA_ARGS__); \
     } \
 })
 
@@ -286,19 +306,19 @@ NSString * _XCTDescriptionForValue (NSValue *value);
         __typeof__(expression1) __xctValue1 = (expression1); \
         __typeof__(expression2) __xctValue2 = (expression2); \
         __typeof__(accuracy) __xctAccuracy = (accuracy); \
-        if (!isnan(__xctValue1) && !isnan(__xctValue2) && ((MAX(__xctValue1, __xctValue2) - MIN(__xctValue1, __xctValue2)) <= __xctAccuracy)) { \
+        if (_XCTValuesEqualWithAccuracy(__xctValue1, __xctValue2, __xctAccuracy)) { \
             NSValue *__xctBox1 = [NSValue value:&__xctValue1 withObjCType:@encode(__typeof__(expression1))]; \
             NSValue *__xctBox2 = [NSValue value:&__xctValue2 withObjCType:@encode(__typeof__(expression2))]; \
             NSValue *__xctAccuracyBox = [NSValue value:&__xctAccuracy withObjCType:@encode(__typeof__(accuracy))]; \
-            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqualWithAccuracy, 0, expressionStr1, expressionStr2, accuracyStr, _XCTDescriptionForValue(__xctBox1), _XCTDescriptionForValue(__xctBox2), _XCTDescriptionForValue(__xctAccuracyBox)), __VA_ARGS__); \
+            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqualWithAccuracy, 0, expressionStr1, expressionStr2, accuracyStr, _XCTDescriptionForValue(__xctBox1), _XCTDescriptionForValue(__xctBox2), _XCTDescriptionForValue(__xctAccuracyBox)), ##__VA_ARGS__); \
         } \
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqualWithAccuracy, 1, expressionStr1, expressionStr2, accuracyStr, [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqualWithAccuracy, 1, expressionStr1, expressionStr2, accuracyStr, [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqualWithAccuracy, 2, expressionStr1, expressionStr2, accuracyStr), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_NotEqualWithAccuracy, 2, expressionStr1, expressionStr2, accuracyStr), ##__VA_ARGS__); \
     } \
 })
 
@@ -307,18 +327,18 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     @try { \
         __typeof__(expression1) __xctValue1 = (expression1); \
         __typeof__(expression2) __xctValue2 = (expression2); \
-        if (__xctValue1 <= __xctValue2) { \
+        if (!(__xctValue1 > __xctValue2)) { \
             NSValue *__xctBox1 = [NSValue value:&__xctValue1 withObjCType:@encode(__typeof__(expression1))]; \
             NSValue *__xctBox2 = [NSValue value:&__xctValue2 withObjCType:@encode(__typeof__(expression2))]; \
-            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_GreaterThan, 0, expressionStr1, expressionStr2, _XCTDescriptionForValue(__xctBox1), _XCTDescriptionForValue(__xctBox2)), __VA_ARGS__); \
+            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_GreaterThan, 0, expressionStr1, expressionStr2, _XCTDescriptionForValue(__xctBox1), _XCTDescriptionForValue(__xctBox2)), ##__VA_ARGS__); \
         } \
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_GreaterThan, 1, expressionStr1, expressionStr2, [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_GreaterThan, 1, expressionStr1, expressionStr2, [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_GreaterThan, 2, expressionStr1, expressionStr2), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_GreaterThan, 2, expressionStr1, expressionStr2), ##__VA_ARGS__); \
     } \
 })
 
@@ -327,18 +347,18 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     @try { \
         __typeof__(expression1) __xctValue1 = (expression1); \
         __typeof__(expression2) __xctValue2 = (expression2); \
-        if (__xctValue1 < __xctValue2) { \
+        if (!(__xctValue1 >= __xctValue2)) { \
             NSValue *__xctBox1 = [NSValue value:&__xctValue1 withObjCType:@encode(__typeof__(expression1))]; \
             NSValue *__xctBox2 = [NSValue value:&__xctValue2 withObjCType:@encode(__typeof__(expression2))]; \
-            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_GreaterThanOrEqual, 0, expressionStr1, expressionStr2, _XCTDescriptionForValue(__xctBox1), _XCTDescriptionForValue(__xctBox2)), __VA_ARGS__); \
+            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_GreaterThanOrEqual, 0, expressionStr1, expressionStr2, _XCTDescriptionForValue(__xctBox1), _XCTDescriptionForValue(__xctBox2)), ##__VA_ARGS__); \
         } \
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_GreaterThanOrEqual, 1, expressionStr1, expressionStr2, [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_GreaterThanOrEqual, 1, expressionStr1, expressionStr2, [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_GreaterThanOrEqual, 2, expressionStr1, expressionStr2), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_GreaterThanOrEqual, 2, expressionStr1, expressionStr2), ##__VA_ARGS__); \
     } \
 })
 
@@ -347,18 +367,18 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     @try { \
         __typeof__(expression1) __xctValue1 = (expression1); \
         __typeof__(expression2) __xctValue2 = (expression2); \
-        if (__xctValue1 >= __xctValue2) { \
+        if (!(__xctValue1 < __xctValue2)) { \
             NSValue *__xctBox1 = [NSValue value:&__xctValue1 withObjCType:@encode(__typeof__(expression1))]; \
             NSValue *__xctBox2 = [NSValue value:&__xctValue2 withObjCType:@encode(__typeof__(expression2))]; \
-            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_LessThan, 0, expressionStr1, expressionStr2, _XCTDescriptionForValue(__xctBox1), _XCTDescriptionForValue(__xctBox2)), __VA_ARGS__); \
+            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_LessThan, 0, expressionStr1, expressionStr2, _XCTDescriptionForValue(__xctBox1), _XCTDescriptionForValue(__xctBox2)), ##__VA_ARGS__); \
         } \
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_LessThan, 1, expressionStr1, expressionStr2, [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_LessThan, 1, expressionStr1, expressionStr2, [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_LessThan, 2, expressionStr1, expressionStr2), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_LessThan, 2, expressionStr1, expressionStr2), ##__VA_ARGS__); \
     } \
 })
 
@@ -367,18 +387,18 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     @try { \
         __typeof__(expression1) __xctValue1 = (expression1); \
         __typeof__(expression2) __xctValue2 = (expression2); \
-        if (__xctValue1 > __xctValue2) { \
+        if (!(__xctValue1 <= __xctValue2)) { \
             NSValue *__xctBox1 = [NSValue value:&__xctValue1 withObjCType:@encode(__typeof__(expression1))]; \
             NSValue *__xctBox2 = [NSValue value:&__xctValue2 withObjCType:@encode(__typeof__(expression2))]; \
-            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_LessThanOrEqual, 0, expressionStr1, expressionStr2, _XCTDescriptionForValue(__xctBox1), _XCTDescriptionForValue(__xctBox2)), __VA_ARGS__); \
+            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_LessThanOrEqual, 0, expressionStr1, expressionStr2, _XCTDescriptionForValue(__xctBox1), _XCTDescriptionForValue(__xctBox2)), ##__VA_ARGS__); \
         } \
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_LessThanOrEqual, 1, expressionStr1, expressionStr2, [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_LessThanOrEqual, 1, expressionStr1, expressionStr2, [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_LessThanOrEqual, 2, expressionStr1, expressionStr2), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, _XCTFailureDescription(_XCTAssertion_LessThanOrEqual, 2, expressionStr1, expressionStr2), ##__VA_ARGS__); \
     } \
 })
 
@@ -393,7 +413,7 @@ NSString * _XCTDescriptionForValue (NSValue *value);
         __didThrow = YES; \
     } \
     if (!__didThrow) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_Throws, 0, expressionStr), __VA_ARGS__); \
+        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_Throws, 0, expressionStr), ##__VA_ARGS__); \
     } \
 })
 
@@ -409,14 +429,14 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     } \
     @catch (NSException *__xctException) { \
         __didThrow = YES; \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_ThrowsSpecific, 0, expressionStr, @#exception_class, [__xctException class], [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_ThrowsSpecific, 0, expressionStr, @#exception_class, [__xctException class], [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
         __didThrow = YES; \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_ThrowsSpecific, 1, expressionStr, @#exception_class), __VA_ARGS__); \
+        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_ThrowsSpecific, 1, expressionStr, @#exception_class), ##__VA_ARGS__); \
     } \
     if (!__didThrow) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_ThrowsSpecific, 2, expressionStr, @#exception_class), __VA_ARGS__); \
+        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_ThrowsSpecific, 2, expressionStr, @#exception_class), ##__VA_ARGS__); \
     } \
 })
 
@@ -430,19 +450,19 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     @catch (exception_class *__xctException) { \
         __didThrow = YES; \
         if (![exception_name isEqualToString:[__xctException name]]) { \
-            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_ThrowsSpecificNamed, 0, expressionStr, @#exception_class, exception_name, [__xctException class], [__xctException name], [__xctException reason]), __VA_ARGS__); \
+            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_ThrowsSpecificNamed, 0, expressionStr, @#exception_class, exception_name, [__xctException class], [__xctException name], [__xctException reason]), ##__VA_ARGS__); \
         } \
     } \
     @catch (NSException *__xctException) { \
         __didThrow = YES; \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_ThrowsSpecificNamed, 1, expressionStr, @#exception_class, exception_name, [__xctException class], [__xctException name], [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_ThrowsSpecificNamed, 1, expressionStr, @#exception_class, exception_name, [__xctException class], [__xctException name], [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
         __didThrow = YES; \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_ThrowsSpecificNamed, 2, expressionStr, @#exception_class, exception_name), __VA_ARGS__); \
+        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_ThrowsSpecificNamed, 2, expressionStr, @#exception_class, exception_name), ##__VA_ARGS__); \
     } \
     if (!__didThrow) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_ThrowsSpecificNamed, 3, expressionStr, @#exception_class, exception_name), __VA_ARGS__); \
+        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_ThrowsSpecificNamed, 3, expressionStr, @#exception_class, exception_name), ##__VA_ARGS__); \
     } \
 })
 
@@ -453,10 +473,10 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NoThrow, 0, expressionStr, [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NoThrow, 0, expressionStr, [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NoThrow, 1, expressionStr), __VA_ARGS__); \
+        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NoThrow, 1, expressionStr), ##__VA_ARGS__); \
     } \
 })
 
@@ -467,7 +487,7 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (exception_class *__xctException) { \
-        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NoThrowSpecific, 0, expressionStr, @#exception_class, [__xctException class], [__xctException reason]), __VA_ARGS__); \
+        _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NoThrowSpecific, 0, expressionStr, @#exception_class, [__xctException class], [__xctException reason]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
         ; \
@@ -482,7 +502,7 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (exception_class *__xctException) { \
         if ([exception_name isEqualToString:[__xctException name]]) { \
-            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NoThrowSpecificNamed, 0, expressionStr, @#exception_class, exception_name, [__xctException class], [__xctException name], [__xctException reason]), __VA_ARGS__); \
+            _XCTRegisterFailure(test, _XCTFailureDescription(_XCTAssertion_NoThrowSpecificNamed, 0, expressionStr, @#exception_class, exception_name, [__xctException class], [__xctException name], [__xctException reason]), ##__VA_ARGS__); \
         } \
     } \
     @catch (...) { \
@@ -492,7 +512,7 @@ NSString * _XCTDescriptionForValue (NSValue *value);
 
 #define _XCTPrimitiveSkip(test, ...) \
 ({ \
-    _XCTSkipHandler(test, __FILE__, __LINE__, nil, @"" __VA_ARGS__); \
+    _XCTSkipHandler(test, __FILE__, __LINE__, nil, ##__VA_ARGS__, nil); \
 })
 
 #define _XCTPrimitiveSkipWhen(test, expression, expressionStr, skipWhen, ...) \
@@ -503,13 +523,13 @@ NSString * _XCTDescriptionForValue (NSValue *value);
     } \
     @catch (_XCTestCaseInterruptionException *__xctInterruption) { [__xctInterruption raise]; } \
     @catch (NSException *__xctException) { \
-        _XCTRegisterFailure(test, ([NSString stringWithFormat:@"(%@) threw exception: %@", expressionStr, [__xctException reason]]), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, ([NSString stringWithFormat:@"(%@) threw exception: %@", expressionStr, [__xctException reason]]), ##__VA_ARGS__); \
     } \
     @catch (...) { \
-        _XCTRegisterFailure(test, ([NSString stringWithFormat:@"(%@) threw unknown exception", expressionStr]), __VA_ARGS__); \
+        _XCTRegisterUnexpectedFailure(test, ([NSString stringWithFormat:@"(%@) threw unknown exception", expressionStr]), ##__VA_ARGS__); \
     } \
     if (__xctShouldSkip) { \
-        _XCTSkipHandler(test, __FILE__, __LINE__, [NSString stringWithFormat:@"(%@) is %@", expressionStr, (skipWhen) ? @"true" : @"false"], @"" __VA_ARGS__); \
+        _XCTSkipHandler(test, __FILE__, __LINE__, [NSString stringWithFormat:@"(%@) is %@", expressionStr, (skipWhen) ? @"true" : @"false"], ##__VA_ARGS__, nil); \
     } \
 })
 

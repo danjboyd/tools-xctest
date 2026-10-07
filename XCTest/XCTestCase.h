@@ -100,6 +100,12 @@
  */
 @property BOOL continueAfterFailure;
 
+/**
+ * GNUstep extension: the number of failures (assertion failures and
+ * unexpected exceptions) in the test's latest run.
+ */
+@property (readonly) NSUInteger failureCount;
+
 /*!
  * How long the test may run, including set up and teardown, when xctest
  * runs with time limits (-test-timeouts-enabled YES, or one of the

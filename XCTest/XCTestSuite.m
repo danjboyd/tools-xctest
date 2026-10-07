@@ -367,9 +367,9 @@ static NSUInteger GSRepetitionIterations = 1;
             }
         }
 
-        if (runTests) {
-            [self _gsRunClassMethod:@selector(tearDown) context:@"+tearDown" skip:NULL];
-        }
+        // +tearDown runs even if +setUp failed or skipped, to undo
+        // whatever +setUp did before it stopped.
+        [self _gsRunClassMethod:@selector(tearDown) context:@"+tearDown" skip:NULL];
     }
 
     _GSXCTWatchdogSuiteDidFinish(self);

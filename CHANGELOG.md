@@ -13,6 +13,29 @@ Releases of this fork (danjboyd/tools-xctest). Versions are tagged
   `LD_PRELOAD`. `xctest-bundle` names a DLL's copy `<Name>.dll`.
 - The time-limit watchdog creates its lock in `+initialize` instead of
   with `pthread_once`.
+- Merged upstream's rewrite (gnustep/tools-xctest 5c84fc3): its
+  `AGENTS.md`, `Tests/Regression.m` and `Tests/run.sh` (now part of
+  `make check` and `meson test`), and these behaviours:
+  - A run in which no test executes fails, as does each `-XCTest` or
+    `-only-testing` selection that matches no test ("No tests matched
+    '<selection>'."), also with `-list-tests`.
+  - `-XCTest` accepts `Class.method` as well as `Class/method`.
+  - `+tearDown` runs even if `+setUp` failed or skipped the class.
+  - `-[XCTestCase failureCount]` (GNUstep extension); `-invokeTest`
+    called directly runs the test in a run of its own.
+  - `-initWithSelector:` rejects selectors that aren't test methods, and
+    a test case without an invocation fails.
+  - Accuracy assertions take integers as well as floating-point values,
+    compared without overflow; a negative or NaN accuracy never matches.
+  - Assertion messages may use a non-literal format string.
+  - The wait handler's timeout error names the unfulfilled expectations.
+- Fixes: an exception thrown while evaluating an assertion's arguments
+  is an unexpected failure, not an expected one (gnustep/tools-xctest#10);
+  `XCTAssertGreaterThan`, `...LessThan` and the `OrEqual` forms fail for
+  NaN operands. The fork already behaved as gnustep/tools-xctest#9 and
+  #11 ask; `Tests/Regression.m` now checks those too.
+- `XCTMetric`'s memory and storage errors use `XCTestErrorDomain`.
+- Line endings are LF throughout.
 
 ## 0.4.0
 

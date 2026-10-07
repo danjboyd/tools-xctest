@@ -90,11 +90,25 @@ static NSString *GSQuotedDescriptions(NSArray *expectations)
 
     if (handler != nil) {
         if (result != XCTWaiterResultCompleted) {
+            NSMutableArray *unfulfilled = [NSMutableArray array];
+            NSString *reason = nil;
+
+            for (XCTestExpectation *expectation in pending) {
+                if (![expectation isInverted] && ![expectation _gsIsFulfilled]) {
+                    [unfulfilled addObject:[NSString stringWithFormat:@"\"%@\"",
+                        [expectation expectationDescription]]];
+                }
+            }
+            reason = (result == XCTWaiterResultTimedOut)
+                ? [NSString stringWithFormat:@"Exceeded timeout of %g seconds, with unfulfilled expectations: %@.",
+                    timeout, [unfulfilled componentsJoinedByString:@", "]]
+                : @"Failed while waiting for expectations.";
             error = [NSError errorWithDomain:XCTestErrorDomain
                                         code:(result == XCTWaiterResultTimedOut
                                               ? XCTestErrorCodeTimeoutWhileWaiting
                                               : XCTestErrorCodeFailureWhileWaiting)
-                                    userInfo:nil];
+                                    userInfo:[NSDictionary dictionaryWithObject:reason
+                                                                         forKey:NSLocalizedDescriptionKey]];
         }
         handler(error);
     }

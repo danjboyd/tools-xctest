@@ -10,7 +10,7 @@ endif
  
 dependencies_to_link = []
 # Common Objective-C flags
-objc_flags = []
+objc_flags = ['-fblocks', '-fobjc-exceptions']
 gnustep_runtime_lib_dirs = []
 gnustep_makefiles = ''
 
@@ -97,6 +97,7 @@ headers = [
 ]
 
 include_dirs = include_directories(
+    '.',
     'XCTest',
 )
 
@@ -188,6 +189,13 @@ if host_machine.system() != 'darwin'
   if host_machine.system() != 'windows'
     xctest_tests += [['hosted', 'run-hosted-tests.sh']]
   endif
+
+  # The standalone regression program (Tests/Regression.m).
+  regression = executable('regression', 'Tests/Regression.m',
+                          include_directories: include_directories('.'),
+                          dependencies: dependencies_to_link,
+                          link_with: xctest_lib)
+  test('regression', regression, is_parallel: false)
 
   test('meson-bundle', xctest_tool,
        args: [meson_fixture_bundle.full_path(), '-only-testing:FilterFixture/AlphaTests'],

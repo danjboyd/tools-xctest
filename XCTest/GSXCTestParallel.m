@@ -566,7 +566,7 @@ static NSString *GSAbsolutePath(NSString *path)
     }
     [fileManager removeItemAtPath:workDirectory error:NULL];
 
-    return ![run hasFailed] && !workerFailed && (junitReporter == nil || [junitReporter wroteReport]);
+    return [identifiers count] > 0 && ![run hasFailed] && !workerFailed && (junitReporter == nil || [junitReporter wroteReport]);
 }
 
 @end

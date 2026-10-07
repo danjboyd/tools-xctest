@@ -671,6 +671,11 @@ int main(int argc, char *argv[]) {
     // -XCTest selections are TestTarget/... identifiers for this bundle.
     for (NSString *test in appleSelections) {
         NSString *target = TargetNameForBundlePath(testBundlePath);
+
+        // Class.method is accepted as well as Apple's Class/method.
+        if ([test rangeOfString:@"/"].location == NSNotFound) {
+            test = [test stringByReplacingOccurrencesOfString:@"." withString:@"/"];
+        }
         [onlyTestIdentifiers addObject:[NSString stringWithFormat:@"%@/%@", target ? target : @"", test]];
     }
 
