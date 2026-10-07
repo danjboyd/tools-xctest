@@ -3,8 +3,17 @@
 Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 `vX.Y.Z`; 0.1.x are upstream's (gnustep/tools-xctest).
 
-## Unreleased
+## 0.5.0
 
+This release is built on upstream's rewrite of tools-xctest
+(gnustep/tools-xctest 5c84fc3), merged into the fork.
+
+Runs that used to pass can now fail: a run in which no test executes,
+and a `-XCTest` or `-only-testing` selection that matches no test, both
+exit nonzero. `+tearDown` now also runs after a failed `+setUp`.
+
+- CI: GitHub Actions builds and tests on Linux (clang, libobjc2; make
+  check and meson test) and Windows (MSYS2 clang64; make check).
 - Builds and runs on Windows (MSYS2 clang64): the CPU, memory and
   storage metrics use the Windows process APIs, parallel workers find
   `xctest` without `/proc`, and a crashed worker's status is shown in
