@@ -24,8 +24,9 @@ assert_status 0
 [ "$output" = "FilterFixture/AlphaTests/testTwo" ] || fail "expected filters to apply to -list-tests"
 
 run_fixture FilterFixture -list-tests -only-testing:FilterFixture/MissingTests
-assert_status 0
-[ -z "$output" ] || fail "expected no tests to be listed"
+assert_status 1
+assert_contains "No tests matched 'FilterFixture/MissingTests'."
+assert_not_contains "FilterFixture/AlphaTests"
 
 run_fixture FilterFixture -list-tests -only-testing:FilterFixture/AlphaTests/testOne/extra
 assert_status 1
