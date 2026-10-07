@@ -225,6 +225,7 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     BOOL usingAppleStyleFilters = (legacyTestNames == nil);
     BOOL usingAnyFilters = NO;
     NSMutableArray *plan = [NSMutableArray array];
+    NSMutableIndexSet *matchedSelections = [NSMutableIndexSet indexSet];
 
     if (usingAppleStyleFilters)
     {
@@ -311,16 +312,18 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
             {
                 if ([parsedOnlyIdentifiers count] > 0)
                 {
+                    NSUInteger i;
+
                     testIsEnabled = NO;
-                    for (NSArray *identifierComponents in parsedOnlyIdentifiers)
+                    for (i = 0; i < [parsedOnlyIdentifiers count]; i++)
                     {
-                        if (GSAppleTestIdentifierMatches(identifierComponents,
+                        if (GSAppleTestIdentifierMatches([parsedOnlyIdentifiers objectAtIndex:i],
                                                          targetName,
                                                          className,
                                                          methodName))
                         {
                             testIsEnabled = YES;
-                            break;
+                            [matchedSelections addIndex:i];
                         }
                     }
                 }
@@ -342,13 +345,15 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
             }
             else if (legacyTestNames)
             {
+                NSUInteger i;
+
                 testIsEnabled = NO; // default to disabled when tests are specified
-                for (NSString *testName in legacyTestNames)
+                for (i = 0; i < [legacyTestNames count]; i++)
                 {
-                    if (GSLegacyTestNameMatches(testName, className, methodName))
+                    if (GSLegacyTestNameMatches([legacyTestNames objectAtIndex:i], className, methodName))
                     {
                         testIsEnabled = YES;
-                        break;
+                        [matchedSelections addIndex:i];
                     }
                 }
             }
@@ -360,6 +365,26 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
         }
 
         [plan addObject:suite];
+    }
+
+    // A selection that matches no test is almost always a typo, so it
+    // fails the run instead of quietly running less than was asked for.
+    // (Skip filters that match nothing are harmless.)
+    {
+        NSArray *selections = usingAppleStyleFilters ? onlyTestIdentifiers : legacyTestNames;
+        NSUInteger count = usingAppleStyleFilters ? [parsedOnlyIdentifiers count] : [legacyTestNames count];
+        BOOL unmatched = NO;
+        NSUInteger i;
+
+        for (i = 0; i < count; i++) {
+            if (![matchedSelections containsIndex:i]) {
+                NSLog(@"XCTest: No tests matched '%@'.", [selections objectAtIndex:i]);
+                unmatched = YES;
+            }
+        }
+        if (unmatched) {
+            return nil;
+        }
     }
 
     if (randomizeExecutionOrder) {

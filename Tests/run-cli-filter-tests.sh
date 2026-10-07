@@ -85,8 +85,28 @@ assert_contains "$combined_output" "fixture: AlphaTests.testTwo"
 assert_not_contains "$combined_output" "fixture: AlphaTests.testOne"
 assert_not_contains "$combined_output" "fixture: BetaTests.testThree"
 
-no_match_output=$(run_xctest -only-testing:FilterFixture/MissingTests)
-assert_contains "$no_match_output" "No tests matched the provided filters."
+# A selection that matches no test fails the run and names the selection,
+# even when the other selections match.
+for selection in "-only-testing:FilterFixture/MissingTests" \
+                 "-only-testing:FilterFixture/AlphaTests/testMissing"; do
+  no_match_status=0
+  set +e
+  no_match_output=$(run_xctest -only-testing:FilterFixture/AlphaTests/testOne "$selection")
+  no_match_status=$?
+  set -e
+  if [ "$no_match_status" -eq 0 ]; then
+    echo "expected $selection, which matches nothing, to fail" >&2
+    echo "$no_match_output" >&2
+    exit 1
+  fi
+  assert_contains "$no_match_output" "No tests matched 'FilterFixture/${selection#-only-testing:FilterFixture/}'."
+  assert_not_contains "$no_match_output" "No tests matched 'FilterFixture/AlphaTests/testOne'."
+  assert_not_contains "$no_match_output" "fixture: AlphaTests.testOne"
+done
+
+# A skip filter that matches nothing is harmless.
+skip_unmatched_output=$(run_xctest -only-testing:FilterFixture/AlphaTests/testOne -skip-testing:FilterFixture/MissingTests)
+assert_contains "$skip_unmatched_output" "fixture: AlphaTests.testOne"
 
 invalid_status=0
 set +e
@@ -120,6 +140,11 @@ run_xctest_bundle -XCTest AlphaTests/testTwo,BetaTests -list-tests
 run_xctest_bundle -XCTest AlphaTests/testOne
 [ "$status" -eq 0 ] || { echo "expected -XCTest AlphaTests/testOne to pass: $output" >&2; exit 1; }
 assert_contains "$output" "AlphaTests: 1 tests PASSED"
+run_xctest_bundle -XCTest AlphaTests/testOne,MissingTests
+[ "$status" -ne 0 ] || { echo "expected -XCTest with an unmatched test to fail: $output" >&2; exit 1; }
+assert_contains "$output" "No tests matched 'FilterFixture/MissingTests'."
+run_xctest_bundle -XCTest MissingTests -list-tests
+[ "$status" -ne 0 ] || { echo "expected -list-tests with an unmatched test to fail: $output" >&2; exit 1; }
 run_xctest_bundle -XCTest ""
 [ "$status" -eq 1 ] || { echo "expected -XCTest without tests to fail" >&2; exit 1; }
 assert_contains "$output" "missing tests for -XCTest"
