@@ -23,6 +23,7 @@
 #endif
 
 #import <XCTest/XCTMetric.h>
+#import <XCTest/XCTestErrors.h>
 #import <XCTest/XCTestPrivate.h>
 
 #include <stdio.h>
@@ -379,7 +380,7 @@ static XCTPerformanceMeasurement *GSMeasurement(NSString *identifier, NSString *
 {
     if (_startResident < 0 || _stopResident < 0) {
         if (error != NULL) {
-            *error = [NSError errorWithDomain:@"XCTestErrorDomain" code:0 userInfo:
+            *error = [NSError errorWithDomain:XCTestErrorDomain code:0 userInfo:
                 [NSDictionary dictionaryWithObject:GSMemoryReadError
                                             forKey:NSLocalizedDescriptionKey]];
         }
@@ -427,7 +428,7 @@ static XCTPerformanceMeasurement *GSMeasurement(NSString *identifier, NSString *
 {
     if (_startWritten < 0 || _stopWritten < 0) {
         if (error != NULL) {
-            *error = [NSError errorWithDomain:@"XCTestErrorDomain" code:0 userInfo:
+            *error = [NSError errorWithDomain:XCTestErrorDomain code:0 userInfo:
                 [NSDictionary dictionaryWithObject:GSStorageReadError
                                             forKey:NSLocalizedDescriptionKey]];
         }
