@@ -81,13 +81,17 @@ jobs:
             mingw-w64-clang-x86_64-gnustep-make
             mingw-w64-clang-x86_64-gnustep-base
 
+      # MSYS2's libdispatch headers (included by Foundation) typedef
+      # mode_t again unless HAVE_MODE_T is defined.
       - name: Build
         run: |
           . /clang64/share/GNUstep/Makefiles/GNUstep.sh
+          export CPPFLAGS=-DHAVE_MODE_T
           make -j"$(nproc)"
 
       # The hosted-test script is left out on Windows (no -host there).
       - name: make check
         run: |
           . /clang64/share/GNUstep/Makefiles/GNUstep.sh
+          export CPPFLAGS=-DHAVE_MODE_T
           make check

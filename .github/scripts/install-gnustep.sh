@@ -44,8 +44,11 @@ clone tools-make "$MAKE_TAG"
   make install)
 echo "::endgroup::"
 
+# GNUstep.sh reads unset variables.
+set +u
 # shellcheck disable=SC1091
 . "$PREFIX/System/Library/Makefiles/GNUstep.sh"
+set -u
 
 for lib in "libs-base $BASE_TAG" "libs-gui $GUI_TAG" "libs-back $BACK_TAG"; do
   set -- $lib
