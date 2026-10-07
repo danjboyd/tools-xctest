@@ -1,4 +1,4 @@
-project('xctest', 'objc', version : '0.4.0', default_options : ['warning_level=3'])
+project('xctest', 'objc', version : '0.5.0', default_options : ['warning_level=3'])
 
 pkg = import('pkgconfig')
 
