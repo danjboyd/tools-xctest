@@ -39,11 +39,13 @@ jobs:
         if: steps.cache.outputs.cache-hit != 'true'
         run: .github/scripts/install-gnustep.sh
 
+      # Serial, as the package builds it: libXCTestHost links against
+      # libXCTest from the same directory.
       - name: Build
         run: |
           . "$PREFIX/System/Library/Makefiles/GNUstep.sh"
           export LD_LIBRARY_PATH="$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
-          make -j"$(nproc)"
+          make
 
       - name: make check
         run: |
@@ -86,12 +88,12 @@ jobs:
       - name: Build
         run: |
           . /clang64/share/GNUstep/Makefiles/GNUstep.sh
-          export CPPFLAGS=-DHAVE_MODE_T
-          make -j"$(nproc)"
+          export ADDITIONAL_CPPFLAGS=-DHAVE_MODE_T
+          make
 
       # The hosted-test script is left out on Windows (no -host there).
       - name: make check
         run: |
           . /clang64/share/GNUstep/Makefiles/GNUstep.sh
-          export CPPFLAGS=-DHAVE_MODE_T
+          export ADDITIONAL_CPPFLAGS=-DHAVE_MODE_T
           make check
