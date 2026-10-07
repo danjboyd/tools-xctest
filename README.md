@@ -45,7 +45,7 @@ To use `tools-xctest`, include the header files in your test classes and link ag
 
 Test classes support the same lifecycle as Apple's XCTest:
 
-- `+setUp` and `+tearDown` run once per class, around all of its tests.
+- `+setUp` and `+tearDown` run once per class, around all of its tests. `+tearDown` runs even if `+setUp` failed or skipped the class.
 - Each test gets a fresh instance and runs `-setUpWithError:`, `-setUp`, the test method, any blocks registered with `-addTeardownBlock:` (last added first), `-tearDown`, then `-tearDownWithError:`.
 - Teardown always runs, even when set up or the test fails or throws.
 - Set `continueAfterFailure = NO` to stop a test at its first failed assertion.
@@ -86,7 +86,7 @@ Tests are run through Apple's object model. Each test is an `XCTestCase` instanc
 
 - Override `+defaultTestSuite` or `+testInvocations` to change which tests a class has. For example, an abstract base class can return an empty suite so its tests only run in subclasses.
 - Override `-invokeTest` to wrap each test, or `-recordIssue:` to see, change or drop failures. Every failure is an `XCTIssue` with a type (assertion failure, thrown error, uncaught exception, performance regression, ...), a source location and, for errors from `-setUpWithError:`, the `associatedError`; `XCTMutableIssue` lets an override change one. Overrides of the older `-recordFailureWithDescription:inFile:atLine:expected:` still work.
-- Build and run suites yourself, and check the run's counts (`failureCount`, `skipCount`, `hasSucceeded`, ...).
+- Build and run suites yourself, and check the run's counts (`failureCount`, `skipCount`, `hasSucceeded`, ...). `-[XCTestCase failureCount]` (a GNUstep extension) gives the failures in a test case's latest run, which is handy when calling `-invokeTest` directly.
 - Register an `XCTestObservation` observer (it gets `testCase:didRecordIssue:` for each failure) with `XCTestObservationCenter` to follow progress. To register one before any test runs, do it in the `-init` of the bundle's principal class (with gnustep-make, `MyTests_PRINCIPAL_CLASS = MyObserverRegistrar`); `xctest` creates it before running tests.
 
 ### Performance tests
@@ -166,7 +166,9 @@ xctest MyTests.bundle -only-testing:MyTests/FooTests/testBar
 xctest MyTests.bundle -skip-testing:MyTests/SlowTests
 ```
 
-Test identifiers use the form `TestTarget[/TestClass[/TestMethod]]`, where `TestTarget` is the bundle name without its `.bundle` or `.xctest` extension. Apple's own `xctest` selection also works: `xctest -XCTest FooTests/testBar,SlowTests MyTests.xctest` (or `-XCTest All`).
+Test identifiers use the form `TestTarget[/TestClass[/TestMethod]]`, where `TestTarget` is the bundle name without its `.bundle` or `.xctest` extension. Apple's own `xctest` selection also works: `xctest -XCTest FooTests/testBar,SlowTests MyTests.xctest` (or `-XCTest All`); `FooTests.testBar` is accepted too.
+
+The exit status is zero only when at least one test runs and every selected test succeeds. An invalid bundle, an unknown option, a selection that matches no test (each `-only-testing` or `-XCTest` entry is checked), a run in which no test executes, and any failure return nonzero.
 
 To build and run the test targets of an Xcode project, use `buildtool test` from [libs-xcode](https://github.com/gnustep/libs-xcode) (with `-target`, `-scheme`, `-only-testing:` and `-skip-testing:`, like `xcodebuild test`); it runs each `.xctest` bundle with `xctest`, inside the app named by the target's `TEST_HOST` if it has one.
 
@@ -194,7 +196,9 @@ To keep a hung test from hanging CI, give tests a time limit: with `-test-timeou
 
 Large suites can run in parallel: `-parallel-testing-enabled YES` runs each test class in a separate `xctest` worker process, `-parallel-testing-worker-count <n>` at a time (default: one per CPU; giving a count turns parallel testing on). Each class's output is printed as one block when it finishes, followed by the usual summary; the JUnit report and exit status cover everything. Filters, random order, repetition, time limits and attachments work as in a single run. A worker that crashes fails only its own class's tests, and with time limits a hung test stops only its own worker, so the rest of the run carries on. Classes must not depend on running in the same process; observers registered by the bundle see each worker's classes separately. It can't be combined with `-host` or `-update-performance-baselines`.
 
-Automated CLI regression tests can be run with `make check` or `meson test -C build`.
+## Regression tests
+
+`make check` (or `meson test -C build`) runs everything: the `Tests/run-*-tests.sh` scripts, each with its fixture bundle, and the standalone regression program and CLI checks in `Tests/Regression.m` and `Tests/run.sh` (which can also be run on their own with `sh Tests/run.sh`). Some fixtures fail on purpose; a script passes only when the failures are the expected ones. `AGENTS.md` describes the conventions for changes.
 
 ## License
 `tools-xctest` is licensed under LGPL-2.1. Please refer to the COPYING.LIB file for detailed information. For files not explicitly licensed, they fall under the same LGPL.

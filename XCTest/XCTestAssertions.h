@@ -37,7 +37,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTFail(...) \
-    _XCTPrimitiveFail(self, __VA_ARGS__)
+    _XCTPrimitiveFail(self, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertNil(expression, ...)
@@ -46,7 +46,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertNil(expression, ...) \
-    _XCTPrimitiveAssertNil(self, expression, @#expression, __VA_ARGS__)
+    _XCTPrimitiveAssertNil(self, expression, @#expression, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertNotNil(expression, ...)
@@ -55,7 +55,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertNotNil(expression, ...) \
-    _XCTPrimitiveAssertNotNil(self, expression, @#expression, __VA_ARGS__)
+    _XCTPrimitiveAssertNotNil(self, expression, @#expression, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssert(expression, ...)
@@ -64,7 +64,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssert(expression, ...) \
-    _XCTPrimitiveAssertTrue(self, expression, @#expression, __VA_ARGS__)
+    _XCTPrimitiveAssertTrue(self, expression, @#expression, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertTrue(expression, ...)
@@ -73,7 +73,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertTrue(expression, ...) \
-    _XCTPrimitiveAssertTrue(self, expression, @#expression, __VA_ARGS__)
+    _XCTPrimitiveAssertTrue(self, expression, @#expression, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertFalse(expression, ...)
@@ -82,7 +82,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertFalse(expression, ...) \
-    _XCTPrimitiveAssertFalse(self, expression, @#expression, __VA_ARGS__)
+    _XCTPrimitiveAssertFalse(self, expression, @#expression, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertEqualObjects(expression1, expression2, ...)
@@ -92,7 +92,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertEqualObjects(expression1, expression2, ...) \
-    _XCTPrimitiveAssertEqualObjects(self, expression1, @#expression1, expression2, @#expression2, __VA_ARGS__)
+    _XCTPrimitiveAssertEqualObjects(self, expression1, @#expression1, expression2, @#expression2, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertIdentical(expression1, expression2, ...)
@@ -103,7 +103,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertIdentical(expression1, expression2, ...) \
-    _XCTPrimitiveAssertIdentical(self, expression1, @#expression1, expression2, @#expression2, YES, __VA_ARGS__)
+    _XCTPrimitiveAssertIdentical(self, expression1, @#expression1, expression2, @#expression2, YES, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertNotIdentical(expression1, expression2, ...)
@@ -114,7 +114,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertNotIdentical(expression1, expression2, ...) \
-    _XCTPrimitiveAssertIdentical(self, expression1, @#expression1, expression2, @#expression2, NO, __VA_ARGS__)
+    _XCTPrimitiveAssertIdentical(self, expression1, @#expression1, expression2, @#expression2, NO, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertNotEqualObjects(expression1, expression2, ...)
@@ -124,7 +124,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertNotEqualObjects(expression1, expression2, ...) \
-    _XCTPrimitiveAssertNotEqualObjects(self, expression1, @#expression1, expression2, @#expression2, __VA_ARGS__)
+    _XCTPrimitiveAssertNotEqualObjects(self, expression1, @#expression1, expression2, @#expression2, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertEqual(expression1, expression2, ...)
@@ -134,7 +134,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertEqual(expression1, expression2, ...) \
-    _XCTPrimitiveAssertEqual(self, expression1, @#expression1, expression2, @#expression2, __VA_ARGS__)
+    _XCTPrimitiveAssertEqual(self, expression1, @#expression1, expression2, @#expression2, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertNotEqual(expression1, expression2, ...)
@@ -144,7 +144,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertNotEqual(expression1, expression2, ...) \
-    _XCTPrimitiveAssertNotEqual(self, expression1, @#expression1, expression2, @#expression2, __VA_ARGS__)
+    _XCTPrimitiveAssertNotEqual(self, expression1, @#expression1, expression2, @#expression2, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertEqualWithAccuracy(expression1, expression2, accuracy, ...)
@@ -155,7 +155,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertEqualWithAccuracy(expression1, expression2, accuracy, ...) \
-    _XCTPrimitiveAssertEqualWithAccuracy(self, expression1, @#expression1, expression2, @#expression2, accuracy, @#accuracy, __VA_ARGS__)
+    _XCTPrimitiveAssertEqualWithAccuracy(self, expression1, @#expression1, expression2, @#expression2, accuracy, @#accuracy, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertNotEqualWithAccuracy(expression1, expression2, accuracy, ...)
@@ -166,7 +166,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertNotEqualWithAccuracy(expression1, expression2, accuracy, ...) \
-    _XCTPrimitiveAssertNotEqualWithAccuracy(self, expression1, @#expression1, expression2, @#expression2, accuracy, @#accuracy, __VA_ARGS__)
+    _XCTPrimitiveAssertNotEqualWithAccuracy(self, expression1, @#expression1, expression2, @#expression2, accuracy, @#accuracy, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertGreaterThan(expression1, expression2, ...)
@@ -176,7 +176,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertGreaterThan(expression1, expression2, ...) \
-    _XCTPrimitiveAssertGreaterThan(self, expression1, @#expression1, expression2, @#expression2, __VA_ARGS__)
+    _XCTPrimitiveAssertGreaterThan(self, expression1, @#expression1, expression2, @#expression2, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertGreaterThanOrEqual(expression1, expression2, ...)
@@ -186,7 +186,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertGreaterThanOrEqual(expression1, expression2, ...) \
-    _XCTPrimitiveAssertGreaterThanOrEqual(self, expression1, @#expression1, expression2, @#expression2, __VA_ARGS__)
+    _XCTPrimitiveAssertGreaterThanOrEqual(self, expression1, @#expression1, expression2, @#expression2, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertLessThan(expression1, expression2, ...)
@@ -196,7 +196,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertLessThan(expression1, expression2, ...) \
-    _XCTPrimitiveAssertLessThan(self, expression1, @#expression1, expression2, @#expression2, __VA_ARGS__)
+    _XCTPrimitiveAssertLessThan(self, expression1, @#expression1, expression2, @#expression2, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertLessThanOrEqual(expression1, expression2, ...)
@@ -206,7 +206,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertLessThanOrEqual(expression1, expression2, ...) \
-    _XCTPrimitiveAssertLessThanOrEqual(self, expression1, @#expression1, expression2, @#expression2, __VA_ARGS__)
+    _XCTPrimitiveAssertLessThanOrEqual(self, expression1, @#expression1, expression2, @#expression2, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertThrows(expression, ...)
@@ -215,7 +215,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertThrows(expression, ...) \
-    _XCTPrimitiveAssertThrows(self, expression, @#expression, __VA_ARGS__)
+    _XCTPrimitiveAssertThrows(self, expression, @#expression, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertThrowsSpecific(expression, exception_class, ...)
@@ -225,7 +225,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertThrowsSpecific(expression, exception_class, ...) \
-    _XCTPrimitiveAssertThrowsSpecific(self, expression, @#expression, exception_class, __VA_ARGS__)
+    _XCTPrimitiveAssertThrowsSpecific(self, expression, @#expression, exception_class, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertThrowsSpecificNamed(expression, exception_class, exception_name, ...)
@@ -236,7 +236,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertThrowsSpecificNamed(expression, exception_class, exception_name, ...) \
-    _XCTPrimitiveAssertThrowsSpecificNamed(self, expression, @#expression, exception_class, exception_name, __VA_ARGS__)
+    _XCTPrimitiveAssertThrowsSpecificNamed(self, expression, @#expression, exception_class, exception_name, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertNoThrow(expression, ...)
@@ -245,7 +245,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertNoThrow(expression, ...) \
-    _XCTPrimitiveAssertNoThrow(self, expression, @#expression, __VA_ARGS__)
+    _XCTPrimitiveAssertNoThrow(self, expression, @#expression, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertNoThrowSpecific(expression, exception_class, ...)
@@ -255,7 +255,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertNoThrowSpecific(expression, exception_class, ...) \
-    _XCTPrimitiveAssertNoThrowSpecific(self, expression, @#expression, exception_class, __VA_ARGS__)
+    _XCTPrimitiveAssertNoThrowSpecific(self, expression, @#expression, exception_class, ##__VA_ARGS__)
 
 /*!
  * @define XCTAssertNoThrowSpecificNamed(expression, exception_class, exception_name, ...)
@@ -266,7 +266,7 @@
  * @param ... An optional supplementary description of the failure. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTAssertNoThrowSpecificNamed(expression, exception_class, exception_name, ...) \
-    _XCTPrimitiveAssertNoThrowSpecificNamed(self, expression, @#expression, exception_class, exception_name, __VA_ARGS__)
+    _XCTPrimitiveAssertNoThrowSpecificNamed(self, expression, @#expression, exception_class, exception_name, ##__VA_ARGS__)
 
 /*!
  * @define XCTSkip(...)
@@ -275,7 +275,7 @@
  * @param ... An optional supplementary description of the skip. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTSkip(...) \
-    _XCTPrimitiveSkip(self, __VA_ARGS__)
+    _XCTPrimitiveSkip(self, ##__VA_ARGS__)
 
 /*!
  * @define XCTSkipIf(expression, ...)
@@ -284,7 +284,7 @@
  * @param ... An optional supplementary description of the skip. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTSkipIf(expression, ...) \
-    _XCTPrimitiveSkipWhen(self, expression, @#expression, YES, __VA_ARGS__)
+    _XCTPrimitiveSkipWhen(self, expression, @#expression, YES, ##__VA_ARGS__)
 
 /*!
  * @define XCTSkipUnless(expression, ...)
@@ -293,5 +293,5 @@
  * @param ... An optional supplementary description of the skip. A literal NSString, optionally with string format specifiers. This parameter can be completely omitted.
 */
 #define XCTSkipUnless(expression, ...) \
-    _XCTPrimitiveSkipWhen(self, expression, @#expression, NO, __VA_ARGS__)
+    _XCTPrimitiveSkipWhen(self, expression, @#expression, NO, ##__VA_ARGS__)
 

@@ -23,6 +23,7 @@
 #import <XCTest/XCTestAssertionsImpl.h>
 
 #import <objc/runtime.h>
+#include <string.h>
 
 GSXCTestIssue *_GSXCTIssueForSkip(_XCTSkipFailureException *skip)
 {
@@ -159,10 +160,16 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     NSMethodSignature *signature = [[self class] instanceMethodSignatureForSelector:selector];
     NSInvocation *invocation = nil;
 
-    if (signature != nil) {
-        invocation = [NSInvocation invocationWithMethodSignature:signature];
-        [invocation setSelector:selector];
+    // A test method takes no arguments and returns void.
+    if (signature == nil || [signature numberOfArguments] != 2
+        || strcmp([signature methodReturnType], @encode(void)) != 0) {
+        [self release];
+        [NSException raise:NSInvalidArgumentException
+                    format:@"Invalid test selector %@", NSStringFromSelector(selector)];
+        return nil;
     }
+    invocation = [NSInvocation invocationWithMethodSignature:signature];
+    [invocation setSelector:selector];
 
     return [self initWithInvocation:invocation];
 }
@@ -200,6 +207,11 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
         [_invocation release];
         _invocation = [invocation retain];
     }
+}
+
+- (NSUInteger) failureCount
+{
+    return [[self testRun] totalFailureCount];
 }
 
 - (NSString *) name
@@ -385,7 +397,7 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
     SEL selector = [_invocation selector];
 
     if (_invocation == nil) {
-        return;
+        [NSException raise:NSInvalidArgumentException format:@"No valid test invocation configured"];
     }
 
     // Plain test methods are called directly; anything else (e.g. a custom
@@ -400,6 +412,13 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
 - (void) invokeTest
 {
     void (^teardownBlock)(void) = nil;
+
+    // Called directly rather than from -performTest: (as -runTest does):
+    // run the test in a run of its own, so its failures are counted.
+    if ([self testRun] == nil || [[self testRun] stopDate] != nil) {
+        [self runTest];
+        return;
+    }
 
     BOOL setUpSucceeded = [self _gsRunPhase:@"setUpWithError:" block:^BOOL(NSError **error) {
         return [self setUpWithError:error];

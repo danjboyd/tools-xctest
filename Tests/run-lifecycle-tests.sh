@@ -98,17 +98,19 @@ assert_contains "SetUpErrorTests: 1/1 tests FAILED"
 assert_contains "fixture tearDown failure"
 assert_contains "TearDownFailsTests: 1/1 tests FAILED"
 
-# A throwing +setUp fails every test in the class without running them.
+# A throwing +setUp fails every test in the class without running them;
+# +tearDown still runs, to undo what +setUp did.
 assert_not_contains "fixture: ClassSetUpThrowsTests test ran"
-assert_not_contains "fixture: ClassSetUpThrowsTests +tearDown ran"
+assert_contains "fixture: ClassSetUpThrowsTests +tearDown ran"
 assert_contains "ClassSetUpThrowsTests: 1/1 tests FAILED"
 
 # A throwing +tearDown fails the class even though its tests passed.
 assert_contains "ClassTearDownThrowsTests: 1 tests passed, +tearDown FAILED"
 
-# XCTSkip in +setUp skips every test in the class, without running them or +tearDown.
+# XCTSkip in +setUp skips every test in the class without running them;
+# +tearDown still runs.
 assert_not_contains "fixture: ClassSkipTests test ran"
-assert_not_contains "fixture: ClassSkipTests +tearDown ran"
+assert_contains "fixture: ClassSkipTests +tearDown ran"
 assert_contains "testOne SKIPPED at LifecycleFixture.m:"
 assert_contains ", fixture class skip"
 assert_contains "ClassSkipTests: 0 tests PASSED, 2 skipped"

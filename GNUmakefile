@@ -53,6 +53,10 @@ after-check:: all
 	  echo "./Tests/run-$$name-tests.sh"; \
 	  ./Tests/run-$$name-tests.sh "$(CURDIR)/obj/xctest" "$(CURDIR)/XCTest/obj" "$(CURDIR)" "$(dir $(GNUSTEP_MAKEFILES))Libraries"; \
 	done
+	@echo "sh Tests/run.sh"; \
+	  PATH="$(CURDIR)/XCTest/obj:$$PATH" \
+	  LD_LIBRARY_PATH="$(dir $(GNUSTEP_MAKEFILES))Libraries$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}" \
+	  sh Tests/run.sh
 
 # xctest.make, for projects' test bundles, and xctest-bundle, for other
 # build systems. (GNUSTEP_TOOLS already includes DESTDIR; GNUSTEP_MAKEFILES

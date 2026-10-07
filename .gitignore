@@ -39,3 +39,5 @@ Tests/ParallelFixture/obj
 Tests/MakeHelperFixture/*.xctest
 Tests/MakeHelperFixture/obj
 /*.d
+Tests/Fixture.bundle/
+Tests/obj
