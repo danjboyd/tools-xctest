@@ -54,6 +54,7 @@ for lib in "libs-base $BASE_TAG" "libs-gui $GUI_TAG" "libs-back $BACK_TAG"; do
   set -- $lib
   echo "::group::$1 $2"
   clone "$1" "$2"
-  (cd "$SRC/$1" && ./configure && make -j"$JOBS" && make install)
+  # Into the System domain, as the Debian packages install them.
+  (cd "$SRC/$1" && ./configure && make -j"$JOBS" && make install GNUSTEP_INSTALLATION_DOMAIN=SYSTEM)
   echo "::endgroup::"
 done
