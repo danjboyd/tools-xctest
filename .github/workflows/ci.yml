@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    name: Linux (clang, libobjc2)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    env:
+      PREFIX: ${{ github.workspace }}/../gnustep
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install packages
+        run: |
+          sudo apt-get -q update
+          sudo apt-get -q -y install clang lld cmake ninja-build meson pkg-config xvfb \
+            libffi-dev libgnutls28-dev libxml2-dev libxslt1-dev libicu-dev zlib1g-dev \
+            libcurl4-gnutls-dev libjpeg-dev libtiff-dev libpng-dev \
+            libcairo2-dev libfreetype-dev libfontconfig-dev \
+            libx11-dev libxext-dev libxft-dev libxrender-dev libxt-dev libxmu-dev
+
+      - name: Cache GNUstep
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PREFIX }}
+          key: gnustep-${{ runner.os }}-ubuntu-24.04-${{ hashFiles('.github/scripts/install-gnustep.sh') }}
+
+      - name: Build GNUstep
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: .github/scripts/install-gnustep.sh
+
+      # Serial, as the package builds it: libXCTestHost links against
+      # libXCTest from the same directory.
+      - name: Build
+        run: |
+          . "$PREFIX/System/Library/Makefiles/GNUstep.sh"
+          make
+
+      - name: make check
+        run: |
+          . "$PREFIX/System/Library/Makefiles/GNUstep.sh"
+          xvfb-run -a make check
+
+      - name: meson test
+        run: |
+          . "$PREFIX/System/Library/Makefiles/GNUstep.sh"
+          OBJC=clang CC=clang meson setup build-meson
+          meson compile -C build-meson
+          xvfb-run -a meson test -C build-meson --print-errorlogs
+
+  windows:
+    name: Windows (MSYS2 clang64)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          install: >-
+            make
+            mingw-w64-clang-x86_64-clang
+            mingw-w64-clang-x86_64-libobjc2
+            mingw-w64-clang-x86_64-libdispatch
+            mingw-w64-clang-x86_64-gnustep-make
+            mingw-w64-clang-x86_64-gnustep-base
+
+      # MSYS2's libdispatch headers (included by Foundation) typedef
+      # mode_t again unless HAVE_MODE_T is defined.
+      - name: Build
+        run: |
+          . /clang64/share/GNUstep/Makefiles/GNUstep.sh
+          export ADDITIONAL_CPPFLAGS=-DHAVE_MODE_T
+          make
+
+      # The hosted-test script is left out on Windows (no -host there).
+      - name: make check
+        run: |
+          . /clang64/share/GNUstep/Makefiles/GNUstep.sh
+          export ADDITIONAL_CPPFLAGS=-DHAVE_MODE_T
+          make check
