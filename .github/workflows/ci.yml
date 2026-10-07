@@ -44,19 +44,16 @@ jobs:
       - name: Build
         run: |
           . "$PREFIX/System/Library/Makefiles/GNUstep.sh"
-          export LD_LIBRARY_PATH="$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
           make
 
       - name: make check
         run: |
           . "$PREFIX/System/Library/Makefiles/GNUstep.sh"
-          export LD_LIBRARY_PATH="$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
           xvfb-run -a make check
 
       - name: meson test
         run: |
           . "$PREFIX/System/Library/Makefiles/GNUstep.sh"
-          export LD_LIBRARY_PATH="$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
           OBJC=clang CC=clang meson setup build-meson
           meson compile -C build-meson
           xvfb-run -a meson test -C build-meson --print-errorlogs

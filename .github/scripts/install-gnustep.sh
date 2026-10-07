@@ -28,13 +28,17 @@ clone libobjc2 "$LIBOBJC2_TAG"
 git -C "$SRC/libobjc2" submodule update -q --init --depth 1
 cmake -S "$SRC/libobjc2" -B "$SRC/libobjc2/build" -G Ninja \
   -DTESTS=OFF -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-  -DGNUSTEP_INSTALL_TYPE=NONE -DCMAKE_INSTALL_PREFIX="$PREFIX"
+  -DGNUSTEP_INSTALL_TYPE=NONE -DCMAKE_INSTALL_PREFIX="$PREFIX" \
+  -DCMAKE_INSTALL_LIBDIR=System/Library/Libraries
 cmake --build "$SRC/libobjc2/build"
 cmake --install "$SRC/libobjc2/build"
 echo "::endgroup::"
 
-export CPPFLAGS="-I$PREFIX/include" LDFLAGS="-L$PREFIX/lib -fuse-ld=lld"
-export LD_LIBRARY_PATH="$PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+# libobjc goes where the Debian package puts it, beside GNUstep's own
+# libraries.
+LIBS="$PREFIX/System/Library/Libraries"
+export CPPFLAGS="-I$PREFIX/include" LDFLAGS="-L$LIBS -fuse-ld=lld"
+export LD_LIBRARY_PATH="$LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 
 echo "::group::gnustep-make $MAKE_TAG"
 clone tools-make "$MAKE_TAG"
