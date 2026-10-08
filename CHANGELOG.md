@@ -12,6 +12,10 @@ Releases of this fork (danjboyd/tools-xctest). Versions are tagged
   and test-class discovery retries if classes are added while it runs.
 - The README is upstream's again, extended with the fork's features; the
   merge had kept an older README.
+- Upstream's method style in its files, and K&R braces in the runner;
+  `XCTestCase.h` again declares the waiting API (via the category
+  header). `AGENTS.md` describes the fork's layout and tests; `xctest.make`
+  and `xctest-bundle` carry the LGPL notice.
 
 ## 0.5.0
 
