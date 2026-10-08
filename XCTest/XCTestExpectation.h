@@ -36,7 +36,7 @@
     id _gsOwner;
 }
 
-- (id) initWithDescription: (NSString *)expectationDescription;
+- (instancetype)initWithDescription:(NSString *)expectationDescription;
 
 @property (copy) NSString *expectationDescription;
 
@@ -51,7 +51,7 @@
  * XCTestCase. */
 @property BOOL assertForOverFulfill;
 
-- (void) fulfill;
+- (void)fulfill;
 
 @end
 
@@ -69,11 +69,11 @@ typedef BOOL (^XCNotificationExpectationHandler)(NSNotification *notification);
     BOOL _observing;
 }
 
-- (id) initWithName: (NSString *)notificationName;
-- (id) initWithName: (NSString *)notificationName object: (id)object;
-- (id) initWithName: (NSString *)notificationName
-             object: (id)object
- notificationCenter: (NSNotificationCenter *)notificationCenter;
+- (id)initWithName:(NSString *)notificationName;
+- (id)initWithName:(NSString *)notificationName object:(id)object;
+- (id)initWithName:(NSString *)notificationName
+             object:(id)object
+ notificationCenter:(NSNotificationCenter *)notificationCenter;
 
 @property (readonly, copy) NSString *notificationName;
 @property (readonly, retain) id observedObject;
@@ -96,10 +96,10 @@ typedef BOOL (^XCKVOExpectationHandler)(id observedObject, NSDictionary *change)
     BOOL _observing;
 }
 
-- (id) initWithKeyPath: (NSString *)keyPath object: (id)object;
-- (id) initWithKeyPath: (NSString *)keyPath
-                object: (id)object
-         expectedValue: (id)expectedValue;
+- (id)initWithKeyPath:(NSString *)keyPath object:(id)object;
+- (id)initWithKeyPath:(NSString *)keyPath
+                object:(id)object
+         expectedValue:(id)expectedValue;
 
 @property (readonly, copy) NSString *keyPath;
 @property (readonly, retain) id observedObject;
@@ -120,7 +120,7 @@ typedef BOOL (^XCPredicateExpectationHandler)(void);
     XCPredicateExpectationHandler _handler;
 }
 
-- (id) initWithPredicate: (NSPredicate *)predicate object: (id)object;
+- (id)initWithPredicate:(NSPredicate *)predicate object:(id)object;
 
 @property (readonly, copy) NSPredicate *predicate;
 @property (readonly, retain) id object;

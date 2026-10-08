@@ -94,7 +94,7 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
 
 @synthesize continueAfterFailure = _continueAfterFailure;
 
-+ (NSArray *) testInvocations
++ (NSArray *)testInvocations
 {
     NSMutableArray *invocations = [NSMutableArray array];
 
@@ -110,7 +110,7 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     return invocations;
 }
 
-+ (XCTestSuite *) defaultTestSuite
++ (XCTestSuite *)defaultTestSuite
 {
     GSXCTestCaseSuite *suite = [GSXCTestCaseSuite suiteForTestCaseClass:self];
 
@@ -121,30 +121,30 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     return suite;
 }
 
-+ (id) testCaseWithInvocation: (NSInvocation *)invocation
++ (instancetype)testCaseWithInvocation:(NSInvocation *)invocation
 {
     return [[[self alloc] initWithInvocation:invocation] autorelease];
 }
 
-+ (id) testCaseWithSelector: (SEL)selector
++ (instancetype)testCaseWithSelector:(SEL)selector
 {
     return [[[self alloc] initWithSelector:selector] autorelease];
 }
 
-+ (void) setUp
++ (void)setUp
 {
 }
 
-+ (void) tearDown
++ (void)tearDown
 {
 }
 
-- (id) init
+- (instancetype)init
 {
     return [self initWithInvocation:nil];
 }
 
-- (id) initWithInvocation: (NSInvocation *)invocation
+- (instancetype)initWithInvocation:(NSInvocation *)invocation
 {
     self = [super init];
     if (self) {
@@ -155,7 +155,7 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     return self;
 }
 
-- (id) initWithSelector: (SEL)selector
+- (instancetype)initWithSelector:(SEL)selector
 {
     NSMethodSignature *signature = [[self class] instanceMethodSignatureForSelector:selector];
     NSInvocation *invocation = nil;
@@ -174,7 +174,7 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     return [self initWithInvocation:invocation];
 }
 
-- (void) dealloc
+- (void)dealloc
 {
     [self _gsInvalidateExpectations];
     [_teardownBlocks release];
@@ -185,23 +185,23 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     [super dealloc];
 }
 
-- (NSTimeInterval) executionTimeAllowance
+- (NSTimeInterval)executionTimeAllowance
 {
     return _executionTimeAllowance > 0 ? _executionTimeAllowance : _GSXCTDefaultExecutionTimeAllowance();
 }
 
-- (void) setExecutionTimeAllowance: (NSTimeInterval)executionTimeAllowance
+- (void)setExecutionTimeAllowance:(NSTimeInterval)executionTimeAllowance
 {
     _executionTimeAllowance = executionTimeAllowance;
     _GSXCTWatchdogAllowanceDidChange();
 }
 
-- (NSInvocation *) invocation
+- (NSInvocation *)invocation
 {
     return [[_invocation retain] autorelease];
 }
 
-- (void) setInvocation: (NSInvocation *)invocation
+- (void)setInvocation:(NSInvocation *)invocation
 {
     if (invocation != _invocation) {
         [_invocation release];
@@ -209,22 +209,22 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     }
 }
 
-- (NSUInteger) failureCount
+- (NSUInteger)failureCount
 {
     return [[self testRun] totalFailureCount];
 }
 
-- (NSString *) name
+- (NSString *)name
 {
     return [NSString stringWithFormat:@"-[%@ %@]", NSStringFromClass([self class]), [self _gsMethodName]];
 }
 
-- (NSUInteger) testCaseCount
+- (NSUInteger)testCaseCount
 {
     return 1;
 }
 
-- (Class) testRunClass
+- (Class)testRunClass
 {
     return [XCTestCaseRun class];
 }
@@ -235,14 +235,14 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
 static __thread XCTestCase *GSLegacyRecordingTest = nil;
 static __thread XCTIssue *GSLegacyRecordingIssue = nil;
 
-- (BOOL) _gsOverridesLegacyRecordFailure
+- (BOOL)_gsOverridesLegacyRecordFailure
 {
     SEL selector = @selector(recordFailureWithDescription:inFile:atLine:expected:);
 
     return [self methodForSelector:selector] != [XCTestCase instanceMethodForSelector:selector];
 }
 
-- (void) recordIssue: (XCTIssue *)issue
+- (void)recordIssue:(XCTIssue *)issue
 {
     if (GSLegacyRecordingTest != self && [self _gsOverridesLegacyRecordFailure]) {
         XCTestCase *previousTest = GSLegacyRecordingTest;
@@ -266,10 +266,10 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
     [self _gsRecordIssue:issue];
 }
 
-- (void) recordFailureWithDescription: (NSString *)description
-                               inFile: (NSString *)filePath
-                               atLine: (NSUInteger)lineNumber
-                             expected: (BOOL)expected
+- (void)recordFailureWithDescription:(NSString *)description
+                               inFile:(NSString *)filePath
+                               atLine:(NSUInteger)lineNumber
+                             expected:(BOOL)expected
 {
     XCTestCase *previousTest = GSLegacyRecordingTest;
     XCTIssue *previousIssue = GSLegacyRecordingIssue;
@@ -313,7 +313,7 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
 
 // Where -recordIssue: ends up: reports the issue as expected, or records
 // it in the run and stops the test if it shouldn't continue.
-- (void) _gsRecordIssue: (XCTIssue *)issue
+- (void)_gsRecordIssue:(XCTIssue *)issue
 {
     GSXCTestIssue *failure = [GSXCTestIssue issueWithXCTIssue:issue];
 
@@ -338,7 +338,7 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
 
 // Records an issue without letting continueAfterFailure = NO stop the
 // test, for failures found while already handling an exception.
-- (void) _gsRecordIssueWithoutInterrupting: (XCTIssue *)issue
+- (void)_gsRecordIssueWithoutInterrupting:(XCTIssue *)issue
 {
     @try {
         [self recordIssue:issue];
@@ -347,7 +347,7 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
     }
 }
 
-- (void) _gsRecordException: (NSException *)exception where: (NSString *)where
+- (void)_gsRecordException:(NSException *)exception where:(NSString *)where
 {
     [self _gsRecordIssueWithoutInterrupting:
         _GSXCTMakeIssue(XCTIssueTypeUncaughtException,
@@ -355,14 +355,14 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
                         nil, 0, nil)];
 }
 
-- (void) _gsRecordSkip: (_XCTSkipFailureException *)skip
+- (void)_gsRecordSkip:(_XCTSkipFailureException *)skip
 {
     [(XCTestCaseRun *)[self testRun] _gsRecordSkip:_GSXCTIssueForSkip(skip)];
 }
 
 // Runs one step of a test. A skip, a failure that stops the test, or an
 // exception ends the step; returns NO if so (or if it returned NO).
-- (BOOL) _gsRunPhase: (NSString *)phaseName block: (BOOL (^)(NSError **error))block
+- (BOOL)_gsRunPhase:(NSString *)phaseName block:(BOOL (^)(NSError **error))block
 {
     NSString *where = phaseName ? [NSString stringWithFormat:@" in %@", phaseName] : @"";
     NSError *error = nil;
@@ -392,7 +392,7 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
     return succeeded;
 }
 
-- (void) _gsInvokeTestMethod
+- (void)_gsInvokeTestMethod
 {
     SEL selector = [_invocation selector];
 
@@ -409,7 +409,7 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
     }
 }
 
-- (void) invokeTest
+- (void)invokeTest
 {
     void (^teardownBlock)(void) = nil;
 
@@ -464,7 +464,7 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
     }];
 }
 
-- (void) performTest: (XCTestRun *)run
+- (void)performTest:(XCTestRun *)run
 {
     XCTestCase *previous = GSCurrentTestCase;
 
@@ -501,12 +501,12 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
     GSCurrentTestCase = previous;
 }
 
-- (void) addAttachment: (XCTAttachment *)attachment
+- (void)addAttachment:(XCTAttachment *)attachment
 {
     _GSXCTAddAttachment(self, attachment, _GSXCTCurrentActivityPath());
 }
 
-- (void) addTeardownBlock: (void (^)(void))block
+- (void)addTeardownBlock:(void (^)(void))block
 {
     if (block == nil) {
         return;
@@ -526,22 +526,22 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
 
 @implementation XCTestCase (GSXCTestRunnerPrivate)
 
-+ (XCTestCase *) _gsCurrentTestCase
++ (XCTestCase *)_gsCurrentTestCase
 {
     return GSCurrentTestCase;
 }
 
-+ (void) _gsSetCurrentTestCase: (XCTestCase *)testCase
++ (void)_gsSetCurrentTestCase:(XCTestCase *)testCase
 {
     GSCurrentTestCase = testCase;
 }
 
-- (NSString *) _gsMethodName
+- (NSString *)_gsMethodName
 {
     return _invocation ? NSStringFromSelector([_invocation selector]) : @"(no test method)";
 }
 
-- (void) _gsFailWithoutRunning: (GSXCTestIssue *)cause
+- (void)_gsFailWithoutRunning:(GSXCTestIssue *)cause
 {
     XCTestRun *run = [[[self testRunClass] alloc] initWithTest:self];
 
@@ -555,12 +555,12 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
     [run release];
 }
 
-- (GSXCTestCaseResult *) _gsReportResult
+- (GSXCTestCaseResult *)_gsReportResult
 {
     return _gsReportResult;
 }
 
-- (void) _gsSetReportResult: (GSXCTestCaseResult *)result
+- (void)_gsSetReportResult:(GSXCTestCaseResult *)result
 {
     if (result != _gsReportResult) {
         [_gsReportResult release];
@@ -568,23 +568,23 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
     }
 }
 
-- (NSUInteger) _gsIteration
+- (NSUInteger)_gsIteration
 {
     return _gsIteration;
 }
 
-- (NSUInteger) _gsIterationCount
+- (NSUInteger)_gsIterationCount
 {
     return _gsIterationCount;
 }
 
-- (void) _gsSetIteration: (NSUInteger)iteration of: (NSUInteger)iterationCount
+- (void)_gsSetIteration:(NSUInteger)iteration of:(NSUInteger)iterationCount
 {
     _gsIteration = iteration;
     _gsIterationCount = iterationCount;
 }
 
-- (void) _gsSkipWithoutRunning: (GSXCTestIssue *)skip
+- (void)_gsSkipWithoutRunning:(GSXCTestIssue *)skip
 {
     XCTestRun *run = [[[self testRunClass] alloc] initWithTest:self];
 

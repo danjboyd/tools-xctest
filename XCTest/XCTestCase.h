@@ -44,10 +44,10 @@
     NSTimeInterval _executionTimeAllowance;
 }
 
-+ (id) testCaseWithInvocation: (NSInvocation *)invocation;
-- (id) initWithInvocation: (NSInvocation *)invocation;
-+ (id) testCaseWithSelector: (SEL)selector;
-- (id) initWithSelector: (SEL)selector;
++ (instancetype)testCaseWithInvocation:(NSInvocation *)invocation;
+- (instancetype)initWithInvocation:(NSInvocation *)invocation;
++ (instancetype)testCaseWithSelector:(SEL)selector;
+- (instancetype)initWithSelector:(SEL)selector;
 
 /*! The test method to run. */
 @property (retain) NSInvocation *invocation;
@@ -57,20 +57,20 @@
  * no arguments, including inherited ones, sorted by name. Override to add
  * or remove tests.
  */
-+ (NSArray *) testInvocations;
++ (NSArray *)testInvocations;
 
 /*!
  * The tests to run for this class: by default a suite with a test case for
  * each of +testInvocations. Override to change it, e.g. return an empty
  * suite from an abstract base class so its tests only run in subclasses.
  */
-+ (XCTestSuite *) defaultTestSuite;
++ (XCTestSuite *)defaultTestSuite;
 
 /*!
  * Runs set up, the test method and teardown, recording any failures. Can
  * be overridden to wrap the whole test; call super.
  */
-- (void) invokeTest;
+- (void)invokeTest;
 
 /*!
  * Records an issue in the test: every failure (assertions, uncaught
@@ -80,7 +80,7 @@
  * is reported as expected; any other fails the test and, with
  * continueAfterFailure NO, stops it (on the main thread).
  */
-- (void) recordIssue: (XCTIssue *)issue;
+- (void)recordIssue:(XCTIssue *)issue;
 
 /*!
  * Superseded by -recordIssue:. Records an assertion failure (\a expected
@@ -88,10 +88,10 @@
  * that overrides this method still sees every issue here first; calling
  * super goes on to record it.
  */
-- (void) recordFailureWithDescription: (NSString *)description
-                               inFile: (NSString *)filePath
-                               atLine: (NSUInteger)lineNumber
-                             expected: (BOOL)expected;
+- (void)recordFailureWithDescription:(NSString *)description
+                               inFile:(NSString *)filePath
+                               atLine:(NSUInteger)lineNumber
+                             expected:(BOOL)expected;
 
 
 /*!
@@ -122,8 +122,8 @@
  * Called once before the first test of the class runs, and once after the
  * last one finishes.
  */
-+ (void) setUp;
-+ (void) tearDown;
++ (void)setUp;
++ (void)tearDown;
 
 /*
  * The instance methods -setUpWithError:, -setUp, -tearDown and
@@ -136,13 +136,13 @@
 /*!
  * Registers a block to run after the current test method, before tearDown.
  */
-- (void) addTeardownBlock: (void (^)(void))block;
+- (void)addTeardownBlock:(void (^)(void))block;
 
 /*!
  * Keeps \a attachment with the test's results (in the innermost
  * XCTContext activity running on this thread, if any). See XCTAttachment.
  */
-- (void) addAttachment: (XCTAttachment *)attachment;
+- (void)addAttachment:(XCTAttachment *)attachment;
 
 @end
 
@@ -154,7 +154,7 @@ extern XCTPerformanceMetric const XCTPerformanceMetric_WallClockTime;
 @interface XCTestCase (XCTPerformanceMeasurement)
 
 /*! The metrics -measureBlock: records: wall-clock time. */
-+ (NSArray *) defaultPerformanceMetrics;
++ (NSArray *)defaultPerformanceMetrics;
 
 /*!
  * Runs \a block 10 times and reports the average and relative standard
@@ -163,18 +163,18 @@ extern XCTPerformanceMetric const XCTPerformanceMetric_WallClockTime;
  * average more than its maxPercentRegression (default 10%) worse fails
  * the test.
  */
-- (void) measureBlock: (void (^)(void))block;
+- (void)measureBlock:(void (^)(void))block;
 
 /*!
  * As -measureBlock:, but if \a automaticallyStartMeasuring is NO, each
  * run of the block must call -startMeasuring and -stopMeasuring once, and
  * only the time between them counts.
  */
-- (void) measureMetrics: (NSArray *)metrics
-automaticallyStartMeasuring: (BOOL)automaticallyStartMeasuring
-               forBlock: (void (^)(void))block;
+- (void)measureMetrics:(NSArray *)metrics
+automaticallyStartMeasuring:(BOOL)automaticallyStartMeasuring
+               forBlock:(void (^)(void))block;
 
-- (void) startMeasuring;
-- (void) stopMeasuring;
+- (void)startMeasuring;
+- (void)stopMeasuring;
 
 @end
