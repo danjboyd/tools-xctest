@@ -10,6 +10,8 @@ Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 - Restored three upstream fixes the merge had lost: `+[GSXCTestRunner
   sharedRunner]` is synchronized, `expectedFulfillmentCount` rejects 0,
   and test-class discovery retries if classes are added while it runs.
+- The README is upstream's again, extended with the fork's features; the
+  merge had kept an older README.
 
 ## 0.5.0
 
