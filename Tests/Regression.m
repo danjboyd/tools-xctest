@@ -328,6 +328,12 @@ int main(void)
             CHECK(NO);
         }
         @catch (NSException *exception) { CHECK([[exception name] isEqual:NSInvalidArgumentException]); }
+        @try {
+            [[[[XCTestExpectation alloc] initWithDescription:@"zero"] autorelease] setExpectedFulfillmentCount:0];
+            CHECK(NO);
+        }
+        @catch (NSException *exception) { CHECK([[exception name] isEqual:NSInvalidArgumentException]); }
+        CHECK([GSXCTestRunner sharedRunner] == [GSXCTestRunner sharedRunner]);
         CHECK(Run([Async class], @selector(testTimeout)) == 1);
         CHECK(Run([Async class], @selector(testInvertedSuccess)) == 0);
         CHECK(Run([Async class], @selector(testInvertedFailure)) == 1);

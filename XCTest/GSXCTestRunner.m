@@ -672,10 +672,9 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 + (GSXCTestRunner *)sharedRunner
 {
     static GSXCTestRunner *runner = nil;
-    if (!runner) {
-        runner = [[GSXCTestRunner alloc] init];
+    @synchronized (self) {
+        if (!runner) runner = [[GSXCTestRunner alloc] init];
     }
-    
     return runner;
 }
 

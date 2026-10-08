@@ -43,12 +43,22 @@ static BOOL GSObjectsEqual(id a, id b)
 
 @synthesize expectationDescription = _expectationDescription;
 @synthesize inverted = _inverted;
-@synthesize expectedFulfillmentCount = _expectedFulfillmentCount;
 @synthesize assertForOverFulfill = _assertForOverFulfill;
 
 - (id) init
 {
     return [self initWithDescription:@"no description provided"];
+}
+
+- (NSUInteger)expectedFulfillmentCount
+{
+    @synchronized (self) { return _expectedFulfillmentCount; }
+}
+
+- (void)setExpectedFulfillmentCount:(NSUInteger)count
+{
+    if (!count) [NSException raise:NSInvalidArgumentException format:@"Expected fulfillment count must be positive"];
+    @synchronized (self) { _expectedFulfillmentCount = count; }
 }
 
 - (id) initWithDescription: (NSString *)expectationDescription

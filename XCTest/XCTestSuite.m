@@ -26,11 +26,19 @@
 
 NSArray *_GSXCTestCaseSubclasses(void)
 {
-    int numClasses = objc_getClassList(NULL, 0);
-    Class *classes = malloc(sizeof(Class) * numClasses);
+    int capacity = 0, numClasses = 0;
+    Class *classes = NULL;
     NSMutableArray *result = [NSMutableArray array];
 
-    numClasses = objc_getClassList(classes, numClasses);
+    /* Classes can be added while enumerating (a bundle loading), so retry
+       until the buffer is big enough. */
+    do {
+        capacity = objc_getClassList(NULL, 0);
+        free(classes);
+        classes = calloc(MAX(capacity, 1), sizeof(Class));
+        if (!classes) [NSException raise:NSMallocException format:@"Cannot enumerate test classes"];
+        numClasses = objc_getClassList(classes, capacity);
+    } while (numClasses > capacity);
     for (int i = 0; i < numClasses; i++) {
         Class superClass = classes[i];
 

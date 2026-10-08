@@ -7,6 +7,9 @@ Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 
 - Upstream's CRLF line endings are restored in `XCTestAssertions.h`,
   `XCTestAssertionsImpl.h` and `GSXCTestRunner.h`.
+- Restored three upstream fixes the merge had lost: `+[GSXCTestRunner
+  sharedRunner]` is synchronized, `expectedFulfillmentCount` rejects 0,
+  and test-class discovery retries if classes are added while it runs.
 
 ## 0.5.0
 
