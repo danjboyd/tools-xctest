@@ -178,3 +178,6 @@ automaticallyStartMeasuring:(BOOL)automaticallyStartMeasuring
 - (void)stopMeasuring;
 
 @end
+
+// Upstream declared the waiting API in this header; keep it available here.
+#import <XCTest/XCTestCase+AsynchronousTesting.h>
