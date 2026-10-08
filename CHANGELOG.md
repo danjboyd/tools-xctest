@@ -3,6 +3,20 @@
 Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 `vX.Y.Z`; 0.1.x are upstream's (gnustep/tools-xctest).
 
+## Unreleased
+
+- Upstream's CRLF line endings are restored in `XCTestAssertions.h`,
+  `XCTestAssertionsImpl.h` and `GSXCTestRunner.h`.
+- Restored three upstream fixes the merge had lost: `+[GSXCTestRunner
+  sharedRunner]` is synchronized, `expectedFulfillmentCount` rejects 0,
+  and test-class discovery retries if classes are added while it runs.
+- The README is upstream's again, extended with the fork's features; the
+  merge had kept an older README.
+- Upstream's method style in its files, and K&R braces in the runner;
+  `XCTestCase.h` again declares the waiting API (via the category
+  header). `AGENTS.md` describes the fork's layout and tests; `xctest.make`
+  and `xctest-bundle` carry the LGPL notice.
+
 ## 0.5.0
 
 This release is built on upstream's rewrite of tools-xctest
@@ -44,7 +58,9 @@ exit nonzero. `+tearDown` now also runs after a failed `+setUp`.
   NaN operands. The fork already behaved as gnustep/tools-xctest#9 and
   #11 ask; `Tests/Regression.m` now checks those too.
 - `XCTMetric`'s memory and storage errors use `XCTestErrorDomain`.
-- Line endings are LF throughout.
+- Line endings are LF, except in upstream's CRLF files. (As released,
+  0.5.0 also converted three of upstream's CRLF files to LF; the next
+  release restores them.)
 
 ## 0.4.0
 

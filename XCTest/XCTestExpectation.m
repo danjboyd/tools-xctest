@@ -43,15 +43,25 @@ static BOOL GSObjectsEqual(id a, id b)
 
 @synthesize expectationDescription = _expectationDescription;
 @synthesize inverted = _inverted;
-@synthesize expectedFulfillmentCount = _expectedFulfillmentCount;
 @synthesize assertForOverFulfill = _assertForOverFulfill;
 
-- (id) init
+- (instancetype)init
 {
     return [self initWithDescription:@"no description provided"];
 }
 
-- (id) initWithDescription: (NSString *)expectationDescription
+- (NSUInteger)expectedFulfillmentCount
+{
+    @synchronized (self) { return _expectedFulfillmentCount; }
+}
+
+- (void)setExpectedFulfillmentCount:(NSUInteger)count
+{
+    if (!count) [NSException raise:NSInvalidArgumentException format:@"Expected fulfillment count must be positive"];
+    @synchronized (self) { _expectedFulfillmentCount = count; }
+}
+
+- (instancetype)initWithDescription:(NSString *)expectationDescription
 {
     self = [super init];
     if (self) {
@@ -62,14 +72,14 @@ static BOOL GSObjectsEqual(id a, id b)
     return self;
 }
 
-- (void) dealloc
+- (void)dealloc
 {
     [_expectationDescription release];
     [_gsOwner release];
     [super dealloc];
 }
 
-- (void) _gsSetOwner: (XCTestCase *)owner
+- (void)_gsSetOwner:(XCTestCase *)owner
 {
     @synchronized (self) {
         if (owner != _gsOwner) {
@@ -79,13 +89,13 @@ static BOOL GSObjectsEqual(id a, id b)
     }
 }
 
-- (NSString *) description
+- (NSString *)description
 {
     return [NSString stringWithFormat:@"<%@: %p> %@",
         NSStringFromClass([self class]), self, _expectationDescription];
 }
 
-- (void) fulfill
+- (void)fulfill
 {
     BOOL overFulfilled = NO;
 
@@ -112,35 +122,35 @@ static BOOL GSObjectsEqual(id a, id b)
     }
 }
 
-- (BOOL) _gsIsFulfilled
+- (BOOL)_gsIsFulfilled
 {
     @synchronized (self) {
         return _fulfillmentToken != 0;
     }
 }
 
-- (NSUInteger) _gsFulfillmentToken
+- (NSUInteger)_gsFulfillmentToken
 {
     @synchronized (self) {
         return _fulfillmentToken;
     }
 }
 
-- (BOOL) _gsHasBeenWaitedOn
+- (BOOL)_gsHasBeenWaitedOn
 {
     return _hasBeenWaitedOn;
 }
 
-- (void) _gsSetHasBeenWaitedOn: (BOOL)waited
+- (void)_gsSetHasBeenWaitedOn:(BOOL)waited
 {
     _hasBeenWaitedOn = waited;
 }
 
-- (void) _gsPoll
+- (void)_gsPoll
 {
 }
 
-- (void) _gsInvalidate
+- (void)_gsInvalidate
 {
 }
 
@@ -152,19 +162,19 @@ static BOOL GSObjectsEqual(id a, id b)
 @synthesize observedObject = _observedObject;
 @synthesize notificationCenter = _notificationCenter;
 
-- (id) initWithName: (NSString *)notificationName
+- (id)initWithName:(NSString *)notificationName
 {
     return [self initWithName:notificationName object:nil notificationCenter:nil];
 }
 
-- (id) initWithName: (NSString *)notificationName object: (id)object
+- (id)initWithName:(NSString *)notificationName object:(id)object
 {
     return [self initWithName:notificationName object:object notificationCenter:nil];
 }
 
-- (id) initWithName: (NSString *)notificationName
-             object: (id)object
- notificationCenter: (NSNotificationCenter *)notificationCenter
+- (id)initWithName:(NSString *)notificationName
+             object:(id)object
+ notificationCenter:(NSNotificationCenter *)notificationCenter
 {
     NSString *description = [NSString stringWithFormat:@"Expect notification '%@' from %@",
         notificationName, object ? object : @"any object"];
@@ -184,7 +194,7 @@ static BOOL GSObjectsEqual(id a, id b)
     return self;
 }
 
-- (void) dealloc
+- (void)dealloc
 {
     [self _gsInvalidate];
     [_notificationName release];
@@ -193,14 +203,14 @@ static BOOL GSObjectsEqual(id a, id b)
     [super dealloc];
 }
 
-- (XCNotificationExpectationHandler) handler
+- (XCNotificationExpectationHandler)handler
 {
     @synchronized (self) {
         return [[_handler retain] autorelease];
     }
 }
 
-- (void) setHandler: (XCNotificationExpectationHandler)handler
+- (void)setHandler:(XCNotificationExpectationHandler)handler
 {
     @synchronized (self) {
         XCNotificationExpectationHandler old = _handler;
@@ -209,7 +219,7 @@ static BOOL GSObjectsEqual(id a, id b)
     }
 }
 
-- (void) _gsReceivedNotification: (NSNotification *)notification
+- (void)_gsReceivedNotification:(NSNotification *)notification
 {
     XCNotificationExpectationHandler handler = [self handler];
 
@@ -218,7 +228,7 @@ static BOOL GSObjectsEqual(id a, id b)
     }
 }
 
-- (void) _gsInvalidate
+- (void)_gsInvalidate
 {
     if (_observing) {
         [_notificationCenter removeObserver:self name:_notificationName object:_observedObject];
@@ -237,14 +247,14 @@ static char GSKVOExpectationContext;
 @synthesize observedObject = _observedObject;
 @synthesize expectedValue = _expectedValue;
 
-- (id) initWithKeyPath: (NSString *)keyPath object: (id)object
+- (id)initWithKeyPath:(NSString *)keyPath object:(id)object
 {
     return [self initWithKeyPath:keyPath object:object expectedValue:nil];
 }
 
-- (id) initWithKeyPath: (NSString *)keyPath
-                object: (id)object
-         expectedValue: (id)expectedValue
+- (id)initWithKeyPath:(NSString *)keyPath
+                object:(id)object
+         expectedValue:(id)expectedValue
 {
     NSString *description = expectedValue
         ? [NSString stringWithFormat:@"Expect value of '%@' of %@ to be '%@'", keyPath, object, expectedValue]
@@ -271,7 +281,7 @@ static char GSKVOExpectationContext;
     return self;
 }
 
-- (void) dealloc
+- (void)dealloc
 {
     [self _gsInvalidate];
     [_keyPath release];
@@ -280,14 +290,14 @@ static char GSKVOExpectationContext;
     [super dealloc];
 }
 
-- (XCKVOExpectationHandler) handler
+- (XCKVOExpectationHandler)handler
 {
     @synchronized (self) {
         return [[_handler retain] autorelease];
     }
 }
 
-- (void) setHandler: (XCKVOExpectationHandler)handler
+- (void)setHandler:(XCKVOExpectationHandler)handler
 {
     @synchronized (self) {
         XCKVOExpectationHandler old = _handler;
@@ -296,10 +306,10 @@ static char GSKVOExpectationContext;
     }
 }
 
-- (void) observeValueForKeyPath: (NSString *)keyPath
-                       ofObject: (id)object
-                         change: (NSDictionary *)change
-                        context: (void *)context
+- (void)observeValueForKeyPath:(NSString *)keyPath
+                       ofObject:(id)object
+                         change:(NSDictionary *)change
+                        context:(void *)context
 {
     XCKVOExpectationHandler handler = nil;
     BOOL matches = NO;
@@ -327,7 +337,7 @@ static char GSKVOExpectationContext;
     }
 }
 
-- (void) _gsInvalidate
+- (void)_gsInvalidate
 {
     if (_observing) {
         [_observedObject removeObserver:self forKeyPath:_keyPath];
@@ -343,7 +353,7 @@ static char GSKVOExpectationContext;
 @synthesize predicate = _predicate;
 @synthesize object = _object;
 
-- (id) initWithPredicate: (NSPredicate *)predicate object: (id)object
+- (id)initWithPredicate:(NSPredicate *)predicate object:(id)object
 {
     NSString *description = [NSString stringWithFormat:@"Expect predicate `%@` for object %@",
         predicate, object];
@@ -357,7 +367,7 @@ static char GSKVOExpectationContext;
     return self;
 }
 
-- (void) dealloc
+- (void)dealloc
 {
     [_predicate release];
     [_object release];
@@ -365,14 +375,14 @@ static char GSKVOExpectationContext;
     [super dealloc];
 }
 
-- (XCPredicateExpectationHandler) handler
+- (XCPredicateExpectationHandler)handler
 {
     @synchronized (self) {
         return [[_handler retain] autorelease];
     }
 }
 
-- (void) setHandler: (XCPredicateExpectationHandler)handler
+- (void)setHandler:(XCPredicateExpectationHandler)handler
 {
     @synchronized (self) {
         XCPredicateExpectationHandler old = _handler;
@@ -381,7 +391,7 @@ static char GSKVOExpectationContext;
     }
 }
 
-- (void) _gsPoll
+- (void)_gsPoll
 {
     XCPredicateExpectationHandler handler = nil;
 
@@ -395,7 +405,7 @@ static char GSKVOExpectationContext;
     }
 }
 
-- (void) _gsInvalidate
+- (void)_gsInvalidate
 {
     [self setHandler:nil];
 }

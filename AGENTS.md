@@ -8,14 +8,21 @@ do not assume that Apple XCTest APIs are available here.
 
 - `XCTest/`: public headers, assertion macros and helpers, test case lifecycle,
   discovery of test methods, and asynchronous expectations.
-- `GSXCTestRunner.h` / `GSXCTestRunner.m`: class discovery, test selection,
-  class lifecycle, execution, and aggregate results.
+- `XCTest/GSXCTestRunner.h` / `XCTest/GSXCTestRunner.m`: class discovery,
+  test selection, class lifecycle, execution, and aggregate results.
+  `XCTestPrivate.h` and `GSXCTestReporting.h` are private headers; they are
+  not installed.
 - `main.m`: CLI argument handling and test bundle loading.
 - `GNUmakefile` and `XCTest/GNUmakefile`: runner and library build definitions.
 - `Tests/Regression.m`: standalone regression checks, including checks of
   expected assertion failures.
 - `Tests/Fixture.m`: loadable bundle fixtures for CLI checks.
 - `Tests/run.sh`: build and regression entry point.
+- `Tests/run-*-tests.sh`, with fixture bundles in `Tests/*Fixture/` and shared
+  helpers in `Tests/test-helpers.sh`: regression scripts for one area each
+  (CLI filters, output formats, reports, hosted and parallel runs, ...).
+- `xctest.make` and `xctest-bundle`: installed helpers for building test
+  bundles with gnustep-make and other build systems.
 - `README.md`: user-facing build instructions and supported behavior.
 
 ## Build and validation
@@ -28,7 +35,9 @@ make
 sh Tests/run.sh
 ```
 
-The test script builds both the project and the tests, sets `LD_LIBRARY_PATH`
+`make check` runs `Tests/run.sh` and every `Tests/run-*-tests.sh` script;
+`meson test -C build` runs them from a Meson build. The test script builds both
+the project and the tests, sets `LD_LIBRARY_PATH`
 to use the local library, and checks the regression program and CLI exit codes.
 Some fixtures deliberately fail: judge the suite by the script's exit status
 and final `All regression and CLI checks passed.` message, not isolated failure
@@ -68,6 +77,6 @@ any environment limitations; do not describe unrun checks as passing.
 ## Workspace hygiene
 
 Inspect `git status` before editing and preserve unrelated work, including
-untracked source files. Do not commit generated `obj/` directories or
-`Tests/Fixture.bundle/`. Files with explicit licenses retain those terms;
+untracked source files. Do not commit generated `obj/` directories or test
+bundles built under `Tests/` (`*.bundle`, `*.xctest`, `*.app`). Files with explicit licenses retain those terms;
 otherwise consult `COPYING.LIB` for the LGPL license.

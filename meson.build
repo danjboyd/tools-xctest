@@ -7,7 +7,7 @@ objc_compiler = meson.get_compiler('objc')
 if objc_compiler.get_id() != 'clang'
   error('Clang is required for this project. Please set CC=clang, and OBJC=clang before running Meson.')
 endif
- 
+
 dependencies_to_link = []
 # Common Objective-C flags
 objc_flags = ['-fblocks', '-fobjc-exceptions']
@@ -54,8 +54,8 @@ add_project_arguments(objc_flags, language: 'objc')
 source = [
 	'XCTest/XCTestAssertions.m',
 	'XCTest/XCTestCase.m',
-	'XCTest/GSXCTestRunner.m',
 	'XCTest/XCTestExpectation.m',
+	'XCTest/GSXCTestRunner.m',
 	'XCTest/XCTWaiter.m',
 	'XCTest/XCTestCase+AsynchronousTesting.m',
 	'XCTest/GSXCTestReporting.m',
@@ -78,8 +78,8 @@ headers = [
 	'XCTest/XCTestAssertions.h',
 	'XCTest/XCTestAssertionsImpl.h',
 	'XCTest/XCTestCase.h',
-	'XCTest/GSXCTestRunner.h',
 	'XCTest/XCTestExpectation.h',
+	'XCTest/GSXCTestRunner.h',
 	'XCTest/XCTWaiter.h',
 	'XCTest/XCTestErrors.h',
 	'XCTest/XCTestCase+AsynchronousTesting.h',

@@ -5,6 +5,7 @@
 //  Created by Adam Fox on 9/17/18.
 //  Copyright © 2018 TestPlant, Inc. All rights reserved.
 //
+
 /*
  This file is part of the GNUstep XCTEST Library.
 
@@ -24,7 +25,6 @@
  Free Software Foundation, 51 Franklin Street, Fifth Floor,
  Boston, MA 02110-1301, USA.
 */
-
 
 #import <XCTest/GSXCTestRunner.h>
 #import <XCTest/XCTestCase.h>
@@ -72,15 +72,12 @@ static NSArray *GSParseAppleTestIdentifier(NSString *identifier)
 {
     NSArray *components = [identifier componentsSeparatedByString:@"/"];
 
-    if ([components count] == 0 || [components count] > 3)
-    {
+    if ([components count] == 0 || [components count] > 3) {
         return nil;
     }
 
-    for (NSString *component in components)
-    {
-        if ([component length] == 0)
-        {
+    for (NSString *component in components) {
+        if ([component length] == 0) {
             return nil;
         }
     }
@@ -91,22 +88,18 @@ static NSArray *GSParseAppleTestIdentifier(NSString *identifier)
 static BOOL GSAppleTestIdentifierMatches(NSArray *identifierComponents,
                                          NSString *targetName,
                                          NSString *className,
-                                         NSString *methodName)
-{
-    if (![targetName isEqualToString:[identifierComponents objectAtIndex:0]])
-    {
+                                         NSString *methodName) {
+    if (![targetName isEqualToString:[identifierComponents objectAtIndex:0]]) {
         return NO;
     }
 
     if ([identifierComponents count] >= 2 &&
-        ![className isEqualToString:[identifierComponents objectAtIndex:1]])
-    {
+        ![className isEqualToString:[identifierComponents objectAtIndex:1]]) {
         return NO;
     }
 
     if ([identifierComponents count] == 3 &&
-        ![methodName isEqualToString:[identifierComponents objectAtIndex:2]])
-    {
+        ![methodName isEqualToString:[identifierComponents objectAtIndex:2]]) {
         return NO;
     }
 
@@ -115,18 +108,15 @@ static BOOL GSAppleTestIdentifierMatches(NSArray *identifierComponents,
 
 static BOOL GSLegacyTestNameMatches(NSString *testName,
                                     NSString *className,
-                                    NSString *methodName)
-{
+                                    NSString *methodName) {
     NSArray *tuple = [testName componentsSeparatedByString:@"."];
 
-    if ([tuple count] == 2)
-    {
+    if ([tuple count] == 2) {
         return [className isEqualToString:[tuple objectAtIndex:0]] &&
                [methodName isEqualToString:[tuple objectAtIndex:1]];
     }
 
-    if ([tuple count] == 1)
-    {
+    if ([tuple count] == 1) {
         return [className isEqualToString:[tuple objectAtIndex:0]];
     }
 
@@ -170,7 +160,7 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     if (self) {
         runLock = [[NSLock alloc] init];
     }
-    
+
     return self;
 }
 
@@ -227,18 +217,14 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     NSMutableArray *plan = [NSMutableArray array];
     NSMutableIndexSet *matchedSelections = [NSMutableIndexSet indexSet];
 
-    if (usingAppleStyleFilters)
-    {
-        if ([onlyTestIdentifiers count] > 0)
-        {
+    if (usingAppleStyleFilters) {
+        if ([onlyTestIdentifiers count] > 0) {
             parsedOnlyIdentifiers = [NSMutableArray arrayWithCapacity:[onlyTestIdentifiers count]];
             usingAnyFilters = YES;
 
-            for (NSString *identifier in onlyTestIdentifiers)
-            {
+            for (NSString *identifier in onlyTestIdentifiers) {
                 NSArray *components = GSParseAppleTestIdentifier(identifier);
-                if (components == nil)
-                {
+                if (components == nil) {
                     NSLog(@"XCTest: Invalid test identifier '%@'. Expected TestTarget[/TestClass[/TestMethod]].", identifier);
                     return nil;
                 }
@@ -247,16 +233,13 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
             }
         }
 
-        if ([skipTestIdentifiers count] > 0)
-        {
+        if ([skipTestIdentifiers count] > 0) {
             parsedSkipIdentifiers = [NSMutableArray arrayWithCapacity:[skipTestIdentifiers count]];
             usingAnyFilters = YES;
 
-            for (NSString *identifier in skipTestIdentifiers)
-            {
+            for (NSString *identifier in skipTestIdentifiers) {
                 NSArray *components = GSParseAppleTestIdentifier(identifier);
-                if (components == nil)
-                {
+                if (components == nil) {
                     NSLog(@"XCTest: Invalid test identifier '%@'. Expected TestTarget[/TestClass[/TestMethod]].", identifier);
                     return nil;
                 }
@@ -265,8 +248,7 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
             }
         }
 
-        if (usingAnyFilters && ([targetName length] == 0))
-        {
+        if (usingAnyFilters && ([targetName length] == 0)) {
             NSLog(@"XCTest: A target name is required when using -only-testing or -skip-testing filters.");
             return nil;
         }
@@ -294,8 +276,7 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 
     // Each class's tests come from its +defaultTestSuite, so a class can
     // override that (or +testInvocations) to change what runs.
-    for (Class testCaseClass in _GSXCTestCaseSubclasses())
-    {
+    for (Class testCaseClass in _GSXCTestCaseSubclasses()) {
         GSXCTestCaseSuite *suite = [GSXCTestCaseSuite suiteForTestCaseClass:testCaseClass];
         NSMutableArray *testCases = [NSMutableArray array];
 
@@ -303,63 +284,50 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
         if (randomizeExecutionOrder) {
             GSShuffle(testCases, &randomState);
         }
-        for (XCTestCase *testCase in testCases)
-        {
+        for (XCTestCase *testCase in testCases) {
             NSString *className = NSStringFromClass([testCase class]);
             NSString *methodName = [testCase _gsMethodName];
             BOOL testIsEnabled = YES;
-            if (usingAppleStyleFilters)
-            {
-                if ([parsedOnlyIdentifiers count] > 0)
-                {
+            if (usingAppleStyleFilters) {
+                if ([parsedOnlyIdentifiers count] > 0) {
                     NSUInteger i;
 
                     testIsEnabled = NO;
-                    for (i = 0; i < [parsedOnlyIdentifiers count]; i++)
-                    {
+                    for (i = 0; i < [parsedOnlyIdentifiers count]; i++) {
                         if (GSAppleTestIdentifierMatches([parsedOnlyIdentifiers objectAtIndex:i],
                                                          targetName,
                                                          className,
-                                                         methodName))
-                        {
+                                                         methodName)) {
                             testIsEnabled = YES;
                             [matchedSelections addIndex:i];
                         }
                     }
                 }
 
-                if (testIsEnabled && [parsedSkipIdentifiers count] > 0)
-                {
-                    for (NSArray *identifierComponents in parsedSkipIdentifiers)
-                    {
+                if (testIsEnabled && [parsedSkipIdentifiers count] > 0) {
+                    for (NSArray *identifierComponents in parsedSkipIdentifiers) {
                         if (GSAppleTestIdentifierMatches(identifierComponents,
                                                          targetName,
                                                          className,
-                                                         methodName))
-                        {
+                                                         methodName)) {
                             testIsEnabled = NO;
                             break;
                         }
                     }
                 }
-            }
-            else if (legacyTestNames)
-            {
+            } else if (legacyTestNames) {
                 NSUInteger i;
 
                 testIsEnabled = NO; // default to disabled when tests are specified
-                for (i = 0; i < [legacyTestNames count]; i++)
-                {
-                    if (GSLegacyTestNameMatches([legacyTestNames objectAtIndex:i], className, methodName))
-                    {
+                for (i = 0; i < [legacyTestNames count]; i++) {
+                    if (GSLegacyTestNameMatches([legacyTestNames objectAtIndex:i], className, methodName)) {
                         testIsEnabled = YES;
                         [matchedSelections addIndex:i];
                     }
                 }
             }
 
-            if (testIsEnabled)
-            {
+            if (testIsEnabled) {
                 [suite addTest:testCase];
             }
         }
@@ -672,10 +640,9 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 + (GSXCTestRunner *)sharedRunner
 {
     static GSXCTestRunner *runner = nil;
-    if (!runner) {
-        runner = [[GSXCTestRunner alloc] init];
+    @synchronized (self) {
+        if (!runner) runner = [[GSXCTestRunner alloc] init];
     }
-    
     return runner;
 }
 
