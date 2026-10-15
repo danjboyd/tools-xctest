@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 // A custom metric: logs its hooks and reports a count that prefers larger.
 @interface WidgetMetric : NSObject <XCTMetric> {
@@ -61,10 +62,17 @@
 
     [options setIterationCount:3];
     [self measureWithMetrics:metrics options:options block:^{
-        // CPU: spin for 20ms; storage: write 100 kB; memory: touch 8 MB.
-        NSDate *until = [NSDate dateWithTimeIntervalSinceNow:0.02];
+        // CPU: spin for 20ms of CPU time (so a busy machine doesn't shorten
+        // it); storage: write 100 kB; memory: touch 8 MB.
         volatile unsigned long spin = 0;
+#if defined(_WIN32)
+        // clock() is elapsed time there.
+        NSDate *until = [NSDate dateWithTimeIntervalSinceNow:0.02];
         while ([until timeIntervalSinceNow] > 0) { spin++; }
+#else
+        clock_t until = clock() + CLOCKS_PER_SEC / 50;
+        while (clock() < until) { spin++; }
+#endif
 #if defined(_WIN32)
         // The file system representation is UTF-16 there.
         FILE *file = _wfopen((const wchar_t *)[path fileSystemRepresentation], L"w");

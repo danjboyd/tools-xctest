@@ -372,6 +372,27 @@ CPU), `-update-performance-baselines` records its baselines under `"machines"`,
 as it does for tests that already have baselines for machines; otherwise it
 records them in the entry, as before.
 
+For dashboards and trend charts, `-performance-report <path>` writes every
+measurement of the run as JSON, with its statistics, the baseline it was
+compared with and the verdict:
+
+```json
+{ "version": 1, "bundle": "ParserTests.xctest", "machine": "ci", "date": "2026-10-15T23:10:00",
+  "measurements": [ { "test": "ParserTests/testParseLargeFile", "metric": "com.apple.XCTPerformanceMetric_WallClockTime",
+                      "displayName": "Time", "unit": "seconds", "polarity": "prefers smaller",
+                      "values": [0.121, 0.119, ...], "average": 0.120, "median": 0.120, "min": 0.118, "max": 0.123,
+                      "stddev": 0.0015, "relativeStandardDeviation": 1.25,
+                      "baseline": { "average": 0.118, "stddev": 0.002, "count": 10, "maxPercentRegression": 10 },
+                      "verdict": "passed", "percentWorse": 1.7, "pValue": 0.04 } ] }
+```
+
+`baseline`, `verdict`, `percentWorse` and `pValue` are `null` when there's
+nothing to compare with; `iteration` is added when tests are repeated. A run
+that can't write the report fails. The JUnit report also gives each test's
+measurements as `<properties>` (`performance.<metric>.average`, `.median`,
+`.relativeStandardDeviation`, `.unit`, `.baselineAverage` and `.verdict`),
+which Jenkins and GitLab show with the test.
+
 #### Hardware counters
 
 On Linux, `XCTCPUMetric` also reports the instructions retired and cycles of

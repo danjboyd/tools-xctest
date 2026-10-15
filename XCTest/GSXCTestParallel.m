@@ -441,7 +441,8 @@ static NSString *GSAbsolutePath(NSString *path)
     GSXCTestRunResult *run = nil;
     id<GSXCTestReporter> consoleReporter = nil;
     GSXCTestJUnitReporter *junitReporter = nil;
-    NSArray *reporters = nil;
+    GSXCTestPerformanceReporter *performanceReporter = nil;
+    NSMutableArray *reporters = nil;
     NSMutableArray *running = [NSMutableArray array];
     NSUInteger nextClass = 0;
     NSUInteger workerNumber = 0;
@@ -481,7 +482,17 @@ static NSString *GSAbsolutePath(NSString *path)
         ? (id<GSXCTestReporter>)[[[GSXCTestAppleReporter alloc] init] autorelease]
         : (id<GSXCTestReporter>)[[[GSXCTestClassicReporter alloc] init] autorelease];
     junitReporter = junitReportPath ? [[[GSXCTestJUnitReporter alloc] initWithPath:junitReportPath] autorelease] : nil;
-    reporters = [NSArray arrayWithObjects:consoleReporter, junitReporter, nil];
+    performanceReporter = performanceReportPath
+        ? [[[GSXCTestPerformanceReporter alloc] initWithPath:performanceReportPath
+                                           machineIdentifier:[self _gsPerformanceMachineIdentifier]] autorelease]
+        : nil;
+    reporters = [NSMutableArray arrayWithObject:consoleReporter];
+    if (junitReporter != nil) {
+        [reporters addObject:junitReporter];
+    }
+    if (performanceReporter != nil) {
+        [reporters addObject:performanceReporter];
+    }
 
     if (![fileManager createDirectoryAtPath:workDirectory withIntermediateDirectories:YES attributes:nil error:NULL]) {
         NSLog(@"XCTest: Could not create '%@' for parallel workers.", workDirectory);
@@ -605,7 +616,8 @@ static NSString *GSAbsolutePath(NSString *path)
     }
     [fileManager removeItemAtPath:workDirectory error:NULL];
 
-    return [identifiers count] > 0 && ![run hasFailed] && !workerFailed && (junitReporter == nil || [junitReporter wroteReport]);
+    return [identifiers count] > 0 && ![run hasFailed] && !workerFailed && (junitReporter == nil || [junitReporter wroteReport])
+        && (performanceReporter == nil || [performanceReporter wroteReport]);
 }
 
 @end

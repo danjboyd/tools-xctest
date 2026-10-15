@@ -34,6 +34,13 @@ grep -q '<testsuites name="ParallelFixture.bundle" tests="14" failures="1" error
 grep -q 'measured \[Time, seconds\]' "$report_dir/parallel.xml" || fail "expected measurements in the JUnit report"
 assert_contains "XCTest:     testMeasures measured [Time, seconds] average: "
 
+# The coordinator writes the performance report, from every worker.
+run_fixture ParallelFixture -parallel-testing-enabled YES -performance-report "$report_dir/performance.json" \
+  -only-testing:ParallelFixture/FailingTests
+report=$(tr -d ' \t\r\n' < "$report_dir/performance.json")
+[[ "$report" == *'"test":"FailingTests/testMeasures"'* && "$report" == *'"metric":"com.apple.XCTPerformanceMetric_WallClockTime"'* ]] \
+  || fail "expected the workers' measurements in the performance report: $report"
+
 # Workers check performance baselines; a regression fails the run.
 printf '{ "FailingTests/testMeasures": { "average": 1e-15 } }\n' > "$report_dir/baselines.json"
 run_fixture ParallelFixture -parallel-testing-enabled YES -performance-baselines "$report_dir/baselines.json" \

@@ -303,6 +303,22 @@ typedef enum {
 @property (readonly) BOOL wroteReport;
 @end
 
+/*!
+ * Writes the run's performance measurements as JSON when the run finishes:
+ * {"version": 1, "bundle", "machine", "date", "measurements": [{"test":
+ * "Class/method", "metric", "values", "average", "median", ...,
+ * "baseline": {...} or null, "verdict", "percentWorse", "pValue"}]}.
+ */
+@interface GSXCTestPerformanceReporter : NSObject <GSXCTestReporter> {
+    NSString *_path;
+    NSString *_machineIdentifier;
+    BOOL _wroteReport;
+}
+- (id) initWithPath: (NSString *)path machineIdentifier: (NSString *)machineIdentifier;
+/*! NO until the report has been written successfully. */
+@property (readonly) BOOL wroteReport;
+@end
+
 /*! In a parallel worker: writes the run's results, as JSON, to a file for
  * the coordinator when the run finishes. */
 @interface GSXCTestWorkerResultsReporter : NSObject <GSXCTestReporter> {

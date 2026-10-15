@@ -154,6 +154,9 @@ static void GSWriteStatusFile(int exitCode)
             if ([GSHostConfig objectForKey:@"performanceWarmUpIterations"] != nil) {
                 [runner setPerformanceWarmUpIterations:[[GSHostConfig objectForKey:@"performanceWarmUpIterations"] integerValue]];
             }
+            if ([[GSHostConfig objectForKey:@"performanceReport"] isKindOfClass:[NSString class]]) {
+                [runner setPerformanceReportPath:[GSHostConfig objectForKey:@"performanceReport"]];
+            }
             if ([[GSHostConfig objectForKey:@"performanceMachineIdentifier"] isKindOfClass:[NSString class]]) {
                 [runner setPerformanceMachineIdentifier:[GSHostConfig objectForKey:@"performanceMachineIdentifier"]];
             }

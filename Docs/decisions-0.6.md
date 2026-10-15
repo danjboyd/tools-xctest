@@ -105,3 +105,24 @@ from master. Each is merged into `next-0.6`. Only those branches are pushed
   coordinator; workers don't log it again.
 - The option wins over `XCTEST_MACHINE_ID`. Parallel workers get the
   option and inherit the environment.
+
+## perf-report
+
+- **Schema** (`"version": 1`): run-level `bundle`, `machine`, `date`, and a
+  flat `measurements` list, one entry per test and metric (and repetition,
+  as `iteration`, when tests are repeated). Fields that don't apply are
+  `null` rather than missing, so consumers can rely on the keys; NaN
+  p-values are `null` too, as JSON has no NaN.
+- **Always written** when asked for, even with no measurements (an empty
+  list), so CI can always collect the file; a failure to write fails the
+  run, as an unwritable JUnit report does.
+- **Parallel runs**: the coordinator writes it from the workers' merged
+  results; workers don't.
+- **JUnit properties** go per `<testcase>`, first in the element, named
+  `performance.<metric identifier>.<field>`. Ant's JUnit schema has no
+  test-case properties, but Jenkins' and GitLab's parsers accept them; the
+  existing `system-out` lines stay for tools that ignore them.
+- **Fixture fix**: `testAllMetrics` spun for 20ms of *elapsed* time and
+  expected 10ms+ of CPU time, which failed under heavy load (load average
+  26 here tonight); it now spins for 20ms of CPU time (`clock()`), except on
+  Windows, where `clock()` is elapsed time. Worth taking to master as well.

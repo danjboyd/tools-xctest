@@ -157,6 +157,39 @@ assert_contains "<unknown>:0: warning: -[MetricVerdictTests testTooNoisy] : [Ser
 grep -q "warning: \[Series, u\] relative standard deviation 7.9%" "$work_dir/verdicts.xml" \
   || fail "expected the inconclusive result in the JUnit report"
 
+# -performance-report writes each measurement, with its statistics,
+# baseline and verdict, as JSON; JUnit reports get them as properties.
+run_fixture MetricFixture -performance-baselines "$work_dir/verdicts.json" -performance-report "$work_dir/report.json" \
+  -junit-report "$work_dir/verdicts.xml" -only-testing:MetricFixture/MetricVerdictTests
+assert_status 1
+report=$(tr -d ' \t\r\n' < "$work_dir/report.json")
+for expected in '"version":1' '"bundle":"MetricFixture.bundle"' 'cores,' \
+    '"test":"MetricVerdictTests/testSignificantRegression"' '"metric":"com.example.series"' \
+    '"values":[110,112,111,113,109]' '"average":111' '"median":111' '"min":109' '"max":113' \
+    '"verdict":"regressed"' '"verdict":"inconclusive"' '"verdict":"passed"' '"percentWorse":11' \
+    '"baseline":{' '"count":5' '"maxPercentRelativeStandardDeviation":5' '"pValue":null' '"polarity":"preferssmaller"'; do
+  [[ "$report" == *"$expected"* ]] || fail "expected $expected in the performance report: $report"
+done
+grep -q '<property name="performance.com.example.series.verdict" value="regressed"/>' "$work_dir/verdicts.xml" \
+  || fail "expected the verdict as a JUnit property"
+grep -q '<property name="performance.com.example.series.median" value="111.000000"/>' "$work_dir/verdicts.xml" \
+  || fail "expected the median as a JUnit property"
+# Without baselines there is nothing to compare with.
+run_fixture MetricFixture -performance-report "$work_dir/plain-report.json" \
+  -only-testing:MetricFixture/MetricVerdictTests/testImprovement
+assert_status 0
+report=$(tr -d ' \t\r\n' < "$work_dir/plain-report.json")
+[[ "$report" == *'"baseline":null'* && "$report" == *'"verdict":null'* && "$report" == *'"percentWorse":null'* ]] \
+  || fail "expected no baseline or verdict: $report"
+# A report that can't be written fails the run.
+run_fixture MetricFixture -performance-report "$work_dir/missing/report.json" \
+  -only-testing:MetricFixture/MetricVerdictTests/testImprovement
+assert_status 1
+assert_contains "Could not write the performance report"
+run_fixture MetricFixture -performance-report
+assert_status 1
+assert_contains "missing path for -performance-report"
+
 # Baselines for particular machines, in an entry's "machines", override
 # the entry's own, key by key. The machine is named by
 # -performance-machine-id or XCTEST_MACHINE_ID, else by its CPU.
