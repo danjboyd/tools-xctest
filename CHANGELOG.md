@@ -3,8 +3,13 @@
 Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 `vX.Y.Z`; 0.1.x are upstream's (gnustep/tools-xctest).
 
-## Unreleased
+## 0.5.1
 
+- The README has Install and Example sections (with real runner output), and
+  a release workflow attaches a source archive and a Windows (MSYS2 clang64)
+  build to each tagged GitHub release.
+- Regression checks that parallel runs log each measurement and fail a test
+  that regresses against its performance baseline (both already worked).
 - Upstream's CRLF line endings are restored in `XCTestAssertions.h`,
   `XCTestAssertionsImpl.h` and `GSXCTestRunner.h`.
 - Restored three upstream fixes the merge had lost: `+[GSXCTestRunner
