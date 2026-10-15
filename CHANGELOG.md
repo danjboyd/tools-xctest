@@ -23,6 +23,11 @@ counted, as Apple's XCTest does, so their averages can differ from 0.5.x.
   Apple's does, and the new `GSXCTHardwareCounterMetric` cache and branch
   misses. Where the kernel doesn't allow them, they're left out with one log
   line; `XCTEST_PERF_COUNTERS=0` turns them off.
+- Baselines for particular machines, in an entry's `"machines"`, override
+  its own. Machines are named by `-performance-machine-id`,
+  `XCTEST_MACHINE_ID`, or their CPU, cores and architecture
+  (`+[GSXCTestRunner defaultPerformanceMachineIdentifier]`), and recorded
+  under `"machines"` when named.
 
 ## 0.5.1
 

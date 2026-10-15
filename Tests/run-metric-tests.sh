@@ -157,6 +157,59 @@ assert_contains "<unknown>:0: warning: -[MetricVerdictTests testTooNoisy] : [Ser
 grep -q "warning: \[Series, u\] relative standard deviation 7.9%" "$work_dir/verdicts.xml" \
   || fail "expected the inconclusive result in the JUnit report"
 
+# Baselines for particular machines, in an entry's "machines", override
+# the entry's own, key by key. The machine is named by
+# -performance-machine-id or XCTEST_MACHINE_ID, else by its CPU.
+cat > "$work_dir/machines.json" <<'JSON'
+{
+  "MetricVerdictTests/testImprovement": {"metrics": {"com.example.series": {"average": 100, "stddev": 1, "count": 5, "maxPercentRegression": 20}},
+                                         "machines": {"slow-box": {"metrics": {"com.example.series": {"average": 70}}},
+                                                      "fast-box": {"metrics": {"com.example.series": {"average": 85, "maxPercentRegression": 1}}}}}
+}
+JSON
+series_test=-only-testing:MetricFixture/MetricVerdictTests/testImprovement
+run_fixture MetricFixture -performance-baselines "$work_dir/machines.json" "$series_test"
+assert_status 0
+assert_contains "XCTest: Performance baselines for machine \""
+assert_contains " cores, "
+assert_contains "baseline average: 100.000000, stddev 1.000000 of 5 values (max regression 20.0%)"
+# 90 against 70 is 28.6% worse: past the entry's 20% (inherited), and
+# significant with its stddev and count (inherited too).
+run_fixture MetricFixture -performance-baselines "$work_dir/machines.json" -performance-machine-id slow-box "$series_test"
+assert_status 1
+assert_contains "XCTest: Performance baselines for machine \"slow-box\""
+assert_contains "testImprovement: [Series, u] average: 90.000000, 28.6% worse than baseline 70.000000 (max allowed regression 20.0%), p = "
+XCTEST_MACHINE_ID=fast-box run_fixture MetricFixture -performance-baselines "$work_dir/machines.json" "$series_test"
+assert_status 1
+assert_contains "5.9% worse than baseline 85.000000 (max allowed regression 1.0%)"
+# The option wins over the environment; an unknown machine gets the entry's.
+XCTEST_MACHINE_ID=fast-box run_fixture MetricFixture -performance-baselines "$work_dir/machines.json" \
+  -performance-machine-id other-box "$series_test"
+assert_status 0
+assert_contains "baseline average: 100.000000"
+run_fixture MetricFixture -performance-machine-id
+assert_status 1
+assert_contains "missing identifier for -performance-machine-id"
+
+# Recording: for the named machine; for this machine (by its CPU) when the
+# entry already has machines; otherwise in the entry, as before.
+run_fixture MetricFixture -performance-baselines "$work_dir/machines.json" -update-performance-baselines \
+  -performance-machine-id new-box "$series_test"
+assert_status 0
+recorded=$(cat "$work_dir/machines.json")
+printf '%s' "$recorded" | tr -d ' \t\r\n' | grep -q '"new-box":{"metrics":{"com.example.series":{' \
+  || fail "expected new-box's baseline to be recorded: $recorded"
+printf '%s' "$recorded" | tr -d ' \t\r\n' | grep -q '"slow-box":{"metrics":{"com.example.series":{"average":70}}}' \
+  || fail "expected slow-box's baseline to be kept: $recorded"
+run_fixture MetricFixture -performance-baselines "$work_dir/machines.json" -update-performance-baselines "$series_test"
+assert_status 0
+recorded=$(cat "$work_dir/machines.json")
+[[ "$recorded" == *' cores, '* ]] || fail "expected this machine's baseline to be recorded: $recorded"
+run_fixture MetricFixture -performance-baselines "$work_dir/plain.json" -update-performance-baselines "$series_test"
+assert_status 0
+recorded=$(cat "$work_dir/plain.json")
+[[ "$recorded" != *'machines'* ]] || fail "expected no machines without a machine id: $recorded"
+
 # Recording baselines nests new metrics under "metrics".
 run_fixture MetricFixture -performance-baselines "$work_dir/new.json" -update-performance-baselines \
   -only-testing:MetricFixture/MetricPassingTests/testAllMetrics

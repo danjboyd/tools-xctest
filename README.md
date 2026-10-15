@@ -353,6 +353,25 @@ inconclusive too, unless it significantly regressed.
 without `stddev` and `count` are judged by `maxPercentRegression` alone, as
 before.
 
+A laptop's baseline is no use on a CI runner, so an entry can also have
+baselines for particular machines, under `"machines"`. This machine's override
+the entry's own, key by key (so `maxPercentRegression` can be set once for all
+machines):
+
+```json
+{ "ParserTests/testParseLargeFile": { "average": 0.120, "maxPercentRegression": 10,
+    "machines": { "ci": { "average": 0.180, "stddev": 0.010, "count": 10 },
+                  "AMD EPYC 7763 64-Core Processor, 4 cores, x86_64": { "average": 0.150 } } } }
+```
+
+A machine is named by `-performance-machine-id <id>` or `XCTEST_MACHINE_ID`,
+or otherwise by its CPU, number of cores and architecture, which `xctest` logs
+when it reads baselines. A CPU-based name stays the same across a CI service's
+runners, unlike a host name. When a machine is named (`auto` names it by its
+CPU), `-update-performance-baselines` records its baselines under `"machines"`,
+as it does for tests that already have baselines for machines; otherwise it
+records them in the entry, as before.
+
 #### Hardware counters
 
 On Linux, `XCTCPUMetric` also reports the instructions retired and cycles of

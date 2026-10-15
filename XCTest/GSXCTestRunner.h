@@ -55,6 +55,7 @@ typedef enum {
     NSMutableDictionary *performanceBaselines;
     NSInteger performanceWarmUpIterations;
     BOOL performanceInconclusiveFails;
+    NSString *performanceMachineIdentifier;
     GSXCTestRepetitionMode repetitionMode;
     NSUInteger testIterations;
     GSXCTestOutputFormat outputFormat;
@@ -110,6 +111,22 @@ typedef enum {
  * but not significantly, or too noisy) fails the test; by default it is
  * only reported. */
 @property BOOL performanceInconclusiveFails;
+
+/*!
+ * Names this machine in performance baselines: a test's entry can have
+ * baselines for particular machines, {"machines": {"<identifier>": {...}}},
+ * which take precedence over its own. nil (the default) uses
+ * XCTEST_MACHINE_ID if set, otherwise defaultPerformanceMachineIdentifier;
+ * "auto" means the latter. If one is chosen (here or by XCTEST_MACHINE_ID),
+ * or a test already has machines' baselines, updatePerformanceBaselines
+ * records them for this machine.
+ */
+@property (copy) NSString *performanceMachineIdentifier;
+
+/*! The CPU's name, number of cores and architecture: "Intel(R) Core(TM)
+ * Ultra 7 255U, 12 cores, x86_64". Unlike a host name, it is the same on
+ * every machine of a kind, such as a CI service's runners. */
++ (NSString *)defaultPerformanceMachineIdentifier;
 
 /*! How tests are repeated; see GSXCTestRepetitionMode. */
 @property GSXCTestRepetitionMode repetitionMode;

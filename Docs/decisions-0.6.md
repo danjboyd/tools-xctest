@@ -82,3 +82,26 @@ from master. Each is merged into `next-0.6`. Only those branches are pushed
   counters, so only the unavailable path ran. To check the rest:
   `sudo sysctl kernel.perf_event_paranoid=2`, then run `make check` (the
   metric script checks the counts when they're available).
+
+## perf-machines
+
+- **Lookup merges key by key.** This machine's entry overrides the test's
+  entry one key at a time, for each metric, so settings such as
+  `maxPercentRegression` (and even `stddev`/`count`) can be given once for
+  all machines. A machine without an entry gets the test's entry.
+- **Recording stays where it was unless asked.** `-update-performance-baselines`
+  writes under `"machines"` only when a machine is named (option or
+  `XCTEST_MACHINE_ID`; `auto` names it by its CPU), or when the test already
+  has machines. Otherwise it updates the entry itself, as in 0.5.x, so
+  existing baseline files don't change shape.
+- **Default identifier**: "<CPU model>, <n> cores, <architecture>", from
+  `/proc/cpuinfo` (`model name`, else ARM's `Hardware`/`Model`) or, on
+  Windows, the registry's `ProcessorNameString`; runs of spaces collapsed.
+  The core count is `NSProcessInfo`'s `processorCount` (all configured
+  CPUs, so a container's CPU quota doesn't change it, though its CPU set
+  might). Naming the machine avoids any doubt.
+- **The machine is logged** ("Performance baselines for machine ...") once
+  per run whenever baselines are read, including by the parallel
+  coordinator; workers don't log it again.
+- The option wins over `XCTEST_MACHINE_ID`. Parallel workers get the
+  option and inherit the environment.
