@@ -365,6 +365,36 @@ automaticallyStartMeasuring: (BOOL)automaticallyStartMeasuring
         warmUpIterations = (NSUInteger)warmUpOverride;
     }
 
+    @try {
+        [self _gsRunMetrics:metrics iterations:iterations warmUpIterations:warmUpIterations
+             automaticStart:automaticStart automaticStop:automaticStop identifiers:identifiers
+               measurements:measurements values:values block:block];
+    }
+    @finally {
+        // Metrics can let go of what they held (the counters' files) now,
+        // rather than when the test case is released at the end of the run.
+        for (id<XCTMetric> metric in metrics) {
+            if ([metric respondsToSelector:@selector(_gsDidFinishMeasuring)]) {
+                [(id<GSXCTMetricFinishing>)metric _gsDidFinishMeasuring];
+            }
+        }
+    }
+}
+
+// The runs of -_gsMeasureMetrics:..., reporting their measurements; stops
+// at a failure (which it records).
+- (void) _gsRunMetrics: (NSArray *)metrics
+            iterations: (NSUInteger)iterations
+      warmUpIterations: (NSUInteger)warmUpIterations
+        automaticStart: (BOOL)automaticStart
+         automaticStop: (BOOL)automaticStop
+           identifiers: (NSMutableArray *)identifiers
+          measurements: (NSMutableDictionary *)measurements
+                values: (NSMutableDictionary *)values
+                 block: (void (^)(void))block
+{
+    GSXCTPerformanceState *state = [self _gsPerformanceState];
+
     for (NSUInteger iteration = 0; iteration < warmUpIterations + iterations; iteration++) {
         BOOL warmingUp = (iteration < warmUpIterations);
 

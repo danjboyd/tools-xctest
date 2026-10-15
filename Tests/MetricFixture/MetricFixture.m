@@ -19,6 +19,9 @@
 - (void)willBeginMeasuring { NSLog(@"widget: willBegin"); }
 - (void)didStartMeasuring { NSLog(@"widget: didStart"); }
 - (void)didStopMeasuring { NSLog(@"widget: didStop"); runs++; }
+// xctest's private hook for metrics that hold resources (the hardware
+// counters' files) while measuring.
+- (void)_gsDidFinishMeasuring { NSLog(@"widget: finished"); }
 
 - (NSArray *)reportMeasurementsFromStartTime:(XCTPerformanceMeasurementTimestamp *)startTime
                                    toEndTime:(XCTPerformanceMeasurementTimestamp *)endTime
