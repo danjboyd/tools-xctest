@@ -167,9 +167,9 @@ run_fixture MetricFixture -performance-baselines "$work_dir/machines.json" -upda
   -performance-machine-id new-box "$series_test"
 assert_status 0
 recorded=$(cat "$work_dir/machines.json")
-printf '%s' "$recorded" | tr -d ' \n' | grep -q '"new-box":{"metrics":{"com.example.series":{' \
+printf '%s' "$recorded" | tr -d ' \t\r\n' | grep -q '"new-box":{"metrics":{"com.example.series":{' \
   || fail "expected new-box's baseline to be recorded: $recorded"
-printf '%s' "$recorded" | tr -d ' \n' | grep -q '"slow-box":{"metrics":{"com.example.series":{"average":70}}}' \
+printf '%s' "$recorded" | tr -d ' \t\r\n' | grep -q '"slow-box":{"metrics":{"com.example.series":{"average":70}}}' \
   || fail "expected slow-box's baseline to be kept: $recorded"
 run_fixture MetricFixture -performance-baselines "$work_dir/machines.json" -update-performance-baselines "$series_test"
 assert_status 0
