@@ -32,6 +32,15 @@ assert_contains "XCTest: 1/6 test cases FAILED (1 test skipped)"
 grep -q '<testsuites name="ParallelFixture.bundle" tests="14" failures="1" errors="0" skipped="1"' "$report_dir/parallel.xml" \
   || fail "expected a merged JUnit report"
 grep -q 'measured \[Time, seconds\]' "$report_dir/parallel.xml" || fail "expected measurements in the JUnit report"
+assert_contains "XCTest:     testMeasures measured [Time, seconds] average: "
+
+# Workers check performance baselines; a regression fails the run.
+printf '{ "FailingTests/testMeasures": { "average": 1e-15 } }\n' > "$report_dir/baselines.json"
+run_fixture ParallelFixture -parallel-testing-enabled YES -performance-baselines "$report_dir/baselines.json" \
+  -only-testing:ParallelFixture/FailingTests/testMeasures
+assert_status 1
+assert_contains "XCTest:   FailingTests.testMeasures: [Time, seconds] average: "
+assert_contains "worse than baseline"
 
 # A crashing worker fails its own class's unreported tests; others run.
 PARALLEL_FIXTURE_CRASH=1 run_fixture ParallelFixture -parallel-testing-enabled YES \
