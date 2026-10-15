@@ -108,6 +108,22 @@
     }];
 }
 
+// Hardware counters, where the system allows them; the test passes
+// either way.
+- (void)testHardwareCounters
+{
+    NSArray *metrics = [NSArray arrayWithObjects:[[[XCTCPUMetric alloc] init] autorelease],
+        [[[GSXCTHardwareCounterMetric alloc] init] autorelease], nil];
+    XCTMeasureOptions *options = [XCTMeasureOptions defaultOptions];
+
+    [options setIterationCount:3];
+    [self measureWithMetrics:metrics options:options block:^{
+        volatile unsigned long sum = 0;
+        for (unsigned long i = 0; i < 2000000; i++) { sum += i; }
+    }];
+    NSLog(@"counters available: %@", [GSXCTHardwareCounterMetric isAvailable] ? @"YES" : @"NO");
+}
+
 - (void)testDefaults
 {
     XCTAssertEqual([[XCTMeasureOptions defaultOptions] iterationCount], (NSUInteger)5);

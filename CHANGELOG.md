@@ -18,6 +18,11 @@ counted, as Apple's XCTest does, so their averages can differ from 0.5.x.
   YES`. Entries can set `maxPercentRelativeStandardDeviation` too.
 - Measurements report their median and minimum (console and JUnit).
 - `-performance-warmup-iterations <n>` sets the number of warm-up runs.
+- Hardware counters on Linux, read with `perf_event_open` (no library
+  needed): `XCTCPUMetric` reports instructions retired and cycles, as
+  Apple's does, and the new `GSXCTHardwareCounterMetric` cache and branch
+  misses. Where the kernel doesn't allow them, they're left out with one log
+  line; `XCTEST_PERF_COUNTERS=0` turns them off.
 
 ## 0.5.1
 
