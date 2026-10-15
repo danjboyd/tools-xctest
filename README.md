@@ -21,6 +21,100 @@ and every selected test succeeds. Invalid bundles, unknown options, unmatched
 filters (each selection is checked), empty runs, assertion failures, and
 uncaught exceptions return nonzero.
 
+## Installing
+
+Each [release](https://github.com/danjboyd/tools-xctest/releases) has a source
+archive and a Windows (MSYS2 clang64) build; unzip the Windows build into the
+MSYS2 root.
+
+Build and install with GNUstep Make, in a shell where `GNUstep.sh` has been
+sourced (install as a user who can write to the GNUstep domain, or with
+`sudo -E`):
+
+```sh
+make
+make check        # optional: the regression suite
+make install
+```
+
+This installs `libXCTest`, the headers, the `xctest` runner, `libXCTestHost`
+for hosted tests, and the `xctest.make` and `xctest-bundle` build helpers.
+
+On Windows, in an MSYS2 CLANG64 shell:
+
+```sh
+pacman -S make mingw-w64-clang-x86_64-clang mingw-w64-clang-x86_64-libobjc2 \
+  mingw-w64-clang-x86_64-libdispatch mingw-w64-clang-x86_64-gnustep-make \
+  mingw-w64-clang-x86_64-gnustep-base
+. /clang64/share/GNUstep/Makefiles/GNUstep.sh
+export ADDITIONAL_CPPFLAGS=-DHAVE_MODE_T   # MSYS2's libdispatch headers
+make && make install
+```
+
+## Example
+
+```objc
+#import <XCTest/XCTest.h>
+
+@interface CalculatorTests : XCTestCase
+@end
+
+@implementation CalculatorTests
+
+- (void)testAddition
+{
+  XCTAssertEqual(2 + 2, 4);
+}
+
+- (void)testDivision
+{
+  XCTAssertEqualWithAccuracy(1.0 / 3.0, 0.33, 0.001, @"rounding");
+}
+
+- (void)testSortPerformance
+{
+  [self measureBlock:^{
+    NSMutableArray *a = [NSMutableArray array];
+    for (int i = 0; i < 20000; i++)
+      [a addObject:[NSNumber numberWithInt:(i * 7919) % 20000]];
+    [a sortUsingSelector:@selector(compare:)];
+  }];
+}
+
+@end
+```
+
+Built into `CalculatorTests.xctest` (see [Building test bundles](#building-test-bundles))
+and run with `xctest -output-format apple CalculatorTests.xctest`:
+
+```
+Test Suite 'All tests' started at 2026-10-15 16:43:57.916.
+Test Suite 'CalculatorTests.xctest' started at 2026-10-15 16:43:57.916.
+Test Suite 'CalculatorTests' started at 2026-10-15 16:43:57.917.
+Test Case '-[CalculatorTests testAddition]' started.
+Test Case '-[CalculatorTests testAddition]' passed (0.000 seconds).
+Test Case '-[CalculatorTests testDivision]' started.
+CalculatorTests.m:15: error: -[CalculatorTests testDivision] : ((1.0 / 3.0) equal to (0.33) +/- (0.001)) failed: ("0.33333333333333331") is not equal to ("0.33") +/- ("0.001"): rounding
+Test Case '-[CalculatorTests testDivision]' failed (0.000 seconds).
+Test Case '-[CalculatorTests testSortPerformance]' started.
+Test Case '-[CalculatorTests testSortPerformance]' measured [Time, seconds] average: 0.008, relative standard deviation: 6.517%, values: [0.008655, 0.006624, 0.008087, 0.008146, 0.008069, 0.008280, 0.008082, 0.008091, 0.007997, 0.008061], performanceMetricID:com.apple.XCTPerformanceMetric_WallClockTime, baselineName: "", baselineAverage: , polarity: prefers smaller, maxPercentRegression: 10.000%
+Test Case '-[CalculatorTests testSortPerformance]' passed (0.081 seconds).
+Test Suite 'CalculatorTests' failed at 2026-10-15 16:43:57.998.
+	 Executed 3 tests, with 1 failure (0 unexpected) in 0.081 (0.081) seconds
+Test Suite 'CalculatorTests.xctest' failed at 2026-10-15 16:43:57.998.
+	 Executed 3 tests, with 1 failure (0 unexpected) in 0.081 (0.082) seconds
+Test Suite 'All tests' failed at 2026-10-15 16:43:57.998.
+	 Executed 3 tests, with 1 failure (0 unexpected) in 0.081 (0.082) seconds
+
+Failing tests:
+	-[CalculatorTests testDivision]: CalculatorTests.m:15: ((1.0 / 3.0) equal to (0.33) +/- (0.001)) failed: ("0.33333333333333331") is not equal to ("0.33") +/- ("0.001"): rounding
+```
+
+`xctest` exits with status 1 because a test failed. Without `-output-format
+apple`, the same results are logged as `XCTest: ...` lines, ending in a
+summary of the failed tests. `-junit-report results.xml` writes them as JUnit
+XML for CI.
+
 ## Building with Meson
 
 As an alternative to GNUstep Make, use Meson with Clang and a configured
