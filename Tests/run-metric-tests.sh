@@ -18,7 +18,7 @@ values() {
 echo "Running XCTMetric regressions..."
 run_fixture MetricFixture -only-testing:MetricFixture/MetricPassingTests
 assert_status 0
-assert_contains "MetricPassingTests: 5 tests PASSED"
+assert_contains "MetricPassingTests: 6 tests PASSED"
 
 # The clock metric: 5 iterations by default, each about 10ms.
 clock=$(values testClock "Clock Monotonic Time, s")
@@ -50,6 +50,36 @@ assert_not_contains "timestamps out of order"
 # ManuallyStop: the block stops measuring itself.
 [ "$(printf '%s\n' "$output" | grep -c 'metric: after stop')" -eq 2 ] || fail "expected 2 manually stopped runs"
 assert_contains "testManualStop measured [Clock Monotonic Time, s]"
+
+# Hardware counters: instructions and cycles with the CPU time, cache and
+# branch misses from GSXCTHardwareCounterMetric. Where the kernel refuses
+# them (as it does by default on Debian and Ubuntu), they're left out with
+# one log line, and the test still passes.
+unavailable="Hardware performance counters are unavailable"
+if [[ "$output" == *"counters available: YES"* ]]; then
+  assert_not_contains "$unavailable"
+  for v in $(values testHardwareCounters "CPU Instructions Retired, kI" | tr ',' ' '); do
+    # The loop alone retires several million instructions.
+    awk -v v="$v" 'BEGIN { exit !(v >= 2000) }' || fail "unexpected instruction count $v"
+  done
+  assert_contains "testHardwareCounters measured [CPU Cycles, kC] average: "
+  assert_contains "testHardwareCounters measured [Cache Misses, misses] average: "
+  assert_contains "testHardwareCounters measured [Branch Misses, misses] average: "
+else
+  [ "$(printf '%s\n' "$output" | grep -c "$unavailable")" -eq 1 ] || fail "expected the counters' absence to be logged once"
+  assert_not_contains "CPU Instructions Retired"
+  assert_not_contains "Cache Misses, misses"
+fi
+assert_contains "testHardwareCounters measured [CPU Time, s] average: "
+
+# XCTEST_PERF_COUNTERS=0 turns them off.
+XCTEST_PERF_COUNTERS=0 run_fixture MetricFixture -only-testing:MetricFixture/MetricPassingTests/testHardwareCounters
+assert_status 0
+assert_contains "$unavailable (turned off by XCTEST_PERF_COUNTERS=0)"
+[ "$(printf '%s\n' "$output" | grep -c "$unavailable")" -eq 1 ] || fail "expected the counters' absence to be logged once"
+assert_contains "counters available: NO"
+assert_contains "testHardwareCounters measured [CPU Time, s] average: "
+assert_not_contains "Branch Misses"
 
 # Misuse fails the test.
 run_fixture MetricFixture -only-testing:MetricFixture/MetricFailingTests

@@ -3,6 +3,14 @@
 Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 `vX.Y.Z`; 0.1.x are upstream's (gnustep/tools-xctest).
 
+## Unreleased
+
+- Hardware counters on Linux, read with `perf_event_open` (no library
+  needed): `XCTCPUMetric` reports instructions retired and cycles, as
+  Apple's does, and the new `GSXCTHardwareCounterMetric` cache and branch
+  misses. Where the kernel doesn't allow them, they're left out with one log
+  line; `XCTEST_PERF_COUNTERS=0` turns them off.
+
 ## 0.5.1
 
 - The README has Install and Example sections (with real runner output), and

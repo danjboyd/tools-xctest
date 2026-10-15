@@ -314,7 +314,8 @@ Xcode project; this file is the GNUstep equivalent.
 `measureWithMetrics:options:block:` (and `measureWithMetrics:block:`,
 `measureWithOptions:block:`) runs the block `iterationCount` times (default 5)
 with any `XCTMetric`s: `XCTClockMetric` (the default), `XCTCPUMetric` (CPU time,
-for the process or the current thread), `XCTMemoryMetric` (resident memory
+for the process or the current thread, and on Linux the instructions retired
+and cycles; see below), `XCTMemoryMetric` (resident memory
 change and peak, in kB) and `XCTStorageMetric` (logical writes, in kB), read
 from `getrusage` and `/proc` (on Windows, from the process and thread APIs,
 where the memory peak is the process's peak so far), or your own class
@@ -326,6 +327,35 @@ whether larger or smaller is worse:
 ```json
 { "ParserTests/testParse": { "metrics": { "com.apple.dt.XCTMetric_CPU.time": { "average": 0.05, "maxPercentRegression": 20 } } } }
 ```
+
+#### Hardware counters
+
+On Linux, `XCTCPUMetric` also reports the instructions retired and cycles of
+the measured code (`"CPU Instructions Retired", kI` and `"CPU Cycles", kC`, as
+Apple's does), and `GSXCTHardwareCounterMetric`, which Apple's XCTest doesn't
+have, reports last-level cache misses and mispredicted branches. Instruction
+counts hardly change from run to run, even on a busy CI machine, so they make
+much steadier baselines than times:
+
+```objc
+[self measureWithMetrics:[NSArray arrayWithObject:[[[XCTCPUMetric alloc] init] autorelease]]
+                   block:^{ [parser parse:data]; }];
+```
+
+They're read straight from the kernel (`perf_event_open`, user-mode work only;
+no library is needed). The kernel only allows that if
+`/proc/sys/kernel/perf_event_paranoid` is 2 or less, and Debian and Ubuntu set it
+to 3 or more by default; containers and virtual machines may not have the
+counters at all. Where they're unavailable, `xctest` logs the reason once,
+leaves those measurements out and doesn't fail the test; elsewhere than Linux
+they're always unavailable. To allow them on a development machine:
+
+```sh
+sudo sysctl kernel.perf_event_paranoid=2
+```
+
+`XCTEST_PERF_COUNTERS=0` turns them off; `[GSXCTHardwareCounterMetric isAvailable]`
+says whether they can be read.
 
 ### Hosted tests (running inside your application)
 

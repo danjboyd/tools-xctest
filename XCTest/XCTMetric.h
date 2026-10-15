@@ -96,14 +96,45 @@ typedef enum {
 @interface XCTClockMetric : NSObject <XCTMetric>
 @end
 
-/*! CPU time (user + system) used by the process, or only the measuring
- * thread ("CPU Time", s). Apple's cycle and instruction counts aren't
- * reported. */
+/*!
+ * CPU time (user + system) used by the process, or only the measuring
+ * thread ("CPU Time", s); and, where the hardware counters are available
+ * (Linux; see GSXCTHardwareCounterMetric), the instructions retired ("CPU
+ * Instructions Retired", kI) and cycles ("CPU Cycles", kC) of user-mode
+ * work by the measuring thread and the threads it starts while measuring
+ * (or only the measuring thread). Instruction counts vary much less from
+ * run to run than times, so they make steadier baselines.
+ */
 @interface XCTCPUMetric : NSObject <XCTMetric> {
     BOOL _currentThreadOnly;
     double _startCPUTime;
     double _stopCPUTime;
+    id _gsCounters;
+    BOOL _gsCountersOpened;
 }
+- (id) init;
+- (id) initLimitingToCurrentThread: (BOOL)limitToCurrentThread;
+@end
+
+/*!
+ * GNUstep's: hardware counts Apple's metrics don't report: last-level cache
+ * misses ("Cache Misses") and mispredicted branches ("Branch Misses") in
+ * user-mode work by the measuring thread and the threads it starts while
+ * measuring (or only the measuring thread).
+ *
+ * The counters are read through Linux's perf_event_open, which the kernel
+ * may refuse (see /proc/sys/kernel/perf_event_paranoid), as may containers
+ * and virtual machines; there and on other systems, nothing is measured and
+ * the test isn't failed (it is logged once). XCTEST_PERF_COUNTERS=0 turns
+ * the counters off.
+ */
+@interface GSXCTHardwareCounterMetric : NSObject <XCTMetric> {
+    BOOL _currentThreadOnly;
+    id _counters;
+    BOOL _countersOpened;
+}
+/*! Whether the counters can be read here. */
++ (BOOL) isAvailable;
 - (id) init;
 - (id) initLimitingToCurrentThread: (BOOL)limitToCurrentThread;
 @end
