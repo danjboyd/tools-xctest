@@ -8,6 +8,9 @@ Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 - The README has Install and Example sections (with real runner output), and
   a release workflow attaches a source archive and a Windows (MSYS2 clang64)
   build to each tagged GitHub release.
+- Windows CI works around MSYS2's gnustep-base 1.31.1-10 header, which
+  clang 23 rejects (gnustep/libs-base#809); the README says how to apply
+  the same fix locally.
 - Regression checks that parallel runs log each measurement and fail a test
   that regresses against its performance baseline (both already worked).
 - Upstream's CRLF line endings are restored in `XCTestAssertions.h`,

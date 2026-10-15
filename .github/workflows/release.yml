@@ -43,6 +43,13 @@ jobs:
             mingw-w64-clang-x86_64-gnustep-make
             mingw-w64-clang-x86_64-gnustep-base
 
+      # MSYS2's gnustep-base 1.31.1-10 puts __block on an instance variable,
+      # which clang 23 rejects; apply libs-base's fix (gnustep/libs-base#809).
+      - name: Patch gnustep-base header
+        run: |
+          sed -i 's/BLOCK_SCOPE GSScheduledBlock _block;/GSScheduledBlock _block;/' \
+            /clang64/include/Foundation/NSBackgroundActivityScheduler.h
+
       # As in ci.yml: MSYS2's libdispatch headers need HAVE_MODE_T.
       - name: Build, test and stage
         run: |

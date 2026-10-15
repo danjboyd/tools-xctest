@@ -51,6 +51,12 @@ export ADDITIONAL_CPPFLAGS=-DHAVE_MODE_T   # MSYS2's libdispatch headers
 make && make install
 ```
 
+With clang 23, MSYS2's gnustep-base 1.31.1-10 fails to compile
+`NSBackgroundActivityScheduler.h` ("'__block' is not allowed on an Objective-C
+instance variable"). Until MSYS2 picks up the fix (gnustep/libs-base#809),
+remove `BLOCK_SCOPE` from the `_block` instance variable in
+`/clang64/include/Foundation/NSBackgroundActivityScheduler.h`.
+
 ## Example
 
 ```objc
