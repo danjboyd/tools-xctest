@@ -27,6 +27,7 @@
 #import <XCTest/XCTestPrivate.h>
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #if defined(_WIN32)
@@ -216,15 +217,7 @@ static NSString *GSCountersUnavailableReason = nil;
                                         count: (NSUInteger)count
                                    threadOnly: (BOOL)threadOnly
 {
-#if defined(__linux__)
-    static const unsigned long long configs[GSCounterCount] = {
-        PERF_COUNT_HW_CPU_CYCLES, PERF_COUNT_HW_INSTRUCTIONS,
-        PERF_COUNT_HW_CACHE_MISSES, PERF_COUNT_HW_BRANCH_MISSES,
-    };
     const char *disable = getenv("XCTEST_PERF_COUNTERS");
-    GSXCTHardwareCounters *counters = nil;
-    unsigned long pmuTypes[4];
-    NSUInteger pmuCount = GSHybridPMUTypes(pmuTypes);
 
     if (GSCountersUnavailableReason != nil) {
         return nil;
@@ -233,6 +226,14 @@ static NSString *GSCountersUnavailableReason = nil;
         [self _gsUnavailable:@"turned off by XCTEST_PERF_COUNTERS=0"];
         return nil;
     }
+#if defined(__linux__)
+    static const unsigned long long configs[GSCounterCount] = {
+        PERF_COUNT_HW_CPU_CYCLES, PERF_COUNT_HW_INSTRUCTIONS,
+        PERF_COUNT_HW_CACHE_MISSES, PERF_COUNT_HW_BRANCH_MISSES,
+    };
+    GSXCTHardwareCounters *counters = nil;
+    unsigned long pmuTypes[4];
+    NSUInteger pmuCount = GSHybridPMUTypes(pmuTypes);
 
     counters = [[[self alloc] init] autorelease];
     for (NSUInteger i = 0; i < count; i++) {
