@@ -36,7 +36,11 @@ from master. Each is merged into `next-0.6`. Only those branches are pushed
   statistics to test) → regressed; past it but not significant →
   inconclusive; noisier than `maxPercentRelativeStandardDeviation` →
   inconclusive unless significantly regressed; otherwise passed. Entries
-  without `stddev`/`count` behave exactly as in 0.5.x.
+  without `stddev`/`count` behave as in 0.5.x, with one exception: an entry
+  that sets Apple's `maxPercentRelativeStandardDeviation` (which 0.5.x
+  ignored) and is both noisier than that and past `maxPercentRegression`
+  is inconclusive rather than a failure, since without the statistics a
+  noisy result can't be told from a regression.
 - **`"version": 2`** is written at the top of the baselines file when
   recording. Older xctest versions ignore it (they skip non-object
   entries), so the file stays readable by 0.5.x.
@@ -72,6 +76,12 @@ from master. Each is merged into `next-0.6`. Only those branches are pushed
   coordinator; workers don't log it again.
 - The option wins over `XCTEST_MACHINE_ID`. Parallel workers get the
   option and inherit the environment.
+- **Malformed entries** (from review): a machine's entry, or a metric's,
+  that isn't a JSON object is replaced when recording instead of crashing
+  the test (`-mutableCopy` on a number threw). The metric case was there in
+  0.5.x too.
+- **The default machine identifier is worked out once** per process, and
+  only when baselines are in use (it reads `/proc/cpuinfo`).
 
 ## perf-report
 
