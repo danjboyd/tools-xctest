@@ -53,6 +53,8 @@ typedef enum {
     NSString *performanceBaselinesPath;
     BOOL updatePerformanceBaselines;
     NSMutableDictionary *performanceBaselines;
+    NSInteger performanceWarmUpIterations;
+    BOOL performanceInconclusiveFails;
     GSXCTestRepetitionMode repetitionMode;
     NSUInteger testIterations;
     GSXCTestOutputFormat outputFormat;
@@ -88,13 +90,26 @@ typedef enum {
  * A JSON file of performance baselines: {"TestClass/testMethod":
  * {"average": seconds, "maxPercentRegression": percent}}. A measured test
  * fails if its average is worse than its baseline by more than
- * maxPercentRegression (default 10).
+ * maxPercentRegression (default 10). With the baseline's "stddev" and
+ * "count", it fails only if it is also significantly worse (Welch's
+ * t-test); otherwise the result is inconclusive.
  */
 @property (copy) NSString *performanceBaselinesPath;
 
-/*! If YES, measured averages are written back to performanceBaselinesPath
- * after the run (keeping each entry's maxPercentRegression). */
+/*! If YES, measured averages (with their standard deviation and number of
+ * values) are written back to performanceBaselinesPath after the run
+ * (keeping each entry's settings). */
 @property BOOL updatePerformanceBaselines;
+
+/*! The number of warm-up runs before the measured runs of a measure
+ * method, which aren't counted; -1 (the default) for Apple's: none for
+ * -measureBlock:, one for -measureWithMetrics:options:block:. */
+@property NSInteger performanceWarmUpIterations;
+
+/*! If YES, an inconclusive comparison with a baseline (worse than allowed
+ * but not significantly, or too noisy) fails the test; by default it is
+ * only reported. */
+@property BOOL performanceInconclusiveFails;
 
 /*! How tests are repeated; see GSXCTestRepetitionMode. */
 @property GSXCTestRepetitionMode repetitionMode;

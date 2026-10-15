@@ -185,8 +185,9 @@ NSString *_GSXCTDescribeException(NSException *exception);
 // The baseline ({average, maxPercentRegression}) for a measurement of
 // "Class/testMethod", or nil.
 - (NSDictionary *) _gsPerformanceBaselineForTest: (NSString *)identifier metric: (NSString *)metric;
-// Remembers a measured average, written out with -update-performance-baselines.
-- (void) _gsRecordPerformanceAverage: (double)average forTest: (NSString *)identifier metric: (NSString *)metric;
+// Remembers a measurement's average, standard deviation and number of
+// values, written out with -update-performance-baselines.
+- (void) _gsRecordPerformanceMeasurement: (GSXCTMeasurement *)measurement forTest: (NSString *)identifier;
 @end
 
 @interface XCTestObservationCenter (GSPrivate)

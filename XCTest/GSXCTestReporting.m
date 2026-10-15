@@ -467,15 +467,24 @@ static NSString *GSSkippedSummary(NSUInteger skipCount)
 
 - (void) test: (GSXCTestCaseResult *)test didMeasure: (GSXCTMeasurement *)measurement
 {
-    NSString *baseline = [measurement baselineAverage]
-        ? [NSString stringWithFormat:@", baseline average: %.6f (max regression %.1f%%)",
-            [[measurement baselineAverage] doubleValue], [measurement maxPercentRegression]]
-        : @"";
+    NSString *baseline = @"";
 
-    NSLog(@"XCTest:     %@ measured %@ average: %.6f, relative standard deviation: %.3f%%%@, values: %@",
+    if ([measurement baselineAverage] != nil && [measurement baselineStandardDeviation] != nil) {
+        baseline = [NSString stringWithFormat:@", baseline average: %.6f, stddev %.6f of %lu values (max regression %.1f%%)",
+            [[measurement baselineAverage] doubleValue], [[measurement baselineStandardDeviation] doubleValue],
+            (unsigned long)[measurement baselineCount], [measurement maxPercentRegression]];
+    } else if ([measurement baselineAverage] != nil) {
+        baseline = [NSString stringWithFormat:@", baseline average: %.6f (max regression %.1f%%)",
+            [[measurement baselineAverage] doubleValue], [measurement maxPercentRegression]];
+    }
+
+    NSLog(@"XCTest:     %@ measured %@ average: %.6f, relative standard deviation: %.3f%%, median: %.6f, min: %.6f%@, values: %@",
         [test methodName], [measurement metricDescription], [measurement average],
-        [measurement relativeStandardDeviation], baseline,
+        [measurement relativeStandardDeviation], [measurement median], [measurement minimum], baseline,
         [measurement valuesDescription]);
+    if ([measurement verdict] == GSXCTMeasurementVerdictInconclusive) {
+        NSLog(@"XCTest:     %@: warning: %@", [test methodName], [measurement verdictDescription]);
+    }
 }
 
 - (void) test: (GSXCTestCaseResult *)test didStartActivity: (NSArray *)activityPath atTime: (NSTimeInterval)time
@@ -672,6 +681,11 @@ static NSString *GSAppleLocation(GSXCTestIssue *issue)
         [measurement relativeStandardDeviation], [measurement valuesDescription], [measurement metricIdentifier],
         [measurement baselineAverage] ? [NSString stringWithFormat:@"%.3f", [[measurement baselineAverage] doubleValue]] : @"",
         [measurement polarityDescription], [measurement maxPercentRegression]]);
+    // Apple has no inconclusive results; this is shaped like its warnings.
+    if ([measurement verdict] == GSXCTMeasurementVerdictInconclusive) {
+        GSPrintLine([NSString stringWithFormat:@"<unknown>:0: warning: %@ : %@",
+            GSAppleTestName(test), [measurement verdictDescription]]);
+    }
 }
 
 - (void) test: (GSXCTestCaseResult *)test didStartActivity: (NSArray *)activityPath atTime: (NSTimeInterval)time
@@ -949,9 +963,12 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
                 }
                 for (GSXCTMeasurement *measurement in [test measurements]) {
                     [lines addObject:[NSString stringWithFormat:
-                        @"measured %@ average: %.6f, relative standard deviation: %.3f%%, values: %@",
+                        @"measured %@ average: %.6f, relative standard deviation: %.3f%%, median: %.6f, min: %.6f, values: %@",
                         [measurement metricDescription], [measurement average], [measurement relativeStandardDeviation],
-                        [measurement valuesDescription]]];
+                        [measurement median], [measurement minimum], [measurement valuesDescription]]];
+                    if ([measurement verdict] == GSXCTMeasurementVerdictInconclusive) {
+                        [lines addObject:[NSString stringWithFormat:@"warning: %@", [measurement verdictDescription]]];
+                    }
                 }
                 for (GSXCTAttachmentRecord *attachment in savedAttachments) {
                     [lines addObject:[NSString stringWithFormat:@"[[ATTACHMENT|%@]]", [attachment savedPath]]];

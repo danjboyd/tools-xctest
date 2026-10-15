@@ -51,6 +51,10 @@ static void PrintUsage(FILE *stream)
     fprintf(stream, "                              (default 60; 0 waits forever; test time doesn't count)\n");
     fprintf(stream, "  -performance-baselines <path>  Fail measured tests that regress against these baselines (JSON)\n");
     fprintf(stream, "  -update-performance-baselines  Record measured averages into the -performance-baselines file\n");
+    fprintf(stream, "  -performance-warmup-iterations <n>  Unmeasured runs before each measurement (default: none for\n");
+    fprintf(stream, "                              measureBlock:, one for measureWithMetrics:)\n");
+    fprintf(stream, "  -performance-inconclusive-fails YES|NO  Fail a test whose comparison with its baseline is\n");
+    fprintf(stream, "                              inconclusive (default NO: only reported)\n");
     fprintf(stream, "  -test-iterations <n>        Run each test n times (the maximum, with the two options below)\n");
     fprintf(stream, "  -run-tests-until-failure    Repeat each test until it fails (at most 100 times by default)\n");
     fprintf(stream, "  -retry-tests-on-failure     Retry a failing test until it passes (at most 3 times by default)\n");
@@ -96,6 +100,7 @@ static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString
                           GSXCTestOutputFormat outputFormat, NSString *junitReportPath,
                           NSString *attachmentsPath,
                           NSString *performanceBaselinesPath, BOOL updatePerformanceBaselines,
+                          NSInteger warmUpIterations, BOOL inconclusiveFails,
                           GSXCTestRepetitionMode repetitionMode, NSInteger testIterations,
                           BOOL randomOrder, unsigned long long orderSeed,
                           BOOL testTimeoutsEnabled, NSTimeInterval defaultAllowance,
@@ -131,6 +136,7 @@ static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString
                           GSXCTestOutputFormat outputFormat, NSString *junitReportPath,
                           NSString *attachmentsPath,
                           NSString *performanceBaselinesPath, BOOL updatePerformanceBaselines,
+                          NSInteger warmUpIterations, BOOL inconclusiveFails,
                           GSXCTestRepetitionMode repetitionMode, NSInteger testIterations,
                           BOOL randomOrder, unsigned long long orderSeed,
                           BOOL testTimeoutsEnabled, NSTimeInterval defaultAllowance,
@@ -181,6 +187,8 @@ static int RunTestsInHost(NSString *hostPath, NSString *testBundlePath, NSString
     [config setObject:[NSNumber numberWithBool:testTimeoutsEnabled] forKey:@"testTimeoutsEnabled"];
     [config setObject:[NSNumber numberWithDouble:defaultAllowance] forKey:@"defaultExecutionTimeAllowance"];
     [config setObject:[NSNumber numberWithDouble:maximumAllowance] forKey:@"maximumExecutionTimeAllowance"];
+    [config setObject:[NSNumber numberWithInteger:warmUpIterations] forKey:@"performanceWarmUpIterations"];
+    [config setObject:[NSNumber numberWithBool:inconclusiveFails] forKey:@"performanceInconclusiveFails"];
     if (performanceBaselinesPath != nil) {
         [config setObject:([performanceBaselinesPath isAbsolutePath] ? performanceBaselinesPath
                            : [[fileManager currentDirectoryPath] stringByAppendingPathComponent:performanceBaselinesPath])
@@ -339,6 +347,8 @@ int main(int argc, char *argv[]) {
     NSTimeInterval hostLaunchTimeout = 60;
     NSString *performanceBaselinesPath = nil;
     BOOL updatePerformanceBaselines = NO;
+    NSInteger warmUpIterations = -1;
+    BOOL inconclusiveFails = NO;
     NSInteger testIterations = 0;
     BOOL runUntilFailure = NO;
     BOOL retryOnFailure = NO;
@@ -570,6 +580,33 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        if ([argument isEqualToString:@"-performance-warmup-iterations"]) {
+            char *end = NULL;
+            const char *value = (i + 1 < argc) ? argv[++i] : "";
+            long count = strtol(value, &end, 10);
+            if (*value == '\0' || end == NULL || *end != '\0' || count < 0) {
+                fprintf(stderr, "xctest: -performance-warmup-iterations needs a number of at least 0\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            warmUpIterations = count;
+            continue;
+        }
+
+        if ([argument isEqualToString:@"-performance-inconclusive-fails"]) {
+            NSString *value = (i + 1 < argc) ? [NSString stringWithUTF8String:argv[++i]] : nil;
+            if ([value caseInsensitiveCompare:@"YES"] == NSOrderedSame) {
+                inconclusiveFails = YES;
+            } else if ([value caseInsensitiveCompare:@"NO"] == NSOrderedSame) {
+                inconclusiveFails = NO;
+            } else {
+                fprintf(stderr, "xctest: -performance-inconclusive-fails must be YES or NO\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            continue;
+        }
+
         if ([argument isEqualToString:@"-host-launch-timeout"]) {
             char *end = NULL;
             hostLaunchTimeout = (i + 1 < argc) ? strtod(argv[++i], &end) : -1;
@@ -685,6 +722,7 @@ int main(int argc, char *argv[]) {
                                   onlyTestIdentifiers, skipTestIdentifiers, outputFormat, junitReportPath,
                                   attachmentsPath,
                                   performanceBaselinesPath, updatePerformanceBaselines,
+                                  warmUpIterations, inconclusiveFails,
                                   repetitionMode, testIterations, randomOrder, orderSeed,
                                   testTimeoutsEnabled,
                                   defaultAllowance, maximumAllowance, hostLaunchTimeout);
@@ -720,6 +758,8 @@ int main(int argc, char *argv[]) {
     [runner setTestBundle:testBundle];
     [runner setPerformanceBaselinesPath:performanceBaselinesPath];
     [runner setUpdatePerformanceBaselines:updatePerformanceBaselines];
+    [runner setPerformanceWarmUpIterations:warmUpIterations];
+    [runner setPerformanceInconclusiveFails:inconclusiveFails];
     [runner setRepetitionMode:repetitionMode];
     [runner setTestIterations:(NSUInteger)testIterations];
     [runner setJunitReportPath:junitReportPath];

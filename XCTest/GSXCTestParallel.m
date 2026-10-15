@@ -32,6 +32,7 @@
 #import <XCTest/XCTestPrivate.h>
 
 #include <limits.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -109,6 +110,20 @@ static NSDictionary *GSPlistFromTest(GSXCTestCaseResult *test)
             [m setObject:[measurement baselineAverage] forKey:@"baselineAverage"];
         }
         [m setObject:[NSNumber numberWithDouble:[measurement maxPercentRegression]] forKey:@"maxPercentRegression"];
+        if ([measurement baselineStandardDeviation] != nil) {
+            [m setObject:[measurement baselineStandardDeviation] forKey:@"baselineStandardDeviation"];
+        }
+        [m setObject:[NSNumber numberWithUnsignedInteger:[measurement baselineCount]] forKey:@"baselineCount"];
+        if ([measurement maxPercentRelativeStandardDeviation] != nil) {
+            [m setObject:[measurement maxPercentRelativeStandardDeviation]
+                  forKey:@"maxPercentRelativeStandardDeviation"];
+        }
+        [m setObject:[NSNumber numberWithInt:[measurement verdict]] forKey:@"verdict"];
+        [m setObject:[NSNumber numberWithDouble:[measurement percentWorse]] forKey:@"percentWorse"];
+        // JSON has no NaN: a missing p-value means there was none.
+        if (!isnan([measurement pValue])) {
+            [m setObject:[NSNumber numberWithDouble:[measurement pValue]] forKey:@"pValue"];
+        }
         return m;
     }) forKey:@"measurements"];
     [plist setObject:GSMap([test attachments], ^id(id item) {
@@ -156,6 +171,14 @@ static GSXCTestCaseResult *GSTestFromPlist(NSDictionary *plist)
         [measurement setValues:[m objectForKey:@"values"]];
         [measurement setBaselineAverage:[m objectForKey:@"baselineAverage"]];
         [measurement setMaxPercentRegression:[[m objectForKey:@"maxPercentRegression"] doubleValue]];
+        [measurement setBaselineStandardDeviation:[m objectForKey:@"baselineStandardDeviation"]];
+        [measurement setBaselineCount:[[m objectForKey:@"baselineCount"] unsignedIntegerValue]];
+        [measurement setMaxPercentRelativeStandardDeviation:[m objectForKey:@"maxPercentRelativeStandardDeviation"]];
+        [measurement setVerdict:(GSXCTMeasurementVerdict)[[m objectForKey:@"verdict"] intValue]];
+        [measurement setPercentWorse:[[m objectForKey:@"percentWorse"] doubleValue]];
+        if ([m objectForKey:@"pValue"] != nil) {
+            [measurement setPValue:[[m objectForKey:@"pValue"] doubleValue]];
+        }
         [[test measurements] addObject:measurement];
     }
     for (NSDictionary *a in [plist objectForKey:@"attachments"]) {
@@ -347,6 +370,14 @@ static NSString *GSAbsolutePath(NSString *path)
     if (performanceBaselinesPath != nil) {
         [arguments addObject:@"-performance-baselines"];
         [arguments addObject:GSAbsolutePath(performanceBaselinesPath)];
+    }
+    if (performanceWarmUpIterations >= 0) {
+        [arguments addObject:@"-performance-warmup-iterations"];
+        [arguments addObject:[NSString stringWithFormat:@"%ld", (long)performanceWarmUpIterations]];
+    }
+    if (performanceInconclusiveFails) {
+        [arguments addObject:@"-performance-inconclusive-fails"];
+        [arguments addObject:@"YES"];
     }
     if (repetitionMode != GSXCTestRepetitionNone) {
         if (repetitionMode == GSXCTestRepetitionUntilFailure) {

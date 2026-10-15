@@ -1,6 +1,9 @@
 #import <XCTest/XCTest.h>
 #import <XCTest/GSXCTestRunner.h>
+#import <XCTest/GSXCTestReporting.h>
+#import <XCTest/GSXCTStatistics.h>
 #include <limits.h>
+#include <math.h>
 #include <stdlib.h>
 
 static int checks, errors;
@@ -278,6 +281,67 @@ static BOOL invokeTestB;
 }
 @end
 
+#define NEAR(a, b) (fabs((a) - (b)) < 1e-6)
+
+static GSXCTMeasurement *Judged(NSArray *values, double baseline, NSNumber *stddev, NSUInteger count, int polarity)
+{
+    GSXCTMeasurement *m = [[[GSXCTMeasurement alloc] init] autorelease];
+    [m setValues:values]; [m setPolarity:polarity];
+    [m setBaselineAverage:[NSNumber numberWithDouble:baseline]]; [m setMaxPercentRegression:10];
+    [m setBaselineStandardDeviation:stddev]; [m setBaselineCount:count];
+    [m judge];
+    return m;
+}
+
+static void CheckStatistics(void)
+{
+    NSArray *steady = [NSArray arrayWithObjects:@110, @112, @111, @113, @109, nil];
+    NSArray *noisy = [NSArray arrayWithObjects:@80, @140, @100, @150, @90, nil];
+    NSNumber *one = [NSNumber numberWithInt:1];
+    GSXCTSummary summary = GSXCTSummarize([NSArray arrayWithObjects:@3, @1, @2, @10, nil]);
+    CHECK(summary.count == 4 && NEAR(summary.mean, 4) && NEAR(summary.median, 2.5));
+    CHECK(NEAR(summary.minimum, 1) && NEAR(summary.maximum, 10) && NEAR(summary.standardDeviation, sqrt(50.0 / 3)));
+    summary = GSXCTSummarize([NSArray arrayWithObject:@7]);
+    CHECK(NEAR(summary.median, 7) && summary.standardDeviation == 0);
+    CHECK(GSXCTSummarize([NSArray array]).count == 0);
+    CHECK(NEAR(GSXCTStudentTCDF(2, 10), 0.963306) && NEAR(GSXCTStudentTCDF(-2, 10), 0.036694));
+    CHECK(NEAR(GSXCTStudentTCDF(0, 5), 0.5) && NEAR(GSXCTStudentTCDF(1, 1), 0.75));
+    CHECK(NEAR(GSXCTStudentTCDF(3.5, 2), 0.5 + 3.5 / (2 * sqrt(2 + 3.5 * 3.5))));
+    CHECK(NEAR(GSXCTWelchPValue(10.5, 1, 10, 10, 1, 10), 0.139126));
+    CHECK(isnan(GSXCTWelchPValue(1, 1, 1, 0, 1, 10)));
+    CHECK(GSXCTWelchPValue(2, 0, 5, 1, 0, 5) == 0 && GSXCTWelchPValue(1, 0, 5, 1, 0, 5) == 1);
+
+    // Without the baseline's stddev and count, past the threshold regresses.
+    GSXCTMeasurement *m = Judged(steady, 100, nil, 0, -1);
+    CHECK([m verdict] == GSXCTMeasurementVerdictRegressed && NEAR([m percentWorse], 11) && isnan([m pValue]));
+    CHECK([[m verdictDescription] hasSuffix:@"(max allowed regression 10.0%)"]);
+    m = Judged(noisy, 100, nil, 0, -1);
+    CHECK([m verdict] == GSXCTMeasurementVerdictRegressed);
+    // With them, it must also be significant.
+    m = Judged(steady, 100, one, 5, -1);
+    CHECK([m verdict] == GSXCTMeasurementVerdictRegressed && [m pValue] < 0.001);
+    m = Judged(noisy, 100, one, 5, -1);
+    CHECK([m verdict] == GSXCTMeasurementVerdictInconclusive && [m pValue] > 0.05);
+    CHECK([[m verdictDescription] rangeOfString:@"but not significantly"].location != NSNotFound);
+    CHECK([[m verdictName] isEqual:@"inconclusive"]);
+    // Better, larger-is-better, unknown polarity and zero baselines.
+    CHECK([Judged(steady, 120, one, 5, -1) verdict] == GSXCTMeasurementVerdictPassed);
+    m = Judged(steady, 100, one, 5, 1);
+    CHECK([m verdict] == GSXCTMeasurementVerdictPassed && NEAR([m percentWorse], -11) && [m pValue] > 0.99);
+    CHECK([Judged(steady, 125, one, 5, 1) verdict] == GSXCTMeasurementVerdictRegressed);
+    CHECK([Judged(steady, 100, one, 5, 0) verdict] == GSXCTMeasurementVerdictNone);
+    CHECK([Judged(steady, 0, nil, 0, -1) verdict] == GSXCTMeasurementVerdictPassed);
+    // Too noisy for the baseline's maximum relative standard deviation.
+    m = [[[GSXCTMeasurement alloc] init] autorelease];
+    [m setValues:noisy]; [m setPolarity:-1]; [m setMaxPercentRegression:50];
+    [m setBaselineAverage:[NSNumber numberWithInt:100]];
+    [m setMaxPercentRelativeStandardDeviation:[NSNumber numberWithInt:5]];
+    [m judge];
+    CHECK([m verdict] == GSXCTMeasurementVerdictInconclusive);
+    CHECK([[m verdictDescription] rangeOfString:@"above the baseline's maximum of 5.0%"].location != NSNotFound);
+    CHECK([Judged(steady, 100, nil, 0, -1) verdictName] != nil && [[[GSXCTMeasurement new] autorelease] verdictName] == nil);
+}
+
 static NSUInteger Run(Class cls, SEL selector)
 {
     XCTestCase *test = [cls testCaseWithSelector:selector];
@@ -288,6 +352,7 @@ static NSUInteger Run(Class cls, SEL selector)
 int main(void)
 {
     @autoreleasepool {
+        CheckStatistics();
         Probe *probe = [Probe new];
         [probe checkAssertions];
         [probe release];

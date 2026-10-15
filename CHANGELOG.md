@@ -3,6 +3,22 @@
 Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 `vX.Y.Z`; 0.1.x are upstream's (gnustep/tools-xctest).
 
+## Unreleased
+
+Performance tests whose results change: `measureWithMetrics:options:block:`
+(and its variants) now runs its block once more first, as a warm-up that isn't
+counted, as Apple's XCTest does, so their averages can differ from 0.5.x.
+`-performance-warmup-iterations 0` restores the old behaviour.
+
+- Performance baselines can be judged statistically: `-update-performance-baselines`
+  records each measurement's `stddev` and `count` (a `"version": 2` file), and
+  a test then fails only if it is past `maxPercentRegression` and
+  significantly worse (Welch's t-test). Otherwise the result is
+  inconclusive: a warning, or a failure with `-performance-inconclusive-fails
+  YES`. Entries can set `maxPercentRelativeStandardDeviation` too.
+- Measurements report their median and minimum (console and JUnit).
+- `-performance-warmup-iterations <n>` sets the number of warm-up runs.
+
 ## 0.5.1
 
 - The README has Install and Example sections (with real runner output), and

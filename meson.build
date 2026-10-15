@@ -71,6 +71,7 @@ source = [
 	'XCTest/XCTAttachment.m',
 	'XCTest/XCTMetric.m',
 	'XCTest/GSXCTestParallel.m',
+	'XCTest/GSXCTStatistics.m',
 ]
 
 headers = [

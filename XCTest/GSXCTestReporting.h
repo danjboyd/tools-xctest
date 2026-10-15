@@ -66,6 +66,19 @@ typedef enum {
 - (NSString *) displayMessage;
 @end
 
+/*! How a measurement compares with its baseline. */
+typedef enum {
+    /*! There is no baseline (or no known polarity) to compare with. */
+    GSXCTMeasurementVerdictNone = 0,
+    GSXCTMeasurementVerdictPassed,
+    /*! Worse than the baseline allows (and significantly so, when the
+     * baseline has the statistics to tell). */
+    GSXCTMeasurementVerdictRegressed,
+    /*! Can't tell: worse than allowed but not significantly, or too
+     * noisy for the baseline's maxPercentRelativeStandardDeviation. */
+    GSXCTMeasurementVerdictInconclusive,
+} GSXCTMeasurementVerdict;
+
 /*! One performance measurement: the values of each run of the block. */
 @interface GSXCTMeasurement : NSObject {
     NSString *_metricIdentifier;
@@ -75,6 +88,12 @@ typedef enum {
     NSArray *_values;
     NSNumber *_baselineAverage;
     double _maxPercentRegression;
+    NSNumber *_baselineStandardDeviation;
+    NSUInteger _baselineCount;
+    NSNumber *_maxPercentRelativeStandardDeviation;
+    GSXCTMeasurementVerdict _verdict;
+    double _percentWorse;
+    double _pValue;
 }
 @property (copy) NSString *metricIdentifier;
 /*! "Time", "Clock Monotonic Time", ... */
@@ -87,9 +106,44 @@ typedef enum {
 /*! nil when the test has no baseline. */
 @property (retain) NSNumber *baselineAverage;
 @property double maxPercentRegression;
+/*! The baseline's sample standard deviation and number of values, which
+ * make the significance test possible; nil and 0 when it has none. */
+@property (retain) NSNumber *baselineStandardDeviation;
+@property NSUInteger baselineCount;
+/*! A relative standard deviation (percent) above which the measurement is
+ * too noisy to judge; nil for no limit. */
+@property (retain) NSNumber *maxPercentRelativeStandardDeviation;
+/*! Set by -judge. */
+@property GSXCTMeasurementVerdict verdict;
+/*! How much worse than the baseline average, in percent (negative if
+ * better); 0 without a baseline. Set by -judge. */
+@property double percentWorse;
+/*! The significance test's p-value, or NAN when it couldn't be done. Set
+ * by -judge. */
+@property double pValue;
 - (double) average;
+- (double) median;
+- (double) minimum;
+- (double) maximum;
+/*! Sample standard deviation. */
+- (double) standardDeviation;
 /*! Sample standard deviation as a percentage of the average. */
 - (double) relativeStandardDeviation;
+/*!
+ * Compares the values with the baseline and sets verdict, percentWorse and
+ * pValue. Worse than maxPercentRegression allows is a regression, unless
+ * the baseline has a standard deviation and count and Welch's t-test
+ * finds the difference isn't significant (inconclusive). A relative
+ * standard deviation over maxPercentRelativeStandardDeviation is
+ * inconclusive too, unless the measurement significantly regressed.
+ */
+- (void) judge;
+/*! Why the verdict is a regression or inconclusive, for issues and logs:
+ * "[Time, seconds] average: 0.002000, 100.0% worse than baseline 0.001000
+ * (max allowed regression 10.0%)". nil for other verdicts. */
+- (NSString *) verdictDescription;
+/*! "passed", "regressed", "inconclusive", or nil for no verdict. */
+- (NSString *) verdictName;
 /*! "[0.001000, 0.001100, ...]" */
 - (NSString *) valuesDescription;
 /*! "[Time, seconds]" */

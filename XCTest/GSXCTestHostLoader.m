@@ -151,6 +151,10 @@ static void GSWriteStatusFile(int exitCode)
                 fflush(stderr);
                 _exit(code);
             }];
+            if ([GSHostConfig objectForKey:@"performanceWarmUpIterations"] != nil) {
+                [runner setPerformanceWarmUpIterations:[[GSHostConfig objectForKey:@"performanceWarmUpIterations"] integerValue]];
+            }
+            [runner setPerformanceInconclusiveFails:[[GSHostConfig objectForKey:@"performanceInconclusiveFails"] boolValue]];
             if ([[GSHostConfig objectForKey:@"performanceBaselines"] isKindOfClass:[NSString class]]) {
                 [runner setPerformanceBaselinesPath:[GSHostConfig objectForKey:@"performanceBaselines"]];
                 [runner setUpdatePerformanceBaselines:[[GSHostConfig objectForKey:@"updatePerformanceBaselines"] boolValue]];
