@@ -622,14 +622,22 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 
 + (NSString *)defaultPerformanceMachineIdentifier
 {
-    NSString *model = GSCPUModel();
+    static NSString *identifier = nil;
 
-    // Runs of spaces in some CPU names (e.g. "Intel(R) Xeon(R) CPU  @ 2.20GHz").
-    while ([model rangeOfString:@"  "].location != NSNotFound) {
-        model = [model stringByReplacingOccurrencesOfString:@"  " withString:@" "];
+    // Worked out once: it doesn't change while the process runs.
+    @synchronized (self) {
+        if (identifier == nil) {
+            NSString *model = GSCPUModel();
+
+            // Runs of spaces in some CPU names (e.g. "Intel(R) Xeon(R) CPU  @ 2.20GHz").
+            while ([model rangeOfString:@"  "].location != NSNotFound) {
+                model = [model stringByReplacingOccurrencesOfString:@"  " withString:@" "];
+            }
+            identifier = [[NSString alloc] initWithFormat:@"%@, %lu cores, %@", model ? model : @"unknown CPU",
+                (unsigned long)[[NSProcessInfo processInfo] processorCount], GSMachineArchitecture()];
+        }
     }
-    return [NSString stringWithFormat:@"%@, %lu cores, %@", model ? model : @"unknown CPU",
-        (unsigned long)[[NSProcessInfo processInfo] processorCount], GSMachineArchitecture()];
+    return identifier;
 }
 
 // performanceMachineIdentifier, else XCTEST_MACHINE_ID, else the default;
@@ -682,13 +690,15 @@ static NSDictionary *GSMetricBaseline(NSDictionary *entry, NSString *metric)
 {
     NSDictionary *entry = [performanceBaselines objectForKey:identifier];
     id machines = [entry objectForKey:@"machines"];
-    NSDictionary *machine = [machines isKindOfClass:[NSDictionary class]]
-        ? [machines objectForKey:[self _gsPerformanceMachineIdentifier]] : nil;
+    NSDictionary *machine = nil;
     NSMutableDictionary *baseline = [NSMutableDictionary dictionary];
 
     // When recording new baselines, don't judge against the old ones.
-    if (updatePerformanceBaselines) {
+    if (updatePerformanceBaselines || entry == nil) {
         return nil;
+    }
+    if ([machines isKindOfClass:[NSDictionary class]]) {
+        machine = [machines objectForKey:[self _gsPerformanceMachineIdentifier]];
     }
 
     [baseline addEntriesFromDictionary:GSMetricBaseline(entry, metric)];
@@ -703,11 +713,12 @@ static NSDictionary *GSMetricBaseline(NSDictionary *entry, NSString *metric)
     NSMutableDictionary *entry = [performanceBaselines objectForKey:identifier];
     NSMutableDictionary *baseline = nil;
     BOOL explicitMachine = NO;
-    NSString *machine = [self _gsResolvedMachineIdentifier:&explicitMachine];
+    NSString *machine = nil;
 
     if (!updatePerformanceBaselines) {
         return;
     }
+    machine = [self _gsResolvedMachineIdentifier:&explicitMachine];
 
     if (entry == nil) {
         entry = [NSMutableDictionary dictionary];
@@ -719,11 +730,10 @@ static NSDictionary *GSMetricBaseline(NSDictionary *entry, NSString *metric)
         id machines = [entry objectForKey:@"machines"];
         NSMutableDictionary *mutableMachines = [machines isKindOfClass:[NSDictionary class]]
             ? [[machines mutableCopy] autorelease] : [NSMutableDictionary dictionary];
-        NSMutableDictionary *machineEntry = [[[mutableMachines objectForKey:machine] mutableCopy] autorelease];
-
-        if (![machineEntry isKindOfClass:[NSMutableDictionary class]]) {
-            machineEntry = [NSMutableDictionary dictionary];
-        }
+        id existing = [mutableMachines objectForKey:machine];
+        // A hand-edited file may have anything here; replace what isn't an object.
+        NSMutableDictionary *machineEntry = [existing isKindOfClass:[NSDictionary class]]
+            ? [[existing mutableCopy] autorelease] : [NSMutableDictionary dictionary];
         [mutableMachines setObject:machineEntry forKey:machine];
         [entry setObject:mutableMachines forKey:@"machines"];
         entry = machineEntry;
@@ -735,10 +745,10 @@ static NSDictionary *GSMetricBaseline(NSDictionary *entry, NSString *metric)
         NSMutableDictionary *mutableMetrics = [metrics isKindOfClass:[NSDictionary class]]
             ? [[metrics mutableCopy] autorelease] : [NSMutableDictionary dictionary];
 
-        baseline = [[[mutableMetrics objectForKey:metric] mutableCopy] autorelease];
-        if (![baseline isKindOfClass:[NSMutableDictionary class]]) {
-            baseline = [NSMutableDictionary dictionary];
-        }
+        id existing = [mutableMetrics objectForKey:metric];
+
+        baseline = [existing isKindOfClass:[NSDictionary class]]
+            ? [[existing mutableCopy] autorelease] : [NSMutableDictionary dictionary];
         [mutableMetrics setObject:baseline forKey:metric];
         [entry setObject:mutableMetrics forKey:@"metrics"];
     }
