@@ -143,6 +143,8 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 @synthesize testBundle;
 @synthesize performanceBaselinesPath;
 @synthesize updatePerformanceBaselines;
+@synthesize performanceWarmUpIterations;
+@synthesize performanceInconclusiveFails;
 @synthesize repetitionMode;
 @synthesize testIterations;
 @synthesize testTimeoutsEnabled;
@@ -159,6 +161,7 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     self = [super init];
     if (self) {
         runLock = [[NSLock alloc] init];
+        performanceWarmUpIterations = -1;
     }
 
     return self;
@@ -536,6 +539,8 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
         return YES;
     }
 
+    // Entries may have "stddev" and "count", which version 1 didn't.
+    [performanceBaselines setObject:[NSNumber numberWithInt:2] forKey:@"version"];
     data = [NSJSONSerialization dataWithJSONObject:performanceBaselines
                                            options:NSJSONWritingPrettyPrinted
                                              error:NULL];
@@ -566,8 +571,9 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     return [metrics isKindOfClass:[NSDictionary class]] ? [metrics objectForKey:metric] : nil;
 }
 
-- (void)_gsRecordPerformanceAverage:(double)average forTest:(NSString *)identifier metric:(NSString *)metric
+- (void)_gsRecordPerformanceMeasurement:(GSXCTMeasurement *)measurement forTest:(NSString *)identifier
 {
+    NSString *metric = [measurement metricIdentifier];
     NSMutableDictionary *entry = [performanceBaselines objectForKey:identifier];
     NSMutableDictionary *baseline = nil;
 
@@ -593,7 +599,9 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
         [mutableMetrics setObject:baseline forKey:metric];
         [entry setObject:mutableMetrics forKey:@"metrics"];
     }
-    [baseline setObject:[NSNumber numberWithDouble:average] forKey:@"average"];
+    [baseline setObject:[NSNumber numberWithDouble:[measurement average]] forKey:@"average"];
+    [baseline setObject:[NSNumber numberWithDouble:[measurement standardDeviation]] forKey:@"stddev"];
+    [baseline setObject:[NSNumber numberWithUnsignedInteger:[[measurement values] count]] forKey:@"count"];
 }
 
 // Creates the test bundle's principal class (NSPrincipalClass in its

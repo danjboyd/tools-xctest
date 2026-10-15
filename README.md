@@ -294,8 +294,8 @@ kept if its test fails, unless its `lifetime` is
 
 ### Performance tests
 
-`measureBlock:` runs a block 10 times and reports the average wall-clock time
-and relative standard deviation. `measureMetrics:automaticallyStartMeasuring:NO
+`measureBlock:` runs a block 10 times and reports the average wall-clock time,
+relative standard deviation, median and minimum. `measureMetrics:automaticallyStartMeasuring:NO
 forBlock:` with `startMeasuring`/`stopMeasuring` measures only part of each run.
 
 To catch regressions, keep baselines in a JSON file keyed by
@@ -312,7 +312,8 @@ the file instead (keeping each entry's settings). Apple keeps baselines in the
 Xcode project; this file is the GNUstep equivalent.
 
 `measureWithMetrics:options:block:` (and `measureWithMetrics:block:`,
-`measureWithOptions:block:`) runs the block `iterationCount` times (default 5)
+`measureWithOptions:block:`) runs the block once as a warm-up, which isn't
+counted, then `iterationCount` times (default 5), as Apple's XCTest does,
 with any `XCTMetric`s: `XCTClockMetric` (the default), `XCTCPUMetric` (CPU time,
 for the process or the current thread), `XCTMemoryMetric` (resident memory
 change and peak, in kB) and `XCTStorageMetric` (logical writes, in kB), read
@@ -326,6 +327,30 @@ whether larger or smaller is worse:
 ```json
 { "ParserTests/testParse": { "metrics": { "com.apple.dt.XCTMetric_CPU.time": { "average": 0.05, "maxPercentRegression": 20 } } } }
 ```
+
+`-performance-warmup-iterations <n>` sets the number of warm-up runs for all
+measure methods (`measureBlock:` has none by default).
+
+On a busy machine, such as a shared CI runner, a test can come out slower than
+its baseline by chance. `-update-performance-baselines` therefore also records
+each measurement's standard deviation and number of values (`"stddev"` and
+`"count"`, in a `"version": 2` file; older versions of `xctest` ignore them).
+With these, a test only fails when it is past `maxPercentRegression` **and**
+significantly worse (a one-sided Welch's t-test, p < 0.05). Past the threshold
+but not significantly worse is *inconclusive*: the test passes, with a warning
+in the console and JUnit report. An entry can also set
+`maxPercentRelativeStandardDeviation`: a measurement noisier than that is
+inconclusive too, unless it significantly regressed.
+
+```json
+{ "version": 2,
+  "ParserTests/testParseLargeFile": { "average": 0.120, "stddev": 0.004, "count": 10,
+                                      "maxPercentRegression": 10, "maxPercentRelativeStandardDeviation": 15 } }
+```
+
+`-performance-inconclusive-fails YES` fails inconclusive tests as well. Entries
+without `stddev` and `count` are judged by `maxPercentRegression` alone, as
+before.
 
 ### Hosted tests (running inside your application)
 

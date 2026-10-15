@@ -74,7 +74,7 @@ run_fixture PerformanceFixture -performance-baselines "$baselines" -update-perfo
 assert_status 0
 output=$(cat "$baselines")
 assert_contains '"maxPercentRegression"'
-awk -v a="$(printf '%s\n' "$output" | grep -A3 'testRegression' | grep -o '"average": [0-9.e-]*' | sed 's/.*: //')" \
+awk -v a="$(printf '%s\n' "$output" | sed -n '/testRegression/,/}/p' | grep -o '"average": [0-9.e-]*' | sed 's/.*: //')" \
   'BEGIN { exit !(a > 0.004) }' || fail "expected the regression baseline to be updated"
 
 run_fixture PerformanceFixture -performance-baselines "$work_dir/missing.json"
