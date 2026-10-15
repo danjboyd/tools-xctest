@@ -132,7 +132,7 @@ grep -q "warning: \[Series, u\] relative standard deviation 7.9%" "$work_dir/ver
 run_fixture MetricFixture -performance-baselines "$work_dir/verdicts.json" -performance-report "$work_dir/report.json" \
   -junit-report "$work_dir/verdicts.xml" -only-testing:MetricFixture/MetricVerdictTests
 assert_status 1
-report=$(tr -d ' \n' < "$work_dir/report.json")
+report=$(tr -d ' \t\r\n' < "$work_dir/report.json")
 for expected in '"version":1' '"bundle":"MetricFixture.bundle"' 'cores,' \
     '"test":"MetricVerdictTests/testSignificantRegression"' '"metric":"com.example.series"' \
     '"values":[110,112,111,113,109]' '"average":111' '"median":111' '"min":109' '"max":113' \
@@ -148,7 +148,7 @@ grep -q '<property name="performance.com.example.series.median" value="111.00000
 run_fixture MetricFixture -performance-report "$work_dir/plain-report.json" \
   -only-testing:MetricFixture/MetricVerdictTests/testImprovement
 assert_status 0
-report=$(tr -d ' \n' < "$work_dir/plain-report.json")
+report=$(tr -d ' \t\r\n' < "$work_dir/plain-report.json")
 [[ "$report" == *'"baseline":null'* && "$report" == *'"verdict":null'* && "$report" == *'"percentWorse":null'* ]] \
   || fail "expected no baseline or verdict: $report"
 # A report that can't be written fails the run.

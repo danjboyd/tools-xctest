@@ -37,7 +37,7 @@ assert_contains "XCTest:     testMeasures measured [Time, seconds] average: "
 # The coordinator writes the performance report, from every worker.
 run_fixture ParallelFixture -parallel-testing-enabled YES -performance-report "$report_dir/performance.json" \
   -only-testing:ParallelFixture/FailingTests
-report=$(tr -d ' \n' < "$report_dir/performance.json")
+report=$(tr -d ' \t\r\n' < "$report_dir/performance.json")
 [[ "$report" == *'"test":"FailingTests/testMeasures"'* && "$report" == *'"metric":"com.apple.XCTPerformanceMetric_WallClockTime"'* ]] \
   || fail "expected the workers' measurements in the performance report: $report"
 
