@@ -240,6 +240,17 @@ run_fixture MetricFixture -performance-baselines "$work_dir/machines.json" -upda
 assert_status 0
 recorded=$(cat "$work_dir/machines.json")
 [[ "$recorded" == *' cores, '* ]] || fail "expected this machine's baseline to be recorded: $recorded"
+# A hand-edited file with something other than an object where a machine's
+# or a metric's baseline belongs: recording replaces it.
+cat > "$work_dir/malformed.json" <<'JSON'
+{ "MetricVerdictTests/testImprovement": {"machines": {"odd-box": 5}, "metrics": {"com.example.series": null}} }
+JSON
+run_fixture MetricFixture -performance-baselines "$work_dir/malformed.json" -update-performance-baselines \
+  -performance-machine-id odd-box "$series_test"
+assert_status 0
+recorded=$(cat "$work_dir/malformed.json")
+printf '%s' "$recorded" | tr -d ' \t\r\n' | grep -q '"odd-box":{"metrics":{"com.example.series":{' \
+  || fail "expected odd-box's baseline to replace the malformed one: $recorded"
 run_fixture MetricFixture -performance-baselines "$work_dir/plain.json" -update-performance-baselines "$series_test"
 assert_status 0
 recorded=$(cat "$work_dir/plain.json")
