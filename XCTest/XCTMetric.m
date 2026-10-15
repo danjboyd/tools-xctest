@@ -134,7 +134,10 @@ typedef enum {
     // One counter per event and CPU type (hybrid CPUs have two or more).
     int _fds[GSCounterCount][4];
     int _fdCount[GSCounterCount];
+    // Each counter's value, time enabled and time running at -start.
+    uint64_t _startReadings[GSCounterCount][4][3];
     double _values[GSCounterCount];
+    BOOL _counted[GSCounterCount];
 }
 /*! Counters for the calling thread and, unless \a threadOnly, threads it
  * starts while counting; nil (after logging why, once) if unavailable. */
@@ -143,8 +146,13 @@ typedef enum {
                                    threadOnly: (BOOL)threadOnly;
 - (void) start;
 - (void) stop;
+/*! Whether \a counter counted anything between -start and -stop (it may
+ * never have had the hardware, if other users of it took every counter). */
+- (BOOL) counted: (GSCounter)counter;
 /*! What \a counter counted between -start and -stop. */
 - (double) valueOf: (GSCounter)counter;
+/*! Closes the counters (also done when released). */
+- (void) close;
 @end
 
 #if defined(__linux__)
@@ -154,6 +162,10 @@ typedef enum {
 #include <sys/syscall.h>
 #include <unistd.h>
 #include <linux/perf_event.h>
+
+#ifndef PERF_FLAG_FD_CLOEXEC
+#define PERF_FLAG_FD_CLOEXEC (1UL << 3)
+#endif
 
 // The PMU types of a hybrid CPU's kinds of core, e.g. cpu_core and
 // cpu_atom; none on other CPUs.
@@ -194,11 +206,15 @@ static int GSOpenCounter(unsigned long long config, BOOL threadOnly)
     // When there are more events than counters, the kernel takes turns;
     // the times say how much of the run each was counting.
     attr.read_format = PERF_FORMAT_TOTAL_TIME_ENABLED | PERF_FORMAT_TOTAL_TIME_RUNNING;
-    return (int)syscall(__NR_perf_event_open, &attr, 0, -1, -1, 0);
+    // Not inherited by processes the tests start.
+    return (int)syscall(__NR_perf_event_open, &attr, 0, -1, -1, PERF_FLAG_FD_CLOEXEC);
 }
 #endif
 
+// Set when the counters can't be used at all (not allowed, not supported).
 static NSString *GSCountersUnavailableReason = nil;
+// Other failures already logged, so each is logged once.
+static NSMutableSet *GSCounterFailuresLogged = nil;
 
 @implementation GSXCTHardwareCounters
 
@@ -209,6 +225,22 @@ static NSString *GSCountersUnavailableReason = nil;
             GSCountersUnavailableReason = [reason copy];
             NSLog(@"XCTest: Hardware performance counters are unavailable (%@); "
                   @"cycles, instructions and cache and branch misses aren't measured.", reason);
+        }
+    }
+}
+
+// A failure that may not last (too many open files, an event this CPU
+// doesn't have): these counters aren't measured, but others may be.
++ (void) _gsFailed: (NSString *)reason
+{
+    @synchronized (self) {
+        if (GSCounterFailuresLogged == nil) {
+            GSCounterFailuresLogged = [[NSMutableSet alloc] init];
+        }
+        if (![GSCounterFailuresLogged containsObject:reason]) {
+            [GSCounterFailuresLogged addObject:reason];
+            NSLog(@"XCTest: Some hardware performance counters couldn't be opened (%@); "
+                  @"their measurements are left out.", reason);
         }
     }
 }
@@ -258,10 +290,16 @@ static NSString *GSCountersUnavailableReason = nil;
         }
         fd = GSOpenCounter(configs[event], threadOnly);
         if (fd < 0) {
-            NSString *reason = [NSString stringWithFormat:@"perf_event_open: %s%@", strerror(errno),
-                (errno == EACCES || errno == EPERM) ? @"; see /proc/sys/kernel/perf_event_paranoid" : @""];
+            int failure = errno;
+            NSString *reason = [NSString stringWithFormat:@"perf_event_open: %s%@", strerror(failure),
+                (failure == EACCES || failure == EPERM) ? @"; see /proc/sys/kernel/perf_event_paranoid" : @""];
 
-            [self _gsUnavailable:reason];
+            // Not allowed, or no perf events at all: that won't change.
+            if (failure == EACCES || failure == EPERM || failure == ENOSYS) {
+                [self _gsUnavailable:reason];
+            } else {
+                [self _gsFailed:reason];
+            }
             return nil;
         }
         counters->_fds[event][counters->_fdCount[event]++] = fd;
@@ -273,24 +311,38 @@ static NSString *GSCountersUnavailableReason = nil;
 #endif
 }
 
-- (void) dealloc
+- (void) close
 {
 #if defined(__linux__)
     for (int event = 0; event < GSCounterCount; event++) {
-        for (int i = 0; i < _fdCount[event]; i++) {
-            close(_fds[event][i]);
+        while (_fdCount[event] > 0) {
+            close(_fds[event][--_fdCount[event]]);
         }
     }
 #endif
+}
+
+- (void) dealloc
+{
+    [self close];
     [super dealloc];
 }
 
 - (void) start
 {
 #if defined(__linux__)
+    // The times since the counter was opened aren't reset, so each run is
+    // measured from a reading at its start.
     for (int event = 0; event < GSCounterCount; event++) {
         for (int i = 0; i < _fdCount[event]; i++) {
-            ioctl(_fds[event][i], PERF_EVENT_IOC_RESET, 0);
+            if (read(_fds[event][i], _startReadings[event][i], sizeof(_startReadings[event][i]))
+                != sizeof(_startReadings[event][i])) {
+                memset(_startReadings[event][i], 0, sizeof(_startReadings[event][i]));
+            }
+        }
+    }
+    for (int event = 0; event < GSCounterCount; event++) {
+        for (int i = 0; i < _fdCount[event]; i++) {
             ioctl(_fds[event][i], PERF_EVENT_IOC_ENABLE, 0);
         }
     }
@@ -306,18 +358,33 @@ static NSString *GSCountersUnavailableReason = nil;
         }
     }
     for (int event = 0; event < GSCounterCount; event++) {
-        _values[event] = 0;
+        double count = 0, enabled = 0, running = 0;
+        BOOL readAll = (_fdCount[event] > 0);
+
         for (int i = 0; i < _fdCount[event]; i++) {
             uint64_t data[3];
 
-            // value, time enabled, time running: scale up for the time
-            // the counter had to share the hardware.
-            if (read(_fds[event][i], data, sizeof(data)) == sizeof(data) && data[2] > 0) {
-                _values[event] += (double)data[0] * ((double)data[1] / (double)data[2]);
+            if (read(_fds[event][i], data, sizeof(data)) != sizeof(data)) {
+                readAll = NO;
+                continue;
             }
+            count += (double)(data[0] - _startReadings[event][i][0]);
+            // A hybrid CPU's counters run in turn as the thread moves
+            // between kinds of core, so together they ran for the sum of
+            // their running times, out of the time they were enabled.
+            enabled = MAX(enabled, (double)(data[1] - _startReadings[event][i][1]));
+            running += (double)(data[2] - _startReadings[event][i][2]);
         }
+        // Scaled up for the time the counters had to share the hardware.
+        _counted[event] = readAll && running > 0;
+        _values[event] = _counted[event] ? count * (running < enabled ? enabled / running : 1) : 0;
     }
 #endif
+}
+
+- (BOOL) counted: (GSCounter)counter
+{
+    return _counted[counter];
 }
 
 - (double) valueOf: (GSCounter)counter
@@ -568,16 +635,28 @@ static XCTPerformanceMeasurement *GSMeasurement(NSString *identifier, NSString *
     XCTPerformanceMeasurement *time = GSMeasurement(@"com.apple.dt.XCTMetric_CPU.time", @"CPU Time",
                                                     _stopCPUTime - _startCPUTime, @"s");
 
-    if (_gsCounters == nil) {
-        return [NSArray arrayWithObject:time];
+    NSMutableArray *measurements = [NSMutableArray array];
+
+    // In Apple's order and units (thousands); a counter that didn't count
+    // this run is left out rather than reported as 0.
+    if ([_gsCounters counted:GSCounterInstructions]) {
+        [measurements addObject:GSMeasurement(@"com.apple.dt.XCTMetric_CPU.instructions_retired",
+            @"CPU Instructions Retired", [_gsCounters valueOf:GSCounterInstructions] / 1000.0, @"kI")];
     }
-    // In Apple's order and units (thousands).
-    return [NSArray arrayWithObjects:
-        GSMeasurement(@"com.apple.dt.XCTMetric_CPU.instructions_retired", @"CPU Instructions Retired",
-                      [_gsCounters valueOf:GSCounterInstructions] / 1000.0, @"kI"),
-        GSMeasurement(@"com.apple.dt.XCTMetric_CPU.cycles", @"CPU Cycles",
-                      [_gsCounters valueOf:GSCounterCycles] / 1000.0, @"kC"),
-        time, nil];
+    if ([_gsCounters counted:GSCounterCycles]) {
+        [measurements addObject:GSMeasurement(@"com.apple.dt.XCTMetric_CPU.cycles",
+            @"CPU Cycles", [_gsCounters valueOf:GSCounterCycles] / 1000.0, @"kC")];
+    }
+    [measurements addObject:time];
+    return measurements;
+}
+
+// The counters stay open across a measurement's runs, then are closed.
+- (void) _gsDidFinishMeasuring
+{
+    [_gsCounters release];
+    _gsCounters = nil;
+    _gsCountersOpened = NO;
 }
 
 @end
@@ -641,17 +720,26 @@ static XCTPerformanceMeasurement *GSMeasurement(NSString *identifier, NSString *
                                     toEndTime: (XCTPerformanceMeasurementTimestamp *)endTime
                                         error: (NSError **)error
 {
+    NSMutableArray *measurements = [NSMutableArray array];
+
     // Without the counters there is nothing to report, which isn't a
     // failure (the reason was logged).
-    if (_counters == nil) {
-        return [NSArray array];
+    if ([_counters counted:GSCounterCacheMisses]) {
+        [measurements addObject:GSMeasurement(@"org.gnustep.XCTMetric_HardwareCounter.cache_misses",
+            @"Cache Misses", [_counters valueOf:GSCounterCacheMisses], @"misses")];
     }
-    return [NSArray arrayWithObjects:
-        GSMeasurement(@"org.gnustep.XCTMetric_HardwareCounter.cache_misses", @"Cache Misses",
-                      [_counters valueOf:GSCounterCacheMisses], @"misses"),
-        GSMeasurement(@"org.gnustep.XCTMetric_HardwareCounter.branch_misses", @"Branch Misses",
-                      [_counters valueOf:GSCounterBranchMisses], @"misses"),
-        nil];
+    if ([_counters counted:GSCounterBranchMisses]) {
+        [measurements addObject:GSMeasurement(@"org.gnustep.XCTMetric_HardwareCounter.branch_misses",
+            @"Branch Misses", [_counters valueOf:GSCounterBranchMisses], @"misses")];
+    }
+    return measurements;
+}
+
+- (void) _gsDidFinishMeasuring
+{
+    [_counters release];
+    _counters = nil;
+    _countersOpened = NO;
 }
 
 @end

@@ -246,6 +246,35 @@ automaticallyStartMeasuring: (BOOL)automaticallyStartMeasuring
     [state->metrics release];
     state->metrics = [metrics copy];
 
+    @try {
+        [self _gsRunMetrics:metrics iterations:iterations automaticStart:automaticStart
+              automaticStop:automaticStop identifiers:identifiers measurements:measurements values:values
+                      block:block];
+    }
+    @finally {
+        // Metrics can let go of what they held (the counters' files) now,
+        // rather than when the test case is released at the end of the run.
+        for (id<XCTMetric> metric in metrics) {
+            if ([metric respondsToSelector:@selector(_gsDidFinishMeasuring)]) {
+                [(id<GSXCTMetricFinishing>)metric _gsDidFinishMeasuring];
+            }
+        }
+    }
+}
+
+// The runs of -_gsMeasureMetrics:..., reporting their measurements; stops
+// at a failure (which it records).
+- (void) _gsRunMetrics: (NSArray *)metrics
+            iterations: (NSUInteger)iterations
+        automaticStart: (BOOL)automaticStart
+         automaticStop: (BOOL)automaticStop
+           identifiers: (NSMutableArray *)identifiers
+          measurements: (NSMutableDictionary *)measurements
+                values: (NSMutableDictionary *)values
+                 block: (void (^)(void))block
+{
+    GSXCTPerformanceState *state = [self _gsPerformanceState];
+
     for (NSUInteger iteration = 0; iteration < iterations; iteration++) {
         state->startCount = 0;
         state->stopCount = 0;

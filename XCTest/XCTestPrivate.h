@@ -181,6 +181,12 @@ NSString *_GSXCTDescribeException(NSException *exception);
 - (void) _gsTerminateWithExitCode: (int)exitCode;
 @end
 
+// Implemented by metrics that hold resources while measuring (the
+// hardware counters): called once a measure method has finished its runs.
+@protocol GSXCTMetricFinishing
+- (void) _gsDidFinishMeasuring;
+@end
+
 @interface GSXCTestRunner (GSPerformancePrivate)
 // The baseline ({average, maxPercentRegression}) for a measurement of
 // "Class/testMethod", or nil.

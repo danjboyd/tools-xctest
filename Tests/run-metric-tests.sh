@@ -43,7 +43,7 @@ assert_contains "testAllMetrics measured [Memory Physical, kB] average: "
 # start with ManuallyStart; its measurements are reported by identifier.
 hooks=$(printf '%s\n' "$output" | grep -o 'widget: .*' | paste -sd '|' -)
 expected="widget: willBegin|widget: block before start|widget: didStart|widget: block measuring|widget: didStop"
-[ "$hooks" = "$expected|$expected" ] || fail "unexpected metric hooks: $hooks"
+[ "$hooks" = "$expected|$expected|widget: finished" ] || fail "unexpected metric hooks: $hooks"
 [ "$(values testManualStartAndCustomMetric "Widgets, w")" = "1.000000, 2.000000" ] || fail "expected the custom metric's values"
 assert_not_contains "timestamps out of order"
 
@@ -88,6 +88,8 @@ assert_contains "testNeverStarts: Must call -startMeasuring and -stopMeasuring o
 assert_not_contains "testNeverStarts: Cannot call -stopMeasuring before -startMeasuring."
 assert_contains "testMeasuresTwice: API violation - measure methods can only be called once per test."
 assert_contains "testMetricError: Failed to measure WidgetMetric: widget counter broke"
+# Metrics are told measuring has finished, even when it failed.
+[ "$(printf '%s\n' "$output" | grep -c 'widget: finished')" -ge 1 ] || fail "expected the metric to be told measuring finished"
 assert_contains "testZeroIterations: The iteration count must be at least 1."
 
 # Baselines are kept per measurement, under the test's "metrics"; polarity

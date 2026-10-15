@@ -21,10 +21,30 @@ and recorded here for review.
   counter per thread, so "the process" means the measuring thread and its
   new threads. CPU time still covers the whole process, as before.
 - **Hybrid CPUs** (Intel cpu_core/cpu_atom): one counter per kind of core
-  (`PERF_PMU_TYPE_SHIFT`, Linux 6.0 and later), summed, so work on either
-  kind is counted; on older kernels, a single generic counter.
-- **Multiplexing.** Counts are scaled by time enabled ÷ time running, as
-  `perf stat` does.
+  (`PERF_PMU_TYPE_SHIFT`, Linux 6.0 and later), so work on either kind is
+  counted; on older kernels, a single generic counter.
+- **Scaling** (fixed after review). Each run reads the counters at its
+  start and end and uses the differences: `PERF_EVENT_IOC_RESET` doesn't
+  reset the enabled/running times, so totals since opening would scale a
+  run by earlier runs' ratios. A hybrid CPU's counters for one event run in
+  turn as the thread moves between kinds of core, so their counts are
+  summed and scaled once, by the largest time enabled over the sum of the
+  times running (1 unless they had to share the hardware). Scaling each
+  separately counted time on the other kind of core as multiplexing and
+  inflated the counts (about 2× for a thread split evenly).
+- **A counter that never ran** (every hardware counter taken by another
+  user, or a failed read) is left out of that run's measurements rather
+  than reported as 0, which a recorded baseline would never flag.
+- **Only permanent failures turn the counters off.** EACCES/EPERM (not
+  allowed) and ENOSYS (no perf events) do, for the rest of the process.
+  Others (EMFILE, an event this CPU lacks, ...) leave out just those
+  counters, logged once per reason, so one metric's failure doesn't change
+  what another reports.
+- **Files.** Counters are opened with close-on-exec, and closed when a
+  measure method finishes (a private `_gsDidFinishMeasuring` hook), not
+  when the test case is released at the end of the run: each suite keeps
+  its tests' first instances, so hundreds of performance tests would
+  otherwise hold thousands of descriptors.
 - **GSXCTHardwareCounterMetric** reports raw counts ("misses") rather than
   thousands, with `org.gnustep.XCTMetric_HardwareCounter.*` identifiers, as
   it isn't Apple's.
