@@ -21,6 +21,7 @@
 #import <XCTest/GSXCTestReporting.h>
 #import <XCTest/XCTestPrivate.h>
 
+#include <math.h>
 #include <stdio.h>
 
 @implementation GSXCTestIssue
@@ -824,6 +825,37 @@ static NSString *GSJUnitTimestamp(NSDate *date)
     return [calendarDate descriptionWithCalendarFormat:@"%Y-%m-%dT%H:%M:%S"];
 }
 
+// A test's measurements as <properties>, which Jenkins and GitLab show:
+// performance.<metric>.average, .median, ..., and the verdict.
+static NSString *GSJUnitMeasurementProperties(GSXCTestCaseResult *test)
+{
+    NSMutableString *xml = [NSMutableString string];
+
+    for (GSXCTMeasurement *measurement in [test measurements]) {
+        NSString *prefix = [NSString stringWithFormat:@"performance.%@", [measurement metricIdentifier]];
+        NSMutableArray *pairs = [NSMutableArray arrayWithObjects:
+            @"average", [NSString stringWithFormat:@"%.6f", [measurement average]],
+            @"median", [NSString stringWithFormat:@"%.6f", [measurement median]],
+            @"relativeStandardDeviation", [NSString stringWithFormat:@"%.3f", [measurement relativeStandardDeviation]],
+            @"unit", ([measurement unitSymbol] ? [measurement unitSymbol] : @""),
+            nil];
+
+        if ([measurement baselineAverage] != nil) {
+            [pairs addObject:@"baselineAverage"];
+            [pairs addObject:[NSString stringWithFormat:@"%.6f", [[measurement baselineAverage] doubleValue]]];
+        }
+        if ([measurement verdictName] != nil) {
+            [pairs addObject:@"verdict"];
+            [pairs addObject:[measurement verdictName]];
+        }
+        for (NSUInteger i = 0; i + 1 < [pairs count]; i += 2) {
+            [xml appendFormat:@"        <property name=\"%@.%@\" value=\"%@\"/>\n",
+                GSXMLEscape(prefix), [pairs objectAtIndex:i], GSXMLEscape([pairs objectAtIndex:i + 1])];
+        }
+    }
+    return [xml length] ? [NSString stringWithFormat:@"      <properties>\n%@      </properties>\n", xml] : @"";
+}
+
 // Appends a <failure> or <error> element for a list of failures.
 static void GSAppendJUnitFailures(NSMutableString *xml, NSArray *failures)
 {
@@ -929,6 +961,8 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
             NSArray *savedAttachments = GSSavedAttachments(test);
             BOOL hasOutput = [[test expectedFailures] count] > 0 || [[test measurements] count] > 0
                 || [savedAttachments count] > 0;
+            // First in the element, whatever follows.
+            NSString *properties = GSJUnitMeasurementProperties(test);
 
             tests++;
             [casesXML appendFormat:@"    <testcase classname=\"%@\" name=\"%@\" time=\"%.3f\"",
@@ -941,14 +975,16 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
                     failures++;
                 }
                 [casesXML appendString:@">\n"];
+                [casesXML appendString:properties];
                 GSAppendJUnitFailures(casesXML, [test failures]);
                 [casesXML appendString:@"    </testcase>\n"];
             } else if ([test status] == GSXCTestStatusSkipped) {
                 skipped++;
-                [casesXML appendFormat:@">\n      <skipped message=\"%@\"/>\n    </testcase>\n",
-                    GSXMLEscape(GSJUnitIssueLine([test skip]))];
+                [casesXML appendFormat:@">\n%@      <skipped message=\"%@\"/>\n    </testcase>\n",
+                    properties, GSXMLEscape(GSJUnitIssueLine([test skip]))];
             } else if (hasOutput) {
                 [casesXML appendString:@">\n"];
+                [casesXML appendString:properties];
             } else {
                 [casesXML appendString:@"/>\n"];
             }
@@ -1029,6 +1065,121 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
     if (!_wroteReport) {
         NSLog(@"XCTest: Could not write JUnit report to '%@': %@", _path,
             error ? [error localizedDescription] : @"unknown error");
+    }
+}
+
+@end
+
+#pragma mark - Performance report
+
+// A number, or null for one that isn't (NaN).
+static id GSJSONNumber(double value)
+{
+    return isnan(value) || isinf(value) ? (id)[NSNull null] : (id)[NSNumber numberWithDouble:value];
+}
+
+static NSDictionary *GSPerformanceReportEntry(GSXCTestCaseResult *test, GSXCTMeasurement *measurement)
+{
+    NSMutableDictionary *entry = [NSMutableDictionary dictionary];
+    id baseline = [NSNull null];
+
+    [entry setObject:[NSString stringWithFormat:@"%@/%@", [test className], [test methodName]] forKey:@"test"];
+    if ([test iterationCount] > 1) {
+        [entry setObject:[NSNumber numberWithUnsignedInteger:[test iteration]] forKey:@"iteration"];
+    }
+    [entry setObject:[measurement metricIdentifier] forKey:@"metric"];
+    [entry setObject:([measurement displayName] ? [measurement displayName] : @"") forKey:@"displayName"];
+    [entry setObject:([measurement unitSymbol] ? [measurement unitSymbol] : @"") forKey:@"unit"];
+    [entry setObject:[measurement polarityDescription] forKey:@"polarity"];
+    [entry setObject:([measurement values] ? [measurement values] : [NSArray array]) forKey:@"values"];
+    [entry setObject:GSJSONNumber([measurement average]) forKey:@"average"];
+    [entry setObject:GSJSONNumber([measurement median]) forKey:@"median"];
+    [entry setObject:GSJSONNumber([measurement minimum]) forKey:@"min"];
+    [entry setObject:GSJSONNumber([measurement maximum]) forKey:@"max"];
+    [entry setObject:GSJSONNumber([measurement standardDeviation]) forKey:@"stddev"];
+    [entry setObject:GSJSONNumber([measurement relativeStandardDeviation]) forKey:@"relativeStandardDeviation"];
+    if ([measurement baselineAverage] != nil) {
+        baseline = [NSMutableDictionary dictionary];
+        [baseline setObject:[measurement baselineAverage] forKey:@"average"];
+        [baseline setObject:[NSNumber numberWithDouble:[measurement maxPercentRegression]] forKey:@"maxPercentRegression"];
+        if ([measurement baselineStandardDeviation] != nil) {
+            [baseline setObject:[measurement baselineStandardDeviation] forKey:@"stddev"];
+            [baseline setObject:[NSNumber numberWithUnsignedInteger:[measurement baselineCount]] forKey:@"count"];
+        }
+        if ([measurement maxPercentRelativeStandardDeviation] != nil) {
+            [baseline setObject:[measurement maxPercentRelativeStandardDeviation]
+                         forKey:@"maxPercentRelativeStandardDeviation"];
+        }
+    }
+    [entry setObject:baseline forKey:@"baseline"];
+    [entry setObject:([measurement verdictName] ? (id)[measurement verdictName] : (id)[NSNull null]) forKey:@"verdict"];
+    [entry setObject:([measurement baselineAverage] ? GSJSONNumber([measurement percentWorse]) : (id)[NSNull null])
+              forKey:@"percentWorse"];
+    [entry setObject:GSJSONNumber([measurement pValue]) forKey:@"pValue"];
+    return entry;
+}
+
+@implementation GSXCTestPerformanceReporter
+
+@synthesize wroteReport = _wroteReport;
+
+- (id) initWithPath: (NSString *)path machineIdentifier: (NSString *)machineIdentifier
+{
+    self = [super init];
+    if (self) {
+        _path = [path copy];
+        _machineIdentifier = [machineIdentifier copy];
+    }
+    return self;
+}
+
+- (void) dealloc
+{
+    [_path release];
+    [_machineIdentifier release];
+    [super dealloc];
+}
+
+- (void) runDidStart: (GSXCTestRunResult *)run {}
+- (void) suiteHasNoSelectedTests: (GSXCTestSuiteResult *)suite {}
+- (void) suiteDidStart: (GSXCTestSuiteResult *)suite {}
+- (void) testDidStart: (GSXCTestCaseResult *)test {}
+- (void) test: (GSXCTestCaseResult *)test didRecordFailure: (GSXCTestIssue *)failure {}
+- (void) test: (GSXCTestCaseResult *)test didRecordFailureAfterFinishing: (GSXCTestIssue *)failure {}
+- (void) test: (GSXCTestCaseResult *)test didRecordExpectedFailure: (GSXCTestIssue *)failure {}
+- (void) test: (GSXCTestCaseResult *)test didMeasure: (GSXCTMeasurement *)measurement {}
+- (void) test: (GSXCTestCaseResult *)test didStartActivity: (NSArray *)activityPath atTime: (NSTimeInterval)time {}
+- (void) suite: (GSXCTestSuiteResult *)suite didRecordClassFailure: (GSXCTestIssue *)failure {}
+- (void) test: (GSXCTestCaseResult *)test didSaveAttachment: (GSXCTAttachmentRecord *)attachment {}
+- (void) testDidFinish: (GSXCTestCaseResult *)test {}
+- (void) testWillBeRetried: (GSXCTestCaseResult *)test {}
+- (void) suiteDidFinish: (GSXCTestSuiteResult *)suite {}
+
+- (void) runDidFinish: (GSXCTestRunResult *)run
+{
+    NSMutableArray *measurements = [NSMutableArray array];
+    NSDictionary *report = nil;
+    NSData *data = nil;
+
+    for (GSXCTestSuiteResult *suite in [run suiteResults]) {
+        for (GSXCTestCaseResult *test in [suite testResults]) {
+            for (GSXCTMeasurement *measurement in [test measurements]) {
+                [measurements addObject:GSPerformanceReportEntry(test, measurement)];
+            }
+        }
+    }
+
+    report = [NSDictionary dictionaryWithObjectsAndKeys:
+        [NSNumber numberWithInt:1], @"version",
+        ([run bundleName] ? [run bundleName] : @""), @"bundle",
+        (_machineIdentifier ? _machineIdentifier : @""), @"machine",
+        GSJUnitTimestamp([run startDate] ? [run startDate] : [NSDate date]), @"date",
+        measurements, @"measurements",
+        nil];
+    data = [NSJSONSerialization dataWithJSONObject:report options:NSJSONWritingPrettyPrinted error:NULL];
+    _wroteReport = (data != nil && [data writeToFile:_path atomically:YES]);
+    if (!_wroteReport) {
+        NSLog(@"XCTest: Could not write the performance report to '%@'.", _path);
     }
 }
 

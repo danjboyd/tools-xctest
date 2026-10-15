@@ -209,6 +209,7 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 @synthesize performanceWarmUpIterations;
 @synthesize performanceInconclusiveFails;
 @synthesize performanceMachineIdentifier;
+@synthesize performanceReportPath;
 @synthesize repetitionMode;
 @synthesize testIterations;
 @synthesize testTimeoutsEnabled;
@@ -239,6 +240,7 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     [performanceBaselinesPath release];
     [performanceBaselines release];
     [performanceMachineIdentifier release];
+    [performanceReportPath release];
     [bundleName release];
     [junitReportPath release];
     [terminationHandler release];
@@ -493,12 +495,24 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     GSXCTestJUnitReporter *junitReporter = junitReportPath
         ? [[[GSXCTestJUnitReporter alloc] initWithPath:junitReportPath] autorelease]
         : nil;
-    NSArray *reporters = [NSArray arrayWithObjects:consoleReporter, junitReporter, nil];
+    GSXCTestPerformanceReporter *performanceReporter = performanceReportPath
+        ? [[[GSXCTestPerformanceReporter alloc] initWithPath:performanceReportPath
+                                           machineIdentifier:[self _gsPerformanceMachineIdentifier]] autorelease]
+        : nil;
+    NSMutableArray *reporters = [NSMutableArray arrayWithObject:consoleReporter];
+
+    if (junitReporter != nil) {
+        [reporters addObject:junitReporter];
+    }
+    if (performanceReporter != nil) {
+        [reporters addObject:performanceReporter];
+    }
 
     // A parallel worker reports to its coordinator.
     if (workerResultsPath != nil) {
         junitReporter = nil;
-        reporters = [NSArray arrayWithObjects:
+        performanceReporter = nil;
+        reporters = [NSMutableArray arrayWithObjects:
             [[[GSXCTestWorkerConsoleReporter alloc] initWithReporter:consoleReporter] autorelease],
             [[[GSXCTestWorkerResultsReporter alloc] initWithPath:workerResultsPath] autorelease],
             nil];
@@ -557,7 +571,8 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     // A run that executes no tests fails: it almost always means the
     // bundle or the selection isn't what was intended.
     return [[topSuite testRun] hasSucceeded] && [[topSuite testRun] executionCount] > 0
-        && savedBaselines && (junitReporter == nil || [junitReporter wroteReport]);
+        && savedBaselines && (junitReporter == nil || [junitReporter wroteReport])
+        && (performanceReporter == nil || [performanceReporter wroteReport]);
 }
 
 // Reads performanceBaselinesPath. A missing file is fine when updating

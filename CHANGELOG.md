@@ -23,6 +23,11 @@ counted, as Apple's XCTest does, so their averages can differ from 0.5.x.
   `XCTEST_MACHINE_ID`, or their CPU, cores and architecture
   (`+[GSXCTestRunner defaultPerformanceMachineIdentifier]`), and recorded
   under `"machines"` when named.
+- `-performance-report <path>` writes the run's measurements as JSON, with
+  their statistics, baselines and verdicts; JUnit reports give each test's
+  measurements as `<properties>`.
+- The metric regression checks spin on CPU time, so a busy machine doesn't
+  fail them.
 
 ## 0.5.1
 

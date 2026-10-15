@@ -56,6 +56,7 @@ typedef enum {
     NSInteger performanceWarmUpIterations;
     BOOL performanceInconclusiveFails;
     NSString *performanceMachineIdentifier;
+    NSString *performanceReportPath;
     GSXCTestRepetitionMode repetitionMode;
     NSUInteger testIterations;
     GSXCTestOutputFormat outputFormat;
@@ -122,6 +123,11 @@ typedef enum {
  * records them for this machine.
  */
 @property (copy) NSString *performanceMachineIdentifier;
+
+/*! If set, the run's performance measurements, with their statistics,
+ * baselines and verdicts, are written here as JSON after each run (see
+ * GSXCTestPerformanceReporter). A run that can't write it counts as failed. */
+@property (copy) NSString *performanceReportPath;
 
 /*! The CPU's name, number of cores and architecture: "Intel(R) Core(TM)
  * Ultra 7 255U, 12 cores, x86_64". Unlike a host name, it is the same on
