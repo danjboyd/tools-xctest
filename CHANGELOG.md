@@ -18,6 +18,11 @@ counted, as Apple's XCTest does, so their averages can differ from 0.5.x.
   YES`. Entries can set `maxPercentRelativeStandardDeviation` too.
 - Measurements report their median and minimum (console and JUnit).
 - `-performance-warmup-iterations <n>` sets the number of warm-up runs.
+- Baselines for particular machines, in an entry's `"machines"`, override
+  its own. Machines are named by `-performance-machine-id`,
+  `XCTEST_MACHINE_ID`, or their CPU, cores and architecture
+  (`+[GSXCTestRunner defaultPerformanceMachineIdentifier]`), and recorded
+  under `"machines"` when named.
 
 ## 0.5.1
 

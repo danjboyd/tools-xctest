@@ -375,6 +375,11 @@ static NSString *GSAbsolutePath(NSString *path)
         [arguments addObject:@"-performance-warmup-iterations"];
         [arguments addObject:[NSString stringWithFormat:@"%ld", (long)performanceWarmUpIterations]];
     }
+    // XCTEST_MACHINE_ID reaches them through the environment.
+    if (performanceMachineIdentifier != nil) {
+        [arguments addObject:@"-performance-machine-id"];
+        [arguments addObject:performanceMachineIdentifier];
+    }
     if (performanceInconclusiveFails) {
         [arguments addObject:@"-performance-inconclusive-fails"];
         [arguments addObject:@"YES"];
@@ -486,6 +491,9 @@ static NSString *GSAbsolutePath(NSString *path)
 
     for (id<GSXCTestReporter> reporter in reporters) {
         [reporter runDidStart:run];
+    }
+    if (performanceBaselinesPath != nil) {
+        NSLog(@"XCTest: Performance baselines for machine \"%@\"", [self _gsPerformanceMachineIdentifier]);
     }
     if ([classNames count] > 0) {
         NSLog(@"XCTest: Running %lu test classes in parallel, %lu at a time",
