@@ -294,8 +294,8 @@ kept if its test fails, unless its `lifetime` is
 
 ### Performance tests
 
-`measureBlock:` runs a block 10 times and reports the average wall-clock time
-and relative standard deviation. `measureMetrics:automaticallyStartMeasuring:NO
+`measureBlock:` runs a block 10 times and reports the average wall-clock time,
+relative standard deviation, median and minimum. `measureMetrics:automaticallyStartMeasuring:NO
 forBlock:` with `startMeasuring`/`stopMeasuring` measures only part of each run.
 
 To catch regressions, keep baselines in a JSON file keyed by
@@ -312,9 +312,11 @@ the file instead (keeping each entry's settings). Apple keeps baselines in the
 Xcode project; this file is the GNUstep equivalent.
 
 `measureWithMetrics:options:block:` (and `measureWithMetrics:block:`,
-`measureWithOptions:block:`) runs the block `iterationCount` times (default 5)
+`measureWithOptions:block:`) runs the block once as a warm-up, which isn't
+counted, then `iterationCount` times (default 5), as Apple's XCTest does,
 with any `XCTMetric`s: `XCTClockMetric` (the default), `XCTCPUMetric` (CPU time,
-for the process or the current thread), `XCTMemoryMetric` (resident memory
+for the process or the current thread, and on Linux the instructions retired
+and cycles; see below), `XCTMemoryMetric` (resident memory
 change and peak, in kB) and `XCTStorageMetric` (logical writes, in kB), read
 from `getrusage` and `/proc` (on Windows, from the process and thread APIs,
 where the memory peak is the process's peak so far), or your own class
@@ -326,6 +328,99 @@ whether larger or smaller is worse:
 ```json
 { "ParserTests/testParse": { "metrics": { "com.apple.dt.XCTMetric_CPU.time": { "average": 0.05, "maxPercentRegression": 20 } } } }
 ```
+
+`-performance-warmup-iterations <n>` sets the number of warm-up runs for all
+measure methods (`measureBlock:` has none by default).
+
+On a busy machine, such as a shared CI runner, a test can come out slower than
+its baseline by chance. `-update-performance-baselines` therefore also records
+each measurement's standard deviation and number of values (`"stddev"` and
+`"count"`, in a `"version": 2` file; older versions of `xctest` ignore them).
+With these, a test only fails when it is past `maxPercentRegression` **and**
+significantly worse (a one-sided Welch's t-test, p < 0.05). Past the threshold
+but not significantly worse is *inconclusive*: the test passes, with a warning
+in the console and JUnit report. An entry can also set
+`maxPercentRelativeStandardDeviation`: a measurement noisier than that is
+inconclusive too, unless it significantly regressed.
+
+```json
+{ "version": 2,
+  "ParserTests/testParseLargeFile": { "average": 0.120, "stddev": 0.004, "count": 10,
+                                      "maxPercentRegression": 10, "maxPercentRelativeStandardDeviation": 15 } }
+```
+
+`-performance-inconclusive-fails YES` fails inconclusive tests as well. Entries
+without `stddev` and `count` are judged by `maxPercentRegression` alone, as
+before.
+
+A laptop's baseline is no use on a CI runner, so an entry can also have
+baselines for particular machines, under `"machines"`. This machine's override
+the entry's own, key by key (so `maxPercentRegression` can be set once for all
+machines):
+
+```json
+{ "ParserTests/testParseLargeFile": { "average": 0.120, "maxPercentRegression": 10,
+    "machines": { "ci": { "average": 0.180, "stddev": 0.010, "count": 10 },
+                  "AMD EPYC 7763 64-Core Processor, 4 cores, x86_64": { "average": 0.150 } } } }
+```
+
+A machine is named by `-performance-machine-id <id>` or `XCTEST_MACHINE_ID`,
+or otherwise by its CPU, number of cores and architecture, which `xctest` logs
+when it reads baselines. A CPU-based name stays the same across a CI service's
+runners, unlike a host name. When a machine is named (`auto` names it by its
+CPU), `-update-performance-baselines` records its baselines under `"machines"`,
+as it does for tests that already have baselines for machines; otherwise it
+records them in the entry, as before.
+
+For dashboards and trend charts, `-performance-report <path>` writes every
+measurement of the run as JSON, with its statistics, the baseline it was
+compared with and the verdict:
+
+```json
+{ "version": 1, "bundle": "ParserTests.xctest", "machine": "ci", "date": "2026-10-15T23:10:00",
+  "measurements": [ { "test": "ParserTests/testParseLargeFile", "metric": "com.apple.XCTPerformanceMetric_WallClockTime",
+                      "displayName": "Time", "unit": "seconds", "polarity": "prefers smaller",
+                      "values": [0.121, 0.119, ...], "average": 0.120, "median": 0.120, "min": 0.118, "max": 0.123,
+                      "stddev": 0.0015, "relativeStandardDeviation": 1.25,
+                      "baseline": { "average": 0.118, "stddev": 0.002, "count": 10, "maxPercentRegression": 10 },
+                      "verdict": "passed", "percentWorse": 1.7, "pValue": 0.04 } ] }
+```
+
+`baseline`, `verdict`, `percentWorse` and `pValue` are `null` when there's
+nothing to compare with; `iteration` is added when tests are repeated. A run
+that can't write the report fails. The JUnit report also gives each test's
+measurements as `<properties>` (`performance.<metric>.average`, `.median`,
+`.relativeStandardDeviation`, `.unit`, `.baselineAverage` and `.verdict`),
+which Jenkins and GitLab show with the test.
+
+#### Hardware counters
+
+On Linux, `XCTCPUMetric` also reports the instructions retired and cycles of
+the measured code (`"CPU Instructions Retired", kI` and `"CPU Cycles", kC`, as
+Apple's does), and `GSXCTHardwareCounterMetric`, which Apple's XCTest doesn't
+have, reports last-level cache misses and mispredicted branches. Instruction
+counts hardly change from run to run, even on a busy CI machine, so they make
+much steadier baselines than times:
+
+```objc
+[self measureWithMetrics:[NSArray arrayWithObject:[[[XCTCPUMetric alloc] init] autorelease]]
+                   block:^{ [parser parse:data]; }];
+```
+
+They're read straight from the kernel (`perf_event_open`, user-mode work only;
+no library is needed). The kernel only allows that if
+`/proc/sys/kernel/perf_event_paranoid` is 2 or less, and Debian and Ubuntu set it
+to 3 or more by default; containers and virtual machines may not have the
+counters at all. Where they're unavailable, `xctest` logs the reason once,
+leaves those measurements out and doesn't fail the test; elsewhere than Linux
+they're always unavailable. To allow them on a development machine:
+
+```sh
+sudo sysctl kernel.perf_event_paranoid=2
+```
+
+`XCTEST_PERF_COUNTERS=0` turns them off; `[GSXCTHardwareCounterMetric isAvailable]`
+says whether they can be read.
 
 ### Hosted tests (running inside your application)
 

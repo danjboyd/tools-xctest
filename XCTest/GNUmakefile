@@ -17,7 +17,7 @@ XCTest_OBJC_FILES = XCTestAssertions.m XCTestCase.m GSXCTestRunner.m \
 	XCAbstractTest.m XCTestSuite.m XCTestRun.m XCTestObservationCenter.m \
 	XCTIssue.m XCTExpectedFailure.m XCTestCase+Performance.m GSXCTestWatchdog.m \
 	XCTContext.m XCTAttachment.m XCTMetric.m \
-	GSXCTestParallel.m
+	GSXCTestParallel.m GSXCTStatistics.m
 XCTest_INCLUDE_DIRS = -I../
 
 # Preloaded into host applications by `xctest -host`.

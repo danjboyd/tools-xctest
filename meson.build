@@ -1,4 +1,4 @@
-project('xctest', 'objc', version : '0.5.1', default_options : ['warning_level=3'])
+project('xctest', 'objc', version : '0.6.0', default_options : ['warning_level=3'])
 
 pkg = import('pkgconfig')
 
@@ -71,6 +71,7 @@ source = [
 	'XCTest/XCTAttachment.m',
 	'XCTest/XCTMetric.m',
 	'XCTest/GSXCTestParallel.m',
+	'XCTest/GSXCTStatistics.m',
 ]
 
 headers = [

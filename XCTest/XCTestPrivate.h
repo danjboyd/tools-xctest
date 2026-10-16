@@ -181,12 +181,21 @@ NSString *_GSXCTDescribeException(NSException *exception);
 - (void) _gsTerminateWithExitCode: (int)exitCode;
 @end
 
+// Implemented by metrics that hold resources while measuring (the
+// hardware counters): called once a measure method has finished its runs.
+@protocol GSXCTMetricFinishing
+- (void) _gsDidFinishMeasuring;
+@end
+
 @interface GSXCTestRunner (GSPerformancePrivate)
 // The baseline ({average, maxPercentRegression}) for a measurement of
 // "Class/testMethod", or nil.
 - (NSDictionary *) _gsPerformanceBaselineForTest: (NSString *)identifier metric: (NSString *)metric;
-// Remembers a measured average, written out with -update-performance-baselines.
-- (void) _gsRecordPerformanceAverage: (double)average forTest: (NSString *)identifier metric: (NSString *)metric;
+// The machine baselines are looked up for (see performanceMachineIdentifier).
+- (NSString *) _gsPerformanceMachineIdentifier;
+// Remembers a measurement's average, standard deviation and number of
+// values, written out with -update-performance-baselines.
+- (void) _gsRecordPerformanceMeasurement: (GSXCTMeasurement *)measurement forTest: (NSString *)identifier;
 @end
 
 @interface XCTestObservationCenter (GSPrivate)

@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 // A custom metric: logs its hooks and reports a count that prefers larger.
 @interface WidgetMetric : NSObject <XCTMetric> {
@@ -18,6 +19,9 @@
 - (void)willBeginMeasuring { NSLog(@"widget: willBegin"); }
 - (void)didStartMeasuring { NSLog(@"widget: didStart"); }
 - (void)didStopMeasuring { NSLog(@"widget: didStop"); runs++; }
+// xctest's private hook for metrics that hold resources (the hardware
+// counters' files) while measuring.
+- (void)_gsDidFinishMeasuring { NSLog(@"widget: finished"); }
 
 - (NSArray *)reportMeasurementsFromStartTime:(XCTPerformanceMeasurementTimestamp *)startTime
                                    toEndTime:(XCTPerformanceMeasurementTimestamp *)endTime
@@ -61,10 +65,17 @@
 
     [options setIterationCount:3];
     [self measureWithMetrics:metrics options:options block:^{
-        // CPU: spin for 20ms; storage: write 100 kB; memory: touch 8 MB.
-        NSDate *until = [NSDate dateWithTimeIntervalSinceNow:0.02];
+        // CPU: spin for 20ms of CPU time (so a busy machine doesn't shorten
+        // it); storage: write 100 kB; memory: touch 8 MB.
         volatile unsigned long spin = 0;
+#if defined(_WIN32)
+        // clock() is elapsed time there.
+        NSDate *until = [NSDate dateWithTimeIntervalSinceNow:0.02];
         while ([until timeIntervalSinceNow] > 0) { spin++; }
+#else
+        clock_t until = clock() + CLOCKS_PER_SEC / 50;
+        while (clock() < until) { spin++; }
+#endif
 #if defined(_WIN32)
         // The file system representation is UTF-16 there.
         FILE *file = _wfopen((const wchar_t *)[path fileSystemRepresentation], L"w");
@@ -106,6 +117,22 @@
         [self stopMeasuring];
         NSLog(@"metric: after stop");
     }];
+}
+
+// Hardware counters, where the system allows them; the test passes
+// either way.
+- (void)testHardwareCounters
+{
+    NSArray *metrics = [NSArray arrayWithObjects:[[[XCTCPUMetric alloc] init] autorelease],
+        [[[GSXCTHardwareCounterMetric alloc] init] autorelease], nil];
+    XCTMeasureOptions *options = [XCTMeasureOptions defaultOptions];
+
+    [options setIterationCount:3];
+    [self measureWithMetrics:metrics options:options block:^{
+        volatile unsigned long sum = 0;
+        for (unsigned long i = 0; i < 2000000; i++) { sum += i; }
+    }];
+    NSLog(@"counters available: %@", [GSXCTHardwareCounterMetric isAvailable] ? @"YES" : @"NO");
 }
 
 - (void)testDefaults
@@ -161,6 +188,75 @@
 - (void)testWidgetsRegress
 {
     [self measureWithMetrics:[NSArray arrayWithObject:[[[WidgetMetric alloc] init] autorelease]] block:^{}];
+}
+
+@end
+
+// Reports the next of a fixed series of values each run (the first is the
+// warm-up's), so comparisons with baselines are deterministic.
+@interface SeriesMetric : NSObject <XCTMetric> {
+    NSArray *values;
+    NSUInteger run;
+}
+- (id)initWithValues:(NSArray *)someValues;
+@end
+
+@implementation SeriesMetric
+
+- (id)initWithValues:(NSArray *)someValues
+{
+    if ((self = [super init])) values = [someValues copy];
+    return self;
+}
+- (void)dealloc { [values release]; [super dealloc]; }
+- (id)copyWithZone:(NSZone *)zone { return [self retain]; }
+
+- (NSArray *)reportMeasurementsFromStartTime:(XCTPerformanceMeasurementTimestamp *)startTime
+                                   toEndTime:(XCTPerformanceMeasurementTimestamp *)endTime
+                                       error:(NSError **)error
+{
+    double value = [[values objectAtIndex:run++ % [values count]] doubleValue];
+
+    return [NSArray arrayWithObject:[[[XCTPerformanceMeasurement alloc]
+        initWithIdentifier:@"com.example.series" displayName:@"Series" doubleValue:value unitSymbol:@"u"] autorelease]];
+}
+
+@end
+
+// Each is baselined to an average of 100 (see run-metric-tests.sh).
+@interface MetricVerdictTests : XCTestCase
+@end
+
+@implementation MetricVerdictTests
+
+- (void)measureSeries:(NSArray *)values
+{
+    [self measureWithMetrics:[NSArray arrayWithObject:[[[SeriesMetric alloc] initWithValues:values] autorelease]]
+                       block:^{}];
+}
+
+// Steadily 11% worse: significant.
+- (void)testSignificantRegression
+{
+    [self measureSeries:[NSArray arrayWithObjects:@0, @110, @112, @111, @113, @109, nil]];
+}
+
+// 12% worse on average, but all over the place: not significant.
+- (void)testNoisyRegression
+{
+    [self measureSeries:[NSArray arrayWithObjects:@0, @80, @140, @100, @150, @90, nil]];
+}
+
+// Within the allowed regression, but noisier than the baseline allows.
+- (void)testTooNoisy
+{
+    [self measureSeries:[NSArray arrayWithObjects:@0, @90, @110, @95, @105, @100, nil]];
+}
+
+// Better than the baseline.
+- (void)testImprovement
+{
+    [self measureSeries:[NSArray arrayWithObjects:@0, @90, @91, @89, @90, @90, nil]];
 }
 
 @end

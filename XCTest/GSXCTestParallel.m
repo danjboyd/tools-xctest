@@ -32,6 +32,7 @@
 #import <XCTest/XCTestPrivate.h>
 
 #include <limits.h>
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -109,6 +110,20 @@ static NSDictionary *GSPlistFromTest(GSXCTestCaseResult *test)
             [m setObject:[measurement baselineAverage] forKey:@"baselineAverage"];
         }
         [m setObject:[NSNumber numberWithDouble:[measurement maxPercentRegression]] forKey:@"maxPercentRegression"];
+        if ([measurement baselineStandardDeviation] != nil) {
+            [m setObject:[measurement baselineStandardDeviation] forKey:@"baselineStandardDeviation"];
+        }
+        [m setObject:[NSNumber numberWithUnsignedInteger:[measurement baselineCount]] forKey:@"baselineCount"];
+        if ([measurement maxPercentRelativeStandardDeviation] != nil) {
+            [m setObject:[measurement maxPercentRelativeStandardDeviation]
+                  forKey:@"maxPercentRelativeStandardDeviation"];
+        }
+        [m setObject:[NSNumber numberWithInt:[measurement verdict]] forKey:@"verdict"];
+        [m setObject:[NSNumber numberWithDouble:[measurement percentWorse]] forKey:@"percentWorse"];
+        // JSON has no NaN: a missing p-value means there was none.
+        if (!isnan([measurement pValue])) {
+            [m setObject:[NSNumber numberWithDouble:[measurement pValue]] forKey:@"pValue"];
+        }
         return m;
     }) forKey:@"measurements"];
     [plist setObject:GSMap([test attachments], ^id(id item) {
@@ -156,6 +171,14 @@ static GSXCTestCaseResult *GSTestFromPlist(NSDictionary *plist)
         [measurement setValues:[m objectForKey:@"values"]];
         [measurement setBaselineAverage:[m objectForKey:@"baselineAverage"]];
         [measurement setMaxPercentRegression:[[m objectForKey:@"maxPercentRegression"] doubleValue]];
+        [measurement setBaselineStandardDeviation:[m objectForKey:@"baselineStandardDeviation"]];
+        [measurement setBaselineCount:[[m objectForKey:@"baselineCount"] unsignedIntegerValue]];
+        [measurement setMaxPercentRelativeStandardDeviation:[m objectForKey:@"maxPercentRelativeStandardDeviation"]];
+        [measurement setVerdict:(GSXCTMeasurementVerdict)[[m objectForKey:@"verdict"] intValue]];
+        [measurement setPercentWorse:[[m objectForKey:@"percentWorse"] doubleValue]];
+        if ([m objectForKey:@"pValue"] != nil) {
+            [measurement setPValue:[[m objectForKey:@"pValue"] doubleValue]];
+        }
         [[test measurements] addObject:measurement];
     }
     for (NSDictionary *a in [plist objectForKey:@"attachments"]) {
@@ -348,6 +371,19 @@ static NSString *GSAbsolutePath(NSString *path)
         [arguments addObject:@"-performance-baselines"];
         [arguments addObject:GSAbsolutePath(performanceBaselinesPath)];
     }
+    if (performanceWarmUpIterations >= 0) {
+        [arguments addObject:@"-performance-warmup-iterations"];
+        [arguments addObject:[NSString stringWithFormat:@"%ld", (long)performanceWarmUpIterations]];
+    }
+    // XCTEST_MACHINE_ID reaches them through the environment.
+    if (performanceMachineIdentifier != nil) {
+        [arguments addObject:@"-performance-machine-id"];
+        [arguments addObject:performanceMachineIdentifier];
+    }
+    if (performanceInconclusiveFails) {
+        [arguments addObject:@"-performance-inconclusive-fails"];
+        [arguments addObject:@"YES"];
+    }
     if (repetitionMode != GSXCTestRepetitionNone) {
         if (repetitionMode == GSXCTestRepetitionUntilFailure) {
             [arguments addObject:@"-run-tests-until-failure"];
@@ -405,7 +441,8 @@ static NSString *GSAbsolutePath(NSString *path)
     GSXCTestRunResult *run = nil;
     id<GSXCTestReporter> consoleReporter = nil;
     GSXCTestJUnitReporter *junitReporter = nil;
-    NSArray *reporters = nil;
+    GSXCTestPerformanceReporter *performanceReporter = nil;
+    NSMutableArray *reporters = nil;
     NSMutableArray *running = [NSMutableArray array];
     NSUInteger nextClass = 0;
     NSUInteger workerNumber = 0;
@@ -445,7 +482,17 @@ static NSString *GSAbsolutePath(NSString *path)
         ? (id<GSXCTestReporter>)[[[GSXCTestAppleReporter alloc] init] autorelease]
         : (id<GSXCTestReporter>)[[[GSXCTestClassicReporter alloc] init] autorelease];
     junitReporter = junitReportPath ? [[[GSXCTestJUnitReporter alloc] initWithPath:junitReportPath] autorelease] : nil;
-    reporters = [NSArray arrayWithObjects:consoleReporter, junitReporter, nil];
+    performanceReporter = performanceReportPath
+        ? [[[GSXCTestPerformanceReporter alloc] initWithPath:performanceReportPath
+                                           machineIdentifier:[self _gsPerformanceMachineIdentifier]] autorelease]
+        : nil;
+    reporters = [NSMutableArray arrayWithObject:consoleReporter];
+    if (junitReporter != nil) {
+        [reporters addObject:junitReporter];
+    }
+    if (performanceReporter != nil) {
+        [reporters addObject:performanceReporter];
+    }
 
     if (![fileManager createDirectoryAtPath:workDirectory withIntermediateDirectories:YES attributes:nil error:NULL]) {
         NSLog(@"XCTest: Could not create '%@' for parallel workers.", workDirectory);
@@ -455,6 +502,9 @@ static NSString *GSAbsolutePath(NSString *path)
 
     for (id<GSXCTestReporter> reporter in reporters) {
         [reporter runDidStart:run];
+    }
+    if (performanceBaselinesPath != nil) {
+        NSLog(@"XCTest: Performance baselines for machine \"%@\"", [self _gsPerformanceMachineIdentifier]);
     }
     if ([classNames count] > 0) {
         NSLog(@"XCTest: Running %lu test classes in parallel, %lu at a time",
@@ -566,7 +616,8 @@ static NSString *GSAbsolutePath(NSString *path)
     }
     [fileManager removeItemAtPath:workDirectory error:NULL];
 
-    return [identifiers count] > 0 && ![run hasFailed] && !workerFailed && (junitReporter == nil || [junitReporter wroteReport]);
+    return [identifiers count] > 0 && ![run hasFailed] && !workerFailed && (junitReporter == nil || [junitReporter wroteReport])
+        && (performanceReporter == nil || [performanceReporter wroteReport]);
 }
 
 @end

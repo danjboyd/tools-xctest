@@ -53,6 +53,10 @@ typedef enum {
     NSString *performanceBaselinesPath;
     BOOL updatePerformanceBaselines;
     NSMutableDictionary *performanceBaselines;
+    NSInteger performanceWarmUpIterations;
+    BOOL performanceInconclusiveFails;
+    NSString *performanceMachineIdentifier;
+    NSString *performanceReportPath;
     GSXCTestRepetitionMode repetitionMode;
     NSUInteger testIterations;
     GSXCTestOutputFormat outputFormat;
@@ -88,13 +92,47 @@ typedef enum {
  * A JSON file of performance baselines: {"TestClass/testMethod":
  * {"average": seconds, "maxPercentRegression": percent}}. A measured test
  * fails if its average is worse than its baseline by more than
- * maxPercentRegression (default 10).
+ * maxPercentRegression (default 10). With the baseline's "stddev" and
+ * "count", it fails only if it is also significantly worse (Welch's
+ * t-test); otherwise the result is inconclusive.
  */
 @property (copy) NSString *performanceBaselinesPath;
 
-/*! If YES, measured averages are written back to performanceBaselinesPath
- * after the run (keeping each entry's maxPercentRegression). */
+/*! If YES, measured averages (with their standard deviation and number of
+ * values) are written back to performanceBaselinesPath after the run
+ * (keeping each entry's settings). */
 @property BOOL updatePerformanceBaselines;
+
+/*! The number of warm-up runs before the measured runs of a measure
+ * method, which aren't counted; -1 (the default) for Apple's: none for
+ * -measureBlock:, one for -measureWithMetrics:options:block:. */
+@property NSInteger performanceWarmUpIterations;
+
+/*! If YES, an inconclusive comparison with a baseline (worse than allowed
+ * but not significantly, or too noisy) fails the test; by default it is
+ * only reported. */
+@property BOOL performanceInconclusiveFails;
+
+/*!
+ * Names this machine in performance baselines: a test's entry can have
+ * baselines for particular machines, {"machines": {"<identifier>": {...}}},
+ * which take precedence over its own. nil (the default) uses
+ * XCTEST_MACHINE_ID if set, otherwise defaultPerformanceMachineIdentifier;
+ * "auto" means the latter. If one is chosen (here or by XCTEST_MACHINE_ID),
+ * or a test already has machines' baselines, updatePerformanceBaselines
+ * records them for this machine.
+ */
+@property (copy) NSString *performanceMachineIdentifier;
+
+/*! If set, the run's performance measurements, with their statistics,
+ * baselines and verdicts, are written here as JSON after each run (see
+ * GSXCTestPerformanceReporter). A run that can't write it counts as failed. */
+@property (copy) NSString *performanceReportPath;
+
+/*! The CPU's name, number of cores and architecture: "Intel(R) Core(TM)
+ * Ultra 7 255U, 12 cores, x86_64". Unlike a host name, it is the same on
+ * every machine of a kind, such as a CI service's runners. */
++ (NSString *)defaultPerformanceMachineIdentifier;
 
 /*! How tests are repeated; see GSXCTestRepetitionMode. */
 @property GSXCTestRepetitionMode repetitionMode;

@@ -3,6 +3,41 @@
 Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 `vX.Y.Z`; 0.1.x are upstream's (gnustep/tools-xctest).
 
+## 0.6.0
+
+Performance testing: steadier regression checks, hardware counters,
+baselines per machine and a JSON report, with no new dependencies. The
+design choices are recorded in `Docs/decisions-0.6.md`.
+
+Performance tests whose results change: `measureWithMetrics:options:block:`
+(and its variants) now runs its block once more first, as a warm-up that isn't
+counted, as Apple's XCTest does, so their averages can differ from 0.5.x.
+`-performance-warmup-iterations 0` restores the old behaviour.
+
+- Performance baselines can be judged statistically: `-update-performance-baselines`
+  records each measurement's `stddev` and `count` (a `"version": 2` file), and
+  a test then fails only if it is past `maxPercentRegression` and
+  significantly worse (Welch's t-test). Otherwise the result is
+  inconclusive: a warning, or a failure with `-performance-inconclusive-fails
+  YES`. Entries can set `maxPercentRelativeStandardDeviation` too.
+- Measurements report their median and minimum (console and JUnit).
+- `-performance-warmup-iterations <n>` sets the number of warm-up runs.
+- Hardware counters on Linux, read with `perf_event_open` (no library
+  needed): `XCTCPUMetric` reports instructions retired and cycles, as
+  Apple's does, and the new `GSXCTHardwareCounterMetric` cache and branch
+  misses. Where the kernel doesn't allow them, they're left out with one log
+  line; `XCTEST_PERF_COUNTERS=0` turns them off.
+- Baselines for particular machines, in an entry's `"machines"`, override
+  its own. Machines are named by `-performance-machine-id`,
+  `XCTEST_MACHINE_ID`, or their CPU, cores and architecture
+  (`+[GSXCTestRunner defaultPerformanceMachineIdentifier]`), and recorded
+  under `"machines"` when named.
+- `-performance-report <path>` writes the run's measurements as JSON, with
+  their statistics, baselines and verdicts; JUnit reports give each test's
+  measurements as `<properties>`.
+- The metric regression checks spin on CPU time, so a busy machine doesn't
+  fail them.
+
 ## 0.5.1
 
 - The README has Install and Example sections (with real runner output), and

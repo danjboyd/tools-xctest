@@ -35,7 +35,13 @@
 #import <objc/runtime.h>
 
 #include <stdio.h>
+#include <string.h>
 #include <unistd.h>
+#if defined(_WIN32)
+#include <windows.h>
+#else
+#include <sys/utsname.h>
+#endif
 
 @interface GSXCTestRunner ()
 - (NSArray *)testPlanForTargetName:(NSString *)targetName
@@ -124,6 +130,63 @@ static BOOL GSLegacyTestNameMatches(NSString *testName,
 }
 
 // Adds the test cases in a test (itself, or a suite's, recursively).
+// The CPU's name, e.g. "Intel(R) Core(TM) Ultra 7 255U", or nil.
+static NSString *GSCPUModel(void)
+{
+#if defined(_WIN32)
+    char name[256];
+    DWORD size = sizeof(name);
+
+    if (RegGetValueA(HKEY_LOCAL_MACHINE, "HARDWARE\\DESCRIPTION\\System\\CentralProcessor\\0",
+                     "ProcessorNameString", RRF_RT_REG_SZ, NULL, name, &size) == ERROR_SUCCESS) {
+        return [NSString stringWithUTF8String:name];
+    }
+    return nil;
+#else
+    // x86 has "model name"; some ARM systems only "Hardware" or "Model".
+    const char *keys[] = {"model name", "Hardware", "Model", NULL};
+    NSString *cpuinfo = [NSString stringWithContentsOfFile:@"/proc/cpuinfo" encoding:NSUTF8StringEncoding error:NULL];
+
+    for (int k = 0; keys[k] != NULL; k++) {
+        NSString *prefix = [NSString stringWithUTF8String:keys[k]];
+
+        for (NSString *line in [cpuinfo componentsSeparatedByString:@"\n"]) {
+            NSRange colon = [line rangeOfString:@":"];
+
+            if (colon.location != NSNotFound && [[[line substringToIndex:colon.location]
+                    stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]] isEqualToString:prefix]) {
+                NSString *value = [[line substringFromIndex:NSMaxRange(colon)]
+                    stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+
+                if ([value length] > 0) {
+                    return value;
+                }
+            }
+        }
+    }
+    return nil;
+#endif
+}
+
+static NSString *GSMachineArchitecture(void)
+{
+#if defined(_WIN32)
+    SYSTEM_INFO info;
+
+    GetNativeSystemInfo(&info);
+    switch (info.wProcessorArchitecture) {
+        case PROCESSOR_ARCHITECTURE_AMD64: return @"x86_64";
+        case PROCESSOR_ARCHITECTURE_ARM64: return @"arm64";
+        case PROCESSOR_ARCHITECTURE_INTEL: return @"x86";
+        default: return @"unknown";
+    }
+#else
+    struct utsname name;
+
+    return uname(&name) == 0 ? [NSString stringWithUTF8String:name.machine] : @"unknown";
+#endif
+}
+
 static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 {
     if ([test isKindOfClass:[XCTestCase class]]) {
@@ -143,6 +206,10 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
 @synthesize testBundle;
 @synthesize performanceBaselinesPath;
 @synthesize updatePerformanceBaselines;
+@synthesize performanceWarmUpIterations;
+@synthesize performanceInconclusiveFails;
+@synthesize performanceMachineIdentifier;
+@synthesize performanceReportPath;
 @synthesize repetitionMode;
 @synthesize testIterations;
 @synthesize testTimeoutsEnabled;
@@ -159,6 +226,7 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     self = [super init];
     if (self) {
         runLock = [[NSLock alloc] init];
+        performanceWarmUpIterations = -1;
     }
 
     return self;
@@ -171,6 +239,8 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     [principalObject release];
     [performanceBaselinesPath release];
     [performanceBaselines release];
+    [performanceMachineIdentifier release];
+    [performanceReportPath release];
     [bundleName release];
     [junitReportPath release];
     [terminationHandler release];
@@ -409,6 +479,9 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
         [runLock unlock];
         return NO;
     }
+    if (performanceBaselinesPath != nil && workerResultsPath == nil) {
+        NSLog(@"XCTest: Performance baselines for machine \"%@\"", [self _gsPerformanceMachineIdentifier]);
+    }
 
     NSString *runBundleName = bundleName ? bundleName
         : (testBundle ? [[testBundle bundlePath] lastPathComponent] : (targetName ? targetName : @"XCTest"));
@@ -422,12 +495,24 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     GSXCTestJUnitReporter *junitReporter = junitReportPath
         ? [[[GSXCTestJUnitReporter alloc] initWithPath:junitReportPath] autorelease]
         : nil;
-    NSArray *reporters = [NSArray arrayWithObjects:consoleReporter, junitReporter, nil];
+    GSXCTestPerformanceReporter *performanceReporter = performanceReportPath
+        ? [[[GSXCTestPerformanceReporter alloc] initWithPath:performanceReportPath
+                                           machineIdentifier:[self _gsPerformanceMachineIdentifier]] autorelease]
+        : nil;
+    NSMutableArray *reporters = [NSMutableArray arrayWithObject:consoleReporter];
+
+    if (junitReporter != nil) {
+        [reporters addObject:junitReporter];
+    }
+    if (performanceReporter != nil) {
+        [reporters addObject:performanceReporter];
+    }
 
     // A parallel worker reports to its coordinator.
     if (workerResultsPath != nil) {
         junitReporter = nil;
-        reporters = [NSArray arrayWithObjects:
+        performanceReporter = nil;
+        reporters = [NSMutableArray arrayWithObjects:
             [[[GSXCTestWorkerConsoleReporter alloc] initWithReporter:consoleReporter] autorelease],
             [[[GSXCTestWorkerResultsReporter alloc] initWithPath:workerResultsPath] autorelease],
             nil];
@@ -486,7 +571,8 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     // A run that executes no tests fails: it almost always means the
     // bundle or the selection isn't what was intended.
     return [[topSuite testRun] hasSucceeded] && [[topSuite testRun] executionCount] > 0
-        && savedBaselines && (junitReporter == nil || [junitReporter wroteReport]);
+        && savedBaselines && (junitReporter == nil || [junitReporter wroteReport])
+        && (performanceReporter == nil || [performanceReporter wroteReport]);
 }
 
 // Reads performanceBaselinesPath. A missing file is fine when updating
@@ -536,6 +622,8 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
         return YES;
     }
 
+    // Entries may have "stddev" and "count", which version 1 didn't.
+    [performanceBaselines setObject:[NSNumber numberWithInt:2] forKey:@"version"];
     data = [NSJSONSerialization dataWithJSONObject:performanceBaselines
                                            options:NSJSONWritingPrettyPrinted
                                              error:NULL];
@@ -547,37 +635,123 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     return YES;
 }
 
++ (NSString *)defaultPerformanceMachineIdentifier
+{
+    static NSString *identifier = nil;
+
+    // Worked out once: it doesn't change while the process runs.
+    @synchronized (self) {
+        if (identifier == nil) {
+            NSString *model = GSCPUModel();
+
+            // Runs of spaces in some CPU names (e.g. "Intel(R) Xeon(R) CPU  @ 2.20GHz").
+            while ([model rangeOfString:@"  "].location != NSNotFound) {
+                model = [model stringByReplacingOccurrencesOfString:@"  " withString:@" "];
+            }
+            identifier = [[NSString alloc] initWithFormat:@"%@, %lu cores, %@", model ? model : @"unknown CPU",
+                (unsigned long)[[NSProcessInfo processInfo] processorCount], GSMachineArchitecture()];
+        }
+    }
+    return identifier;
+}
+
+// performanceMachineIdentifier, else XCTEST_MACHINE_ID, else the default;
+// "auto" means the default. *explicit says whether one was chosen.
+- (NSString *)_gsResolvedMachineIdentifier:(BOOL *)explicit
+{
+    NSString *identifier = performanceMachineIdentifier;
+
+    if ([identifier length] == 0) {
+        const char *environment = getenv("XCTEST_MACHINE_ID");
+
+        identifier = (environment != NULL && *environment != '\0') ? [NSString stringWithUTF8String:environment] : nil;
+    }
+    if (explicit != NULL) {
+        *explicit = (identifier != nil);
+    }
+    if (identifier == nil || [identifier isEqualToString:@"auto"]) {
+        identifier = [[self class] defaultPerformanceMachineIdentifier];
+    }
+    return identifier;
+}
+
+- (NSString *)_gsPerformanceMachineIdentifier
+{
+    return [self _gsResolvedMachineIdentifier:NULL];
+}
+
 // The legacy wall-clock metric's baseline is the test's entry itself
 // ({"average", "maxPercentRegression"}); other metrics' are in its
 // "metrics" object, by measurement identifier.
+static NSDictionary *GSMetricBaseline(NSDictionary *entry, NSString *metric)
+{
+    id metrics = nil;
+
+    if (![entry isKindOfClass:[NSDictionary class]]) {
+        return nil;
+    }
+    if ([metric isEqualToString:XCTPerformanceMetric_WallClockTime]) {
+        return entry;
+    }
+    metrics = [entry objectForKey:@"metrics"];
+    metrics = [metrics isKindOfClass:[NSDictionary class]] ? [metrics objectForKey:metric] : nil;
+    return [metrics isKindOfClass:[NSDictionary class]] ? metrics : nil;
+}
+
+// The test's entry may have baselines for particular machines, in its
+// "machines" object by machine identifier, each shaped like the entry.
+// This machine's override the entry's, key by key.
 - (NSDictionary *)_gsPerformanceBaselineForTest:(NSString *)identifier metric:(NSString *)metric
 {
     NSDictionary *entry = [performanceBaselines objectForKey:identifier];
-    id metrics = [entry objectForKey:@"metrics"];
+    id machines = [entry objectForKey:@"machines"];
+    NSDictionary *machine = nil;
+    NSMutableDictionary *baseline = [NSMutableDictionary dictionary];
 
     // When recording new baselines, don't judge against the old ones.
-    if (updatePerformanceBaselines) {
+    if (updatePerformanceBaselines || entry == nil) {
         return nil;
     }
-
-    if ([metric isEqualToString:XCTPerformanceMetric_WallClockTime]) {
-        return [entry objectForKey:@"average"] ? entry : nil;
+    if ([machines isKindOfClass:[NSDictionary class]]) {
+        machine = [machines objectForKey:[self _gsPerformanceMachineIdentifier]];
     }
-    return [metrics isKindOfClass:[NSDictionary class]] ? [metrics objectForKey:metric] : nil;
+
+    [baseline addEntriesFromDictionary:GSMetricBaseline(entry, metric)];
+    [baseline addEntriesFromDictionary:GSMetricBaseline(machine, metric)];
+    [baseline removeObjectsForKeys:[NSArray arrayWithObjects:@"metrics", @"machines", nil]];
+    return [baseline objectForKey:@"average"] ? baseline : nil;
 }
 
-- (void)_gsRecordPerformanceAverage:(double)average forTest:(NSString *)identifier metric:(NSString *)metric
+- (void)_gsRecordPerformanceMeasurement:(GSXCTMeasurement *)measurement forTest:(NSString *)identifier
 {
+    NSString *metric = [measurement metricIdentifier];
     NSMutableDictionary *entry = [performanceBaselines objectForKey:identifier];
     NSMutableDictionary *baseline = nil;
+    BOOL explicitMachine = NO;
+    NSString *machine = nil;
 
     if (!updatePerformanceBaselines) {
         return;
     }
+    machine = [self _gsResolvedMachineIdentifier:&explicitMachine];
 
     if (entry == nil) {
         entry = [NSMutableDictionary dictionary];
         [performanceBaselines setObject:entry forKey:identifier];
+    }
+    // Recorded for this machine if one was chosen, or if the test already
+    // has baselines for machines; otherwise for any machine, as before.
+    if (explicitMachine || [[entry objectForKey:@"machines"] isKindOfClass:[NSDictionary class]]) {
+        id machines = [entry objectForKey:@"machines"];
+        NSMutableDictionary *mutableMachines = [machines isKindOfClass:[NSDictionary class]]
+            ? [[machines mutableCopy] autorelease] : [NSMutableDictionary dictionary];
+        id existing = [mutableMachines objectForKey:machine];
+        // A hand-edited file may have anything here; replace what isn't an object.
+        NSMutableDictionary *machineEntry = [existing isKindOfClass:[NSDictionary class]]
+            ? [[existing mutableCopy] autorelease] : [NSMutableDictionary dictionary];
+        [mutableMachines setObject:machineEntry forKey:machine];
+        [entry setObject:mutableMachines forKey:@"machines"];
+        entry = machineEntry;
     }
     if ([metric isEqualToString:XCTPerformanceMetric_WallClockTime]) {
         baseline = entry;
@@ -586,14 +760,16 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
         NSMutableDictionary *mutableMetrics = [metrics isKindOfClass:[NSDictionary class]]
             ? [[metrics mutableCopy] autorelease] : [NSMutableDictionary dictionary];
 
-        baseline = [[[mutableMetrics objectForKey:metric] mutableCopy] autorelease];
-        if (![baseline isKindOfClass:[NSMutableDictionary class]]) {
-            baseline = [NSMutableDictionary dictionary];
-        }
+        id existing = [mutableMetrics objectForKey:metric];
+
+        baseline = [existing isKindOfClass:[NSDictionary class]]
+            ? [[existing mutableCopy] autorelease] : [NSMutableDictionary dictionary];
         [mutableMetrics setObject:baseline forKey:metric];
         [entry setObject:mutableMetrics forKey:@"metrics"];
     }
-    [baseline setObject:[NSNumber numberWithDouble:average] forKey:@"average"];
+    [baseline setObject:[NSNumber numberWithDouble:[measurement average]] forKey:@"average"];
+    [baseline setObject:[NSNumber numberWithDouble:[measurement standardDeviation]] forKey:@"stddev"];
+    [baseline setObject:[NSNumber numberWithUnsignedInteger:[[measurement values] count]] forKey:@"count"];
 }
 
 // Creates the test bundle's principal class (NSPrincipalClass in its
