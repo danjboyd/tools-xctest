@@ -94,7 +94,7 @@ statistics, hardware counters, baselines per machine, and the report.
   `XCTEST_PERF_COUNTERS=0` turns them off (also how the tests exercise that
   path). `+[GSXCTHardwareCounterMetric isAvailable]` is public so a test can
   skip itself.
-- **The working path, tested 2026-10-16** with
+- **The working path, tested 2026-10-15** with
   `kernel.perf_event_paranoid=2` (Intel Core Ultra 7 255U, hybrid; Linux
   6.12): the metric script's counter checks ran and passed, and make check
   and meson test passed. A 2M-iteration loop measured 7,203.7 kI
