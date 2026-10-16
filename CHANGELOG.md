@@ -3,7 +3,11 @@
 Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 `vX.Y.Z`; 0.1.x are upstream's (gnustep/tools-xctest).
 
-## Unreleased
+## 0.6.0
+
+Performance testing: steadier regression checks, hardware counters,
+baselines per machine and a JSON report, with no new dependencies. The
+design choices are recorded in `Docs/decisions-0.6.md`.
 
 Performance tests whose results change: `measureWithMetrics:options:block:`
 (and its variants) now runs its block once more first, as a warm-up that isn't

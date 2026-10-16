@@ -1,17 +1,10 @@
-# 0.6.0 performance work: decisions log
+# 0.6.0 performance features: design decisions
 
-Dan approved the plan on 2026-10-15 ("all recommended"). The work was done
-overnight; when a question came up that the plan didn't settle, the
-conservative option was taken (match Apple, opt-in, backwards-compatible)
-and recorded here for review.
-
-## Branches
-
-The features touch the same baseline and reporting code, so their branches
-are stacked rather than each taken from master: `perf-statistics` →
-`perf-machines` → `perf-report`. `perf-counters` is independent and starts
-from master. Each is merged into `next-0.6`. Only those branches are pushed
-(for CI); master, tags and upstream are untouched.
+Why 0.6.0's performance features work the way they do, where the choice
+wasn't obvious. Where nothing else decided it, the conservative option was
+taken: match Apple's XCTest, make new behaviour opt-in, and keep existing
+baseline files working. The sections follow the four parts of the work:
+statistics, hardware counters, baselines per machine, and the report.
 
 ## perf-statistics
 
@@ -101,7 +94,7 @@ from master. Each is merged into `next-0.6`. Only those branches are pushed
   `XCTEST_PERF_COUNTERS=0` turns them off (also how the tests exercise that
   path). `+[GSXCTHardwareCounterMetric isAvailable]` is public so a test can
   skip itself.
-- **The working path, tested 2026-10-16** after Dan set
+- **The working path, tested 2026-10-16** with
   `kernel.perf_event_paranoid=2` (Intel Core Ultra 7 255U, hybrid; Linux
   6.12): the metric script's counter checks ran and passed, and make check
   and meson test passed. A 2M-iteration loop measured 7,203.7 kI
@@ -156,6 +149,6 @@ from master. Each is merged into `next-0.6`. Only those branches are pushed
   test-case properties, but Jenkins' and GitLab's parsers accept them; the
   existing `system-out` lines stay for tools that ignore them.
 - **Fixture fix**: `testAllMetrics` spun for 20ms of *elapsed* time and
-  expected 10ms+ of CPU time, which failed under heavy load (load average
-  26 here tonight); it now spins for 20ms of CPU time (`clock()`), except on
-  Windows, where `clock()` is elapsed time. Worth taking to master as well.
+  expected 10ms+ of CPU time, which failed under heavy load (a load
+  average of 26 on a 14-core machine); it now spins for 20ms of CPU time
+  (`clock()`), except on Windows, where `clock()` is elapsed time.
