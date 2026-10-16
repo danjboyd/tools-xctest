@@ -101,11 +101,14 @@ from master. Each is merged into `next-0.6`. Only those branches are pushed
   `XCTEST_PERF_COUNTERS=0` turns them off (also how the tests exercise that
   path). `+[GSXCTHardwareCounterMetric isAvailable]` is public so a test can
   skip itself.
-- **Untested here: the working path.** Debian (this machine) and Ubuntu
-  (CI) set `perf_event_paranoid` to 3+, which refuses all unprivileged
-  counters, so only the unavailable path ran. To check the rest:
-  `sudo sysctl kernel.perf_event_paranoid=2`, then run `make check` (the
-  metric script checks the counts when they're available).
+- **The working path, tested 2026-10-16** after Dan set
+  `kernel.perf_event_paranoid=2` (Intel Core Ultra 7 255U, hybrid; Linux
+  6.12): the metric script's counter checks ran and passed, and make check
+  and meson test passed. A 2M-iteration loop measured 7,203.7 kI
+  instructions retired with a 0.001% relative standard deviation over three
+  runs (CPU time: 2.7%), and 3.63M cycles in 1.39 ms of CPU time (about
+  2.6 GHz, so not inflated). CI (Ubuntu, paranoid 4) still only exercises
+  the unavailable path.
 
 ## perf-machines
 
