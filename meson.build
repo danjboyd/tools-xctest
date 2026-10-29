@@ -95,6 +95,8 @@ headers = [
 	'XCTest/XCTContext.h',
 	'XCTest/XCTAttachment.h',
 	'XCTest/XCTMetric.h',
+	# Lets Clang and Swift `import XCTest`.
+	'XCTest/module.modulemap',
 ]
 
 include_dirs = include_directories(
@@ -186,6 +188,7 @@ if host_machine.system() != 'darwin'
     ['metrics', 'run-metric-tests.sh'],
     ['parallel', 'run-parallel-tests.sh'],
     ['make-helper', 'run-make-helper-tests.sh'],
+    ['throwing', 'run-throwing-tests.sh'],
   ]
   if host_machine.system() != 'windows'
     xctest_tests += [['hosted', 'run-hosted-tests.sh']]

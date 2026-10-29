@@ -220,6 +220,33 @@ static int setups, teardowns, bodies, classSetups, classTeardowns;
 
 /* gnustep/tools-xctest#10: failures recorded around -invokeTest. */
 static BOOL invokeTestB;
+// Throwing Swift tests, `func testFoo() throws`, as the runtime sees them.
+static int throwingBodies;
+@interface Throwing : XCTestCase { @public NSMutableArray *issues; } @end
+@implementation Throwing
+- (void)dealloc { [issues release]; [super dealloc]; }
+- (void)recordIssue:(XCTIssue *)issue
+{
+    if (issues == nil) issues = [NSMutableArray new];
+    [issues addObject:[issue compactDescription]];
+    [super recordIssue:issue];
+}
+- (BOOL)testAndReturnError:(NSError **)error { throwingBodies++; return YES; }
+- (BOOL)testSucceedsAndReturnError:(NSError **)error { throwingBodies++; return YES; }
+- (BOOL)testThrowsAndReturnError:(NSError **)error
+{
+    *error = [NSError errorWithDomain:@"Example" code:7
+                             userInfo:[NSDictionary dictionaryWithObject:@"example error"
+                                                                  forKey:NSLocalizedDescriptionKey]];
+    return NO;
+}
+- (BOOL)testNoErrorAndReturnError:(NSError **)error { return NO; }
+- (BOOL)testAssertsAndReturnError:(NSError **)error { XCTFail(); throwingBodies++; return YES; }
+- (int)testIntReturnAndReturnError:(NSError **)error { abort(); return 1; }
+- (BOOL)testIntArgumentAndReturnError:(int)arg { abort(); return YES; }
+- (BOOL)testOtherWithError:(NSError **)error { abort(); return YES; }
+- (BOOL)testBool { abort(); return YES; }
+@end
 @interface FailureBeforeSuper : XCTestCase @end
 @implementation FailureBeforeSuper
 - (void)invokeTest { XCTFail(@"before super"); [super invokeTest]; }
@@ -413,6 +440,26 @@ int main(void)
         CHECK(Run([Expectations class], @selector(testWaitInsideCallback)) == 0);
         CHECK(Run([FailureBeforeSuper class], @selector(testBody)) == 1);
 
+        NSArray *throwingTests = [[Throwing defaultTestSuite] tests];
+        CHECK([throwingTests count] == 5);
+        CHECK([[[throwingTests valueForKey:@"name"] componentsJoinedByString:@","]
+                  isEqual:@"-[Throwing test],-[Throwing testAsserts],-[Throwing testNoError],"
+                          @"-[Throwing testSucceeds],-[Throwing testThrows]"]);
+        CHECK(Run([Throwing class], @selector(testSucceedsAndReturnError:)) == 0);
+        CHECK(Run([Throwing class], @selector(testAndReturnError:)) == 0);
+        CHECK(throwingBodies == 2);
+        CHECK(Run([Throwing class], @selector(testAssertsAndReturnError:)) == 1);
+        CHECK(throwingBodies == 3);
+        Throwing *thrower = (Throwing *)[Throwing testCaseWithSelector:@selector(testThrowsAndReturnError:)];
+        [thrower invokeTest];
+        CHECK([thrower failureCount] == 1 && [thrower->issues count] == 1);
+        CHECK([[thrower->issues lastObject] rangeOfString:@"example error"].location != NSNotFound);
+        CHECK([[thrower testRun] unexpectedExceptionCount] == 0);
+        Throwing *noError = (Throwing *)[Throwing testCaseWithSelector:@selector(testNoErrorAndReturnError:)];
+        [noError invokeTest];
+        CHECK([noError failureCount] == 1);
+        CHECK([[noError->issues lastObject] rangeOfString:@"returned NO without an error"].location != NSNotFound);
+
         GSXCTestRunner *runner = [GSXCTestRunner new];
         CHECK(![runner runTestsNamed:[NSArray arrayWithObject:@"ThrowFromInvokeTest"]]);
         CHECK(invokeTestB);
@@ -424,6 +471,9 @@ int main(void)
         CHECK(![runner runTestsNamed:[NSArray arrayWithObject:@"ClassFailure.testPass"]]);
         CHECK(classTeardowns == 3);
         CHECK([runner runTestsNamed:[NSArray arrayWithObject:@"Lifecycle.testPass"]]);
+        CHECK([runner runTestsNamed:[NSArray arrayWithObject:@"Throwing.testSucceeds"]]);
+        CHECK(![runner runTestsNamed:[NSArray arrayWithObject:@"Throwing.testThrows"]]);
+        CHECK(![runner runTestsNamed:[NSArray arrayWithObject:@"Throwing.testSucceedsAndReturnError:"]]);
         [runner waitForCompletion];
         [runner release];
         NSLog(@"Regression: %d checks, %d errors", checks, errors);
