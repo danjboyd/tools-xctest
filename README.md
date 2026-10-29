@@ -62,8 +62,10 @@ The runner is part of `libXCTest`; its public header is
   formatted messages. Expressions are evaluated once. Accuracy comparisons
   support integers and floating-point values without integer subtraction
   overflow. NaN operands or a negative/NaN accuracy never yield equality.
-- `XCTestExpectation`, fulfillment counts, inverted expectations, and optional
-  over-fulfillment checks while waiting. `fulfill` is thread-safe.
+- `XCTestExpectation`, fulfillment counts, inverted expectations, and
+  over-fulfillment checks (`assertForOverFulfill`), on by default for
+  expectations a test case creates, as in Apple's XCTest. `fulfill` is
+  thread-safe.
   `waitForExpectationsWithTimeout:handler:` and
   `waitForExpectations:timeout:` pump the calling thread's default run loop.
   Timeouts and expectation violations record failures; completion handlers
@@ -71,8 +73,9 @@ The runner is part of `libXCTest`; its public header is
 
 Create and wait on expectations on the test thread; callbacks on other threads
 may fulfill them. Inverted expectations require waiting for the entire timeout.
-Nested waits and empty expectation lists are rejected. Callbacks should finish
-before the test returns; late fulfillment after a completed wait is not checked.
+A nested wait records a failure and returns at once; empty expectation lists
+are rejected. An over-fulfillment after a completed wait is reported until the
+test ends; callbacks should finish before the test returns.
 
 This is a subset of XCTest, not full Apple XCTest compatibility. Test suites/run
 objects, observation APIs, performance measurement, UI testing, specialized

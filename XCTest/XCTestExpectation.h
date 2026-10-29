@@ -7,6 +7,8 @@ typedef NS_ENUM(NSInteger, XCTestErrorCode) {
 };
 typedef void (^XCWaitCompletionHandler)(NSError *error);
 
+@class XCTestCase;
+
 @interface XCTestExpectation : NSObject
 {
     NSString *_expectationDescription;
@@ -14,9 +16,10 @@ typedef void (^XCWaitCompletionHandler)(NSError *error);
     NSUInteger _fulfillmentCount;
     BOOL _inverted;
     BOOL _assertForOverFulfill;
+    XCTestCase *_testCase; /* not retained; set while a waited-on expectation's test runs */
 }
 - (instancetype)initWithDescription:(NSString *)expectationDescription;
-@property (readonly, copy) NSString *expectationDescription;
+@property (copy) NSString *expectationDescription;
 @property NSUInteger expectedFulfillmentCount;
 @property (getter=isInverted) BOOL inverted;
 @property BOOL assertForOverFulfill;

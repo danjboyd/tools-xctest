@@ -25,6 +25,7 @@
 
 @interface XCTestExpectation (GSWaiting)
 - (NSUInteger)_waitStatus;
+- (void)_setTestCase:(XCTestCase *)testCase;
 @end
 
 @interface _GSXCPredicateExpectation : XCTestExpectation
@@ -122,6 +123,7 @@
         _invocation = [invocation retain];
         _continueAfterFailure = YES;
         _expectations = [NSMutableArray new];
+        _waitedExpectations = [NSMutableArray new];
     }
     return self;
 }
@@ -129,6 +131,7 @@
 {
     [_invocation release];
     [_expectations release];
+    [_waitedExpectations release];
     [super dealloc];
 }
 - (NSString *)name
@@ -189,6 +192,9 @@
             @catch (_XCTestCaseInterruptionException *interruption) {}
             [_expectations removeAllObjects];
         }
+        /* A late -fulfill can no longer report on this test. */
+        for (XCTestExpectation *expectation in _waitedExpectations) [expectation _setTestCase:nil];
+        [_waitedExpectations removeAllObjects];
     }
 }
 - (XCTestExpectation *)expectationForPredicate:(NSPredicate *)predicate evaluatedWithObject:(id)object handler:(XCPredicateExpectationHandler)handler
@@ -199,25 +205,34 @@
     expectation->predicate = [predicate retain];
     expectation->object = [object retain];
     expectation->handler = [handler copy];
+    [expectation setAssertForOverFulfill:YES];
     [_expectations addObject:expectation];
     return expectation;
 }
 - (XCTestExpectation *)expectationWithDescription:(NSString *)description
 {
     XCTestExpectation *expectation = [[[XCTestExpectation alloc] initWithDescription:description] autorelease];
+    [expectation setAssertForOverFulfill:YES];
     [_expectations addObject:expectation];
     return expectation;
 }
 - (NSError *)_waitForExpectations:(NSArray *)expectations timeout:(NSTimeInterval)timeout
 {
-    if (_waiting || ![expectations count] || !isfinite(timeout) || timeout < 0) {
-        [NSException raise:NSInvalidArgumentException format:@"Wait requires expectations, a finite nonnegative timeout, and no nested wait"];
+    /* A wait started from a run loop callback can't raise: the run loop would swallow the exception. */
+    if (_waiting) {
+        return [NSError errorWithDomain:XCTestErrorDomain code:XCTestErrorCodeFailureWhileWaiting
+            userInfo:[NSDictionary dictionaryWithObject:@"API violation - a wait can't start while another wait is running"
+                forKey:NSLocalizedDescriptionKey]];
+    }
+    if (![expectations count] || !isfinite(timeout) || timeout < 0) {
+        [NSException raise:NSInvalidArgumentException format:@"Wait requires expectations and a finite nonnegative timeout"];
     }
     for (id expectation in expectations) {
         if (![expectation isKindOfClass:[XCTestExpectation class]])
             [NSException raise:NSInvalidArgumentException format:@"Invalid expectation %@", expectation];
     }
     NSArray *pending = [[expectations copy] autorelease];
+    for (XCTestExpectation *expectation in pending) [expectation _setTestCase:nil];
     NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:timeout];
     NSError *error = nil;
     _waiting = YES;
@@ -253,6 +268,10 @@
     @finally {
         _waiting = NO;
         [_expectations removeObjectsInArray:pending];
+        for (XCTestExpectation *expectation in pending) {
+            [expectation _setTestCase:self];
+            [_waitedExpectations addObject:expectation];
+        }
     }
     return error;
 }

@@ -105,6 +105,8 @@ static int setups, teardowns, bodies, classSetups, classTeardowns;
 + (void)setUp { Throw(); }
 @end
 
+static XCTestExpectation *lateExpectation;
+static BOOL innerWaitReturned;
 @interface Async : XCTestCase @end
 @implementation Async
 - (void)testPredicateSuccess
@@ -206,6 +208,56 @@ static int setups, teardowns, bodies, classSetups, classTeardowns;
     [self waitForExpectationsWithTimeout:0 handler:nil];
 }
 - (void)testUnwaited { [self expectationWithDescription:@"unused"]; }
+- (void)testDefaultOverFulfill
+{
+    XCTestExpectation *e = [self expectationWithDescription:@"twice"];
+    CHECK(e.assertForOverFulfill);
+    [e fulfill]; [e fulfill];
+    [self waitForExpectationsWithTimeout:0 handler:nil];
+}
+- (void)testLateFulfill
+{
+    XCTestExpectation *e = [self expectationWithDescription:@"again"];
+    [e fulfill];
+    [self waitForExpectationsWithTimeout:0 handler:nil];
+    [e fulfill];
+}
+- (void)testLateFulfillUnchecked
+{
+    XCTestExpectation *e = [[[XCTestExpectation alloc] initWithDescription:@"unchecked"] autorelease];
+    CHECK(!e.assertForOverFulfill);
+    [e fulfill];
+    [self waitForExpectations:[NSArray arrayWithObject:e] timeout:0];
+    [e fulfill];
+}
+- (void)testFulfillAfterTest
+{
+    lateExpectation = [[self expectationWithDescription:@"after the test"] retain];
+    [lateExpectation fulfill];
+    [self waitForExpectationsWithTimeout:0 handler:nil];
+}
+- (void)testSetDescription
+{
+    XCTestExpectation *e = [[[XCTestExpectation alloc] initWithDescription:@"before"] autorelease];
+    e.expectationDescription = @"after";
+    CHECK([e.expectationDescription isEqual:@"after"]);
+    [e fulfill];
+    [self waitForExpectations:[NSArray arrayWithObject:e] timeout:0];
+}
+- (void)innerWait:(XCTestExpectation *)outer
+{
+    XCTestExpectation *inner = [[[XCTestExpectation alloc] initWithDescription:@"inner"] autorelease];
+    [inner fulfill];
+    [self waitForExpectations:[NSArray arrayWithObject:inner] timeout:1];
+    innerWaitReturned = YES;
+    [outer fulfill];
+}
+- (void)testNestedWait
+{
+    XCTestExpectation *outer = [[[XCTestExpectation alloc] initWithDescription:@"outer"] autorelease];
+    [self performSelector:@selector(innerWait:) withObject:outer afterDelay:0.01];
+    [self waitForExpectations:[NSArray arrayWithObject:outer] timeout:1];
+}
 - (void)testExplicit
 {
     XCTestExpectation *e = [[[XCTestExpectation alloc] initWithDescription:@"external"] autorelease];
@@ -285,6 +337,15 @@ int main(void)
         CHECK(Run([Async class], @selector(testOverFulfill)) == 1);
         CHECK(Run([Async class], @selector(testUnwaited)) == 1);
         CHECK(Run([Async class], @selector(testExplicit)) == 0);
+        CHECK(Run([Async class], @selector(testDefaultOverFulfill)) == 1);
+        CHECK(Run([Async class], @selector(testLateFulfill)) == 1);
+        CHECK(Run([Async class], @selector(testLateFulfillUnchecked)) == 0);
+        CHECK(Run([Async class], @selector(testFulfillAfterTest)) == 0);
+        [lateExpectation fulfill];
+        [lateExpectation release];
+        CHECK(Run([Async class], @selector(testSetDescription)) == 0);
+        CHECK(Run([Async class], @selector(testNestedWait)) == 1);
+        CHECK(innerWaitReturned);
 
         GSXCTestRunner *runner = [GSXCTestRunner new];
         CHECK([runner runTestsNamed:[NSArray arrayWithObject:@"Inherited.testPass"]]);

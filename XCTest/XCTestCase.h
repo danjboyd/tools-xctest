@@ -29,6 +29,7 @@ typedef BOOL (^XCPredicateExpectationHandler)(void);
     BOOL _continueAfterFailure;
     NSUInteger _failureCount;
     NSMutableArray *_expectations;
+    NSMutableArray *_waitedExpectations;
     BOOL _waiting;
 }
 
