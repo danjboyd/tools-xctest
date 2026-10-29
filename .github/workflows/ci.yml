@@ -1,0 +1,44 @@
+# CI for the upstream patch series (danjboyd fork only; not part of any
+# patch). Runs upstream's Tests/run.sh on Windows MSYS2 clang64.
+name: series-ci
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  windows:
+    name: Windows (MSYS2 clang64)
+    runs-on: windows-latest
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: CLANG64
+          update: true
+          install: >-
+            make
+            mingw-w64-clang-x86_64-clang
+            mingw-w64-clang-x86_64-libobjc2
+            mingw-w64-clang-x86_64-libdispatch
+            mingw-w64-clang-x86_64-gnustep-make
+            mingw-w64-clang-x86_64-gnustep-base
+
+      # As in the fork's CI: gnustep/libs-base#809, and libdispatch's mode_t.
+      - name: Patch gnustep-base header
+        run: |
+          sed -i 's/BLOCK_SCOPE GSScheduledBlock _block;/GSScheduledBlock _block;/' \
+            /clang64/include/Foundation/NSBackgroundActivityScheduler.h
+
+      # Windows finds DLLs on PATH, not LD_LIBRARY_PATH.
+      - name: Tests/run.sh
+        run: |
+          . /clang64/share/GNUstep/Makefiles/GNUstep.sh
+          export ADDITIONAL_CPPFLAGS=-DHAVE_MODE_T
+          export PATH="$PWD/XCTest/obj:$PATH"
+          sh Tests/run.sh
