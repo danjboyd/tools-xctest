@@ -28,7 +28,12 @@
 
 #import <XCTest/GSXCTestRunner.h>
 #import <XCTest/XCTestCase.h>
+#import <XCTest/XCTestAssertionsImpl.h>
 #import <objc/runtime.h>
+
+@interface XCTestCase (GSXCTestRunnerPrivate)
+- (void)recordException:(id)exception phase:(NSString *)phase;
+@end
 
 static NSArray *TestClassNames(void)
 {
@@ -102,7 +107,10 @@ static NSArray *TestClassNames(void)
                     for (NSInvocation *invocation in selected) {
                         @autoreleasepool {
                             XCTestCase *test = [cls testCaseWithInvocation:invocation];
-                            [test invokeTest];
+                            /* An exception escaping an -invokeTest override fails that test, not the class. */
+                            @try { [test invokeTest]; }
+                            @catch (_XCTestCaseInterruptionException *interruption) {}
+                            @catch (id exception) { [test recordException:exception phase:@"invokeTest"]; }
                             if ([test failureCount]) failures++; else successes++;
                             NSLog(@"XCTest:     %@ %@", [test name], [test failureCount] ? @"FAILED" : @"PASSED");
                         }

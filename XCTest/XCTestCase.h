@@ -42,7 +42,7 @@ typedef BOOL (^XCPredicateExpectationHandler)(void);
 @property (retain) NSInvocation *invocation;
 @property BOOL continueAfterFailure;
 @property (readonly, copy) NSString *name;
-/* GNUstep extension: failures recorded during the most recent invocation. */
+/* GNUstep extension: failures recorded by this test case. */
 @property (readonly) NSUInteger failureCount;
 - (void)setUp;
 - (void)tearDown;

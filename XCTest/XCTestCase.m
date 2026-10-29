@@ -162,8 +162,8 @@
 }
 - (void)invokeTest
 {
-    @synchronized (self) { _failureCount = 0; }
-    [_expectations removeAllObjects];
+    /* Each test gets a fresh instance, so there is nothing to reset here; a reset
+       would discard failures that an -invokeTest override records before super. */
     @try {
         [self setUp];
         NSMethodSignature *signature = [_invocation methodSignature];

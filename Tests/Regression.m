@@ -9,7 +9,7 @@ static void Throw(void) { [NSException raise:@"Example" format:@"example reason"
 static int ThrowInt(void) { Throw(); return 0; }
 static void ThrowObject(void) { @throw @"not an NSException"; }
 
-@interface Probe : XCTestCase { @public NSMutableArray *messages; }
+@interface Probe : XCTestCase { @public NSMutableArray *messages; NSUInteger unexpected; }
 @end
 @implementation Probe
 - (id)init { if ((self = [super init])) messages = [NSMutableArray new]; return self; }
@@ -18,7 +18,7 @@ static void ThrowObject(void) { @throw @"not an NSException"; }
 {
     CHECK([file hasSuffix:@"Regression.m"]);
     CHECK(line > 0);
-    CHECK(expected);
+    if (!expected) unexpected++;
     [messages addObject:description];
 }
 - (void)checkAssertions
@@ -65,7 +65,9 @@ static void ThrowObject(void) { @throw @"not an NSException"; }
     XCTAssertNoThrow(Throw());
     XCTAssertNoThrowSpecific(Throw(), NSException);
     XCTAssertNoThrowSpecificNamed(Throw(), NSException, @"Example");
+    CHECK(unexpected == 0);
     XCTAssertEqual(ThrowInt(), 1);
+    CHECK(unexpected == 1);
     CHECK([[messages lastObject] rangeOfString:@"example reason"].location != NSNotFound);
     CHECK([messages count] == 25);
 }
@@ -212,6 +214,22 @@ static int setups, teardowns, bodies, classSetups, classTeardowns;
 }
 @end
 
+static int invokeBodies;
+@interface FailureBeforeSuper : XCTestCase @end
+@implementation FailureBeforeSuper
+- (void)invokeTest { XCTFail(@"recorded before super"); [super invokeTest]; }
+- (void)testBody { invokeBodies++; }
+@end
+@interface ThrowFromInvokeTest : XCTestCase @end
+@implementation ThrowFromInvokeTest
+- (void)invokeTest
+{
+    if ([NSStringFromSelector([[self invocation] selector]) isEqual:@"testA"]) Throw();
+    [super invokeTest];
+}
+- (void)testA { invokeBodies += 100; }
+- (void)testB { invokeBodies++; }
+@end
 static NSUInteger Run(Class cls, SEL selector)
 {
     XCTestCase *test = [cls testCaseWithSelector:selector];
@@ -244,9 +262,8 @@ int main(void)
         CHECK(teardowns == 7);
         CHECK(Run([Inherited class], @selector(testPass)) == 0);
         CHECK(bodies == 12);
-        XCTestCase *repeat = [Lifecycle testCaseWithSelector:@selector(testPass)];
-        [repeat recordFailureWithDescription:@"old failure" inFile:nil atLine:0 expected:YES];
-        [repeat invokeTest]; CHECK([repeat failureCount] == 0);
+        CHECK(Run([FailureBeforeSuper class], @selector(testBody)) == 1);
+        CHECK(invokeBodies == 1);
         CHECK(Run([Async class], @selector(testPredicateSuccess)) == 0);
         CHECK(Run([Async class], @selector(testPredicateHandler)) == 0);
         CHECK(Run([Async class], @selector(testPredicateTimeout)) == 1);
@@ -288,6 +305,12 @@ int main(void)
         CHECK(![runner runTestsNamed:[NSArray arrayWithObject:@"Inherited.testPass"] skipping:[NSArray arrayWithObject:@"Inherited.testPass"]]);
         CHECK(![runner runTestsNamed:[NSArray arrayWithObject:@"Inherited.testPass"] skipping:[NSArray arrayWithObject:@"Inherited"]]);
         CHECK(bodies == 10);
+        invokeBodies = 0;
+        CHECK(![runner runTestsNamed:[NSArray arrayWithObject:@"FailureBeforeSuper"]]);
+        CHECK(invokeBodies == 1);
+        CHECK(![runner runTestsNamed:[NSArray arrayWithObject:@"ThrowFromInvokeTest"]]);
+        CHECK(invokeBodies == 2);
+        CHECK([runner runTestsNamed:[NSArray arrayWithObject:@"ThrowFromInvokeTest.testB"]]);
         [runner waitForCompletion];
         [runner release];
         NSLog(@"Regression: %d checks, %d errors", checks, errors);
