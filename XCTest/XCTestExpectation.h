@@ -1,6 +1,6 @@
 #import <Foundation/Foundation.h>
 
-FOUNDATION_EXPORT NSString * const XCTestErrorDomain;
+extern NSString * const XCTestErrorDomain; /* CI only: FOUNDATION_EXPORT is dllimport on Windows */
 typedef NS_ENUM(NSInteger, XCTestErrorCode) {
     XCTestErrorCodeTimeoutWhileWaiting = 0,
     XCTestErrorCodeFailureWhileWaiting = 1
