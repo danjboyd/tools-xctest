@@ -144,6 +144,10 @@ executables are `<Name>.dll`.
 - Discovery of `void` instance methods whose names start with `test` and which
   take no arguments, including inherited methods and subclass overrides.
   Classes and methods run in alphabetical order, with a fresh instance per test.
+- Throwing tests: `-(BOOL)testFooAndReturnError:(NSError **)error`, which is
+  how a Swift `func testFoo() throws` appears to Objective-C, is a test named
+  `testFoo` (in output, reports and `-only-testing:`). Returning `NO` fails
+  it with the error's description.
 - Class `+setUp` / `+tearDown` and instance `-setUp` / `-tearDown`, plus
   `-setUpWithError:`, `-tearDownWithError:` and `-addTeardownBlock:`. Instance
   teardown runs even when setup or the test throws; class teardown runs after
@@ -481,6 +485,11 @@ my_tests = custom_target('MyTests.xctest',
                          build_by_default: true)
 test('MyTests', xctest, args: [my_tests.full_path()], depends: [my_tests])
 ```
+
+The headers are installed with a Clang module map, so `@import XCTest;` (with
+`-fmodules`), or `import XCTest` from Swift, needs only the header directory on
+the include path. GNUstep's runner is a separate submodule,
+`XCTest.GSXCTestRunner`.
 
 To build and run the test targets of an Xcode project, use `buildtool test`
 from [libs-xcode](https://github.com/gnustep/libs-xcode); it runs each

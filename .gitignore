@@ -41,3 +41,5 @@ Tests/MakeHelperFixture/obj
 /*.d
 Tests/Fixture.bundle/
 Tests/obj
+Tests/ThrowingFixture/ThrowingFixture.bundle
+Tests/ThrowingFixture/obj
