@@ -65,8 +65,10 @@ while [ $# -gt 0 ]; do
   esac
   shift
 done
+# STAND_IN_OBJC_FLAGS: the GNUstep flags, taken outside the build (inside
+# it, gnustep-config would describe the Swift-capable gnustep-make's prefix).
 # shellcheck disable=SC2086
-exec clang -x objective-c $xcc $(gnustep-config --objc-flags | sed 's/-MMD//;s/-MP//') -fPIC -c "$primary" -o "$out"
+exec clang -x objective-c $xcc $STAND_IN_OBJC_FLAGS -fPIC -c "$primary" -o "$out"
 EOF
 cat > "$tools/bin/swift-autolink-extract" <<'EOF'
 #!/bin/sh
@@ -78,6 +80,9 @@ chmod +x "$tools/bin/"*
 printf 'int xctest_stand_in_swiftrt_marker = 1;\n' > "$tools/swiftrt.c"
 clang -fPIC -c "$tools/swiftrt.c" -o "$tools/resource/linux/$(uname -m)/swiftrt.o"
 : > "$tools/empty.modulemap"
+
+STAND_IN_OBJC_FLAGS=$(gnustep-config --objc-flags | sed 's/-MMD//;s/-MP//')
+export STAND_IN_OBJC_FLAGS
 
 swift_make() {
   GNUSTEP_SWIFT_SWIFT_FRONTEND="$tools/bin/swift-frontend" \
