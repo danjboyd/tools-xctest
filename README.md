@@ -591,6 +591,10 @@ class ParserTests: XCTestCase {
   `@MainActor`, later `@MainActor` tests would hang. Use `try XCTUnwrap`, or
   `return` or throw, to end one early. (An Objective-C
   `-testFooWithCompletionHandler:` still stops during the call itself.)
+  Apple's XCTest has the same limit. From Xcode 26, an Apple engineer
+  [describes](https://developer.apple.com/forums/thread/809989) it ending and
+  relaunching its test runner after such a test's teardown; this runner stays
+  in the same process and carries on with the next test.
 - **Not supported:** `async setUp`/`tearDown` and `await fulfillment(of:)`.
 
 With gnustep-make, list the Swift sources in `<Bundle>_SWIFT_FILES` and
