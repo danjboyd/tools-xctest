@@ -29,3 +29,36 @@ XCTestHost_LIBRARIES_DEPEND_UPON = -L./obj -lXCTest $(FND_LIBS) $(OBJC_LIBS) $(S
 -include GNUmakefile.preamble
 include $(GNUSTEP_MAKEFILES)/library.make
 -include GNUmakefile.postamble
+
+# The Swift overlay (Swift/*.swift): XCTAssert* and friends for Swift tests.
+# Built only when XCTEST_SWIFTC names a swiftc with GNUstep's Objective-C
+# interop; XCTEST_SWIFTFLAGS carries that toolchain's own flags (resource
+# directory, -gnustep-objc-interop, libs-base's module map, ...). It is a
+# Swift module named XCTest over the Clang module of the same name, so
+# `import XCTest` gives both, and importing it links libXCTestSwift.
+ifneq ($(XCTEST_SWIFTC),)
+XCTEST_SWIFT_SOURCES = Swift/Bridge.swift Swift/Assertions.swift Swift/Errors.swift
+
+after-all:: obj/libXCTestSwift$(SHARED_LIBEXT)
+
+obj/libXCTestSwift$(SHARED_LIBEXT): $(XCTEST_SWIFT_SOURCES) obj/libXCTest$(SHARED_LIBEXT) $(XCTest_HEADER_FILES)
+	$(ECHO_NOTHING)echo " Compiling the Swift overlay ..."; \
+	$(XCTEST_SWIFTC) $(XCTEST_SWIFTFLAGS) -parse-as-library \
+	  -module-name XCTest -module-link-name XCTestSwift \
+	  -emit-library -emit-module -emit-module-path obj/XCTest.swiftmodule \
+	  -I.. -Xcc -I.. $(XCTEST_SWIFT_SOURCES) \
+	  -L./obj -lXCTest -o $@$(END_ECHO)
+
+after-install::
+	$(MKDIRS) $(DESTDIR)$(GNUSTEP_HEADERS) $(DESTDIR)$(GNUSTEP_LIBRARIES)
+	$(INSTALL_DATA) obj/XCTest.swiftmodule $(DESTDIR)$(GNUSTEP_HEADERS)/XCTest.swiftmodule
+	$(INSTALL_DATA) obj/XCTest.swiftdoc $(DESTDIR)$(GNUSTEP_HEADERS)/XCTest.swiftdoc
+	$(INSTALL_PROGRAM) obj/libXCTestSwift$(SHARED_LIBEXT) $(DESTDIR)$(GNUSTEP_LIBRARIES)/libXCTestSwift$(SHARED_LIBEXT)
+
+after-uninstall::
+	rm -f $(DESTDIR)$(GNUSTEP_HEADERS)/XCTest.swiftmodule $(DESTDIR)$(GNUSTEP_HEADERS)/XCTest.swiftdoc \
+	  $(DESTDIR)$(GNUSTEP_LIBRARIES)/libXCTestSwift$(SHARED_LIBEXT)
+
+after-clean::
+	rm -f obj/libXCTestSwift$(SHARED_LIBEXT) obj/XCTest.swiftmodule obj/XCTest.swiftdoc
+endif

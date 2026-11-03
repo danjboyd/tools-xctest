@@ -118,6 +118,28 @@ install_headers(
   install_dir: join_paths(get_option('prefix'), get_option('includedir'), 'XCTest'),
 )
 
+# The Swift overlay; see meson_options.txt. A Swift module named XCTest over
+# the Clang module of the same name, so `import XCTest` gives both, and
+# importing it links libXCTestSwift.
+swiftc = find_program(get_option('swiftc'), required: get_option('swift'))
+if swiftc.found()
+  swift_overlay_sources = files('XCTest/Swift/Bridge.swift', 'XCTest/Swift/Assertions.swift',
+                                'XCTest/Swift/Errors.swift')
+  swift_overlay = custom_target('XCTestSwift',
+    input: swift_overlay_sources,
+    output: ['lib' + 'XCTestSwift.' + (host_machine.system() == 'darwin' ? 'dylib' : 'so'),
+             'XCTest.swiftmodule', 'XCTest.swiftdoc'],
+    command: [swiftc, get_option('xctest_swift_flags'), '-parse-as-library',
+              '-module-name', 'XCTest', '-module-link-name', 'XCTestSwift',
+              '-emit-library', '-emit-module', '-emit-module-path', '@OUTPUT1@',
+              '-I', meson.current_source_dir(), '-Xcc', '-I' + meson.current_source_dir(),
+              '@INPUT@', '-L' + meson.current_build_dir(), '-lXCTest', '-o', '@OUTPUT0@'],
+    depends: xctest_lib,
+    install: true,
+    install_dir: [get_option('libdir'), get_option('includedir'), get_option('includedir')],
+    build_by_default: true)
+endif
+
 pkg.generate(libraries : xctest_lib,
              version : meson.project_version(),
              name : 'XCTest',
@@ -191,6 +213,8 @@ if host_machine.system() != 'darwin'
     ['throwing', 'run-throwing-tests.sh'],
     ['module-map', 'run-module-map-tests.sh'],
     ['module-name', 'run-module-name-tests.sh'],
+    ['control-flow', 'run-control-flow-tests.sh'],
+    ['swift-overlay', 'run-swift-overlay-tests.sh'],
   ]
   if host_machine.system() != 'windows'
     xctest_tests += [['hosted', 'run-hosted-tests.sh']]
