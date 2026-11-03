@@ -566,7 +566,7 @@ class ParserTests: XCTestCase {
   setting.)
 - **`NSLog`** from Swift needs gnustep-swift 4ddb1c6 or later, whose
   Foundation overlay adds it; with older overlays, use `print`.
-- **`async` tests (not yet verified with Swift).** The runner runs
+- **`async` tests (not yet run end to end with Swift).** The runner runs
   `-testFooWithCompletionHandler:` methods as the test `testFoo`. That is
   how a Swift `func testFoo() async` reaches Objective-C on Apple's
   platforms. It calls the method with a completion block, then runs the test
@@ -576,9 +576,11 @@ class ParserTests: XCTestCase {
   fails the test, or skips it, as from a throwing test. The block can only
   take that error if the method's type encoding says so with an extended
   block signature (`@?<v@?@>`). Otherwise it's called as `void (^)(void)`,
-  and an `async throws` test's error isn't seen. Whether gnustep-swift's
-  toolchain emits these selectors and signatures is being checked
-  (spike 5).
+  and an `async throws` test's error isn't seen. gnustep-swift's toolchain
+  emits both: `@?<v@?>` for `async`, and `@?<v@?@"NSError">` for
+  `async throws`, with or without `@objc`. Their completions run under the
+  run loop, mostly on another thread, and `@MainActor` ones on the main
+  thread.
 - **Not supported:** `async setUp`/`tearDown` and `await fulfillment(of:)`.
 
 `xctest.make` doesn't compile Swift yet, so Swift test bundles are built

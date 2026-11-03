@@ -94,8 +94,9 @@ static BOOL GSIsBlockType(const char *type)
 }
 
 // Whether an async test's completion block takes an NSError * (async
-// throws). Only an extended block signature, @?<v@?@>, says so (libobjc2
-// rejects class names in encodings, so not @"NSError");
+// throws). Only an extended block signature says so: @?<v@?@"NSError">, as
+// gnustep-swift's toolchain emits it, or @?<v@?@> (class_addMethod can't
+// take @"..." in libobjc2);
 // without one the block is called as void (^)(void), which is safe either
 // way: a block given an argument it doesn't read ignores it, but one that
 // reads an argument it wasn't given reads garbage.
