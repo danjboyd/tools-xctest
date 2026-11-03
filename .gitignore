@@ -50,3 +50,6 @@ Tests/ControlFlowFixture/obj
 Examples/SwiftTests/CalculatorTests.xctest
 Tests/AsyncMethodFixture/AsyncMethodFixture.bundle
 Tests/AsyncMethodFixture/obj
+Examples/SwiftTests/obj
+Tests/SwiftMakeFixture/SwiftMakeTests.xctest
+Tests/SwiftMakeFixture/obj

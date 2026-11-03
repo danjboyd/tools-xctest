@@ -556,6 +556,10 @@ class ParserTests: XCTestCase {
   meson setup build -Dswift=enabled -Dswiftc=/path/to/swiftc -Dxctest_swift_flags=...
   ```
 
+  The overlay is linked against the libobjc in GNUstep's library
+  directories (or the gnustep-swift profile's `GNUSTEP_SWIFT_LIBOBJC2_LIBDIR`),
+  so that the Swift driver doesn't pick GCC's `libobjc.so.4`. If libobjc2
+  is elsewhere, add `-L<its directory>` to the flags.
   The flags are `swiftc` driver flags; pass frontend-only ones with
   `-Xfrontend` (e.g. `-Xfrontend -disable-objc-attr-requires-foundation-module`).
   It installs `XCTest.swiftmodule` next to the headers' `XCTest/` directory
@@ -566,7 +570,7 @@ class ParserTests: XCTestCase {
   setting.)
 - **`NSLog`** from Swift needs gnustep-swift 4ddb1c6 or later, whose
   Foundation overlay adds it; with older overlays, use `print`.
-- **`async` tests (not yet run end to end with Swift).** The runner runs
+- **`async` tests.** The runner runs
   `-testFooWithCompletionHandler:` methods as the test `testFoo`. That is
   how a Swift `func testFoo() async` reaches Objective-C on Apple's
   platforms. It calls the method with a completion block, then runs the test
@@ -583,15 +587,34 @@ class ParserTests: XCTestCase {
   thread.
 - **Not supported:** `async setUp`/`tearDown` and `await fulfillment(of:)`.
 
-`xctest.make` doesn't compile Swift yet, so Swift test bundles are built
-directly with the toolchain: compile with `-parse-as-library`, link as a
-shared library with `-lXCTestSwift -lXCTest`, and put it in a bundle whose
-`Resources/Info-gnustep.plist` names it as `NSExecutable`. Link through
-`swiftc`, or, linking with `clang`, put the toolchain's
-`lib/swift/linux/<arch>/swiftrt.o` first: without it the image's Swift
-metadata isn't registered, and protocol casts (including the one that gives
-`XCTSkip` its message and location) fail.
-`Examples/SwiftTests` does this with a short GNUmakefile.
+With gnustep-make, list the Swift sources in `<Bundle>_SWIFT_FILES` and
+include `xctest.make` as for Objective-C tests (Swift and Objective-C files
+can share a bundle):
+
+```make
+include $(GNUSTEP_MAKEFILES)/common.make
+
+XCTEST_BUNDLE_NAME = ParserTests
+ParserTests_SWIFT_FILES = ParserTests.swift
+
+include $(GNUSTEP_MAKEFILES)/Auxiliary/xctest.make
+```
+
+This needs a gnustep-make that compiles Swift: gnustep-swift's tools-make,
+with its `GNUSTEP_SWIFT_*` profile. That builds the sources and links
+`swiftrt.o`; `xctest.make` adds the libraries the Swift objects ask for
+(`libXCTestSwift`, the Swift runtime, ...), which `bundle.make` doesn't link
+for bundles. With a gnustep-make that can't build Swift, a bundle with
+`_SWIFT_FILES` is an error rather than a bundle without its tests.
+`Examples/SwiftTests` is such a bundle.
+
+Without gnustep-make, build the bundle with the toolchain: compile with
+`-parse-as-library`, link as a shared library with `-lXCTestSwift -lXCTest`,
+and put it in a bundle whose `Resources/Info-gnustep.plist` names it as
+`NSExecutable`. Link through `swiftc`, or, linking with `clang`, put the
+toolchain's `lib/swift/linux/<arch>/swiftrt.o` first: without it the image's
+Swift metadata isn't registered, and protocol casts (including the one that
+gives `XCTSkip` its message and location) fail.
 
 ## Running tests
 

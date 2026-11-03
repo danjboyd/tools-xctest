@@ -125,6 +125,12 @@ swiftc = find_program(get_option('swiftc'), required: get_option('swift'))
 if swiftc.found()
   swift_overlay_sources = files('XCTest/Swift/Bridge.swift', 'XCTest/Swift/Assertions.swift',
                                 'XCTest/Swift/Errors.swift')
+  # The overlay's -lobjc (autolinked) must be the libobjc libXCTest links:
+  # left to the Swift driver, it can find GCC's libobjc.so.4.
+  swift_overlay_lib_dirs = []
+  foreach dir : gnustep_runtime_lib_dirs
+    swift_overlay_lib_dirs += '-L' + dir
+  endforeach
   swift_overlay = custom_target('XCTestSwift',
     input: swift_overlay_sources,
     output: ['lib' + 'XCTestSwift.' + (host_machine.system() == 'darwin' ? 'dylib' : 'so'),
@@ -133,7 +139,7 @@ if swiftc.found()
     # explicitly, so an installed tools-xctest's map doesn't clash.
     command: [swiftc, '-I', meson.current_source_dir(), '-Xcc', '-I' + meson.current_source_dir(),
               '-Xcc', '-fmodule-map-file=' + join_paths(meson.current_source_dir(), 'XCTest', 'module.modulemap'),
-              get_option('xctest_swift_flags'), '-parse-as-library',
+              swift_overlay_lib_dirs, get_option('xctest_swift_flags'), '-parse-as-library',
               '-module-name', 'XCTest', '-module-link-name', 'XCTestSwift',
               '-emit-library', '-emit-module', '-emit-module-path', '@OUTPUT1@',
               '@INPUT@', '-L' + meson.current_build_dir(), '-lXCTest', '-o', '@OUTPUT0@'],
@@ -219,6 +225,7 @@ if host_machine.system() != 'darwin'
     ['control-flow', 'run-control-flow-tests.sh'],
     ['swift-overlay', 'run-swift-overlay-tests.sh'],
     ['async-methods', 'run-async-method-tests.sh'],
+    ['make-swift', 'run-make-swift-tests.sh'],
   ]
   if host_machine.system() != 'windows'
     xctest_tests += [['hosted', 'run-hosted-tests.sh']]
