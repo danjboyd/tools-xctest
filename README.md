@@ -568,15 +568,34 @@ class ParserTests: XCTestCase {
   Foundation overlay adds it; with older overlays, use `print`.
 - **Not supported:** `async` tests and `await fulfillment(of:)`.
 
-`xctest.make` doesn't compile Swift yet, so Swift test bundles are built
-directly with the toolchain: compile with `-parse-as-library`, link as a
-shared library with `-lXCTestSwift -lXCTest`, and put it in a bundle whose
-`Resources/Info-gnustep.plist` names it as `NSExecutable`. Link through
-`swiftc`, or, linking with `clang`, put the toolchain's
-`lib/swift/linux/<arch>/swiftrt.o` first: without it the image's Swift
-metadata isn't registered, and protocol casts (including the one that gives
-`XCTSkip` its message and location) fail.
-`Examples/SwiftTests` does this with a short GNUmakefile.
+With gnustep-make, list the Swift sources in `<Bundle>_SWIFT_FILES` and
+include `xctest.make` as for Objective-C tests (Swift and Objective-C files
+can share a bundle):
+
+```make
+include $(GNUSTEP_MAKEFILES)/common.make
+
+XCTEST_BUNDLE_NAME = ParserTests
+ParserTests_SWIFT_FILES = ParserTests.swift
+
+include $(GNUSTEP_MAKEFILES)/Auxiliary/xctest.make
+```
+
+This needs a gnustep-make that compiles Swift: gnustep-swift's tools-make,
+with its `GNUSTEP_SWIFT_*` profile. That builds the sources and links
+`swiftrt.o`; `xctest.make` adds the libraries the Swift objects ask for
+(`libXCTestSwift`, the Swift runtime, ...), which `bundle.make` doesn't link
+for bundles. With a gnustep-make that can't build Swift, a bundle with
+`_SWIFT_FILES` is an error rather than a bundle without its tests.
+`Examples/SwiftTests` is such a bundle.
+
+Without gnustep-make, build the bundle with the toolchain: compile with
+`-parse-as-library`, link as a shared library with `-lXCTestSwift -lXCTest`,
+and put it in a bundle whose `Resources/Info-gnustep.plist` names it as
+`NSExecutable`. Link through `swiftc`, or, linking with `clang`, put the
+toolchain's `lib/swift/linux/<arch>/swiftrt.o` first: without it the image's
+Swift metadata isn't registered, and protocol casts (including the one that
+gives `XCTSkip` its message and location) fail.
 
 ## Running tests
 

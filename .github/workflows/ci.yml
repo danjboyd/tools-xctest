@@ -46,6 +46,19 @@ jobs:
           . "$PREFIX/System/Library/Makefiles/GNUstep.sh"
           make
 
+      # gnustep-swift's tools-make (makefiles only, into a scratch prefix),
+      # for run-make-swift-tests.sh: Swift test bundles through xctest.make,
+      # built with a stand-in Swift toolchain.
+      - name: Install gnustep-swift's tools-make
+        run: |
+          git clone -q https://github.com/danjboyd/tools-make.git "$RUNNER_TEMP/tools-make-swift-src"
+          cd "$RUNNER_TEMP/tools-make-swift-src"
+          git checkout -q 3dbfc7d3177e6b08a04102394296b3db0cc96fb5
+          ./configure --prefix="$RUNNER_TEMP/tools-make-swift" --with-layout=gnustep \
+            --with-library-combo=ng-gnu-gnu --with-runtime-abi=gnustep-2.2 > /dev/null
+          make install > /dev/null
+          echo "XCTEST_SWIFT_MAKEFILES=$RUNNER_TEMP/tools-make-swift/System/Library/Makefiles" >> "$GITHUB_ENV"
+
       - name: make check
         run: |
           . "$PREFIX/System/Library/Makefiles/GNUstep.sh"
