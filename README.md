@@ -556,6 +556,10 @@ class ParserTests: XCTestCase {
   meson setup build -Dswift=enabled -Dswiftc=/path/to/swiftc -Dxctest_swift_flags=...
   ```
 
+  The overlay is linked against the libobjc in GNUstep's library
+  directories (or the gnustep-swift profile's `GNUSTEP_SWIFT_LIBOBJC2_LIBDIR`),
+  so that the Swift driver doesn't pick GCC's `libobjc.so.4`. If libobjc2
+  is elsewhere, add `-L<its directory>` to the flags.
   The flags are `swiftc` driver flags; pass frontend-only ones with
   `-Xfrontend` (e.g. `-Xfrontend -disable-objc-attr-requires-foundation-module`).
   It installs `XCTest.swiftmodule` next to the headers' `XCTest/` directory
