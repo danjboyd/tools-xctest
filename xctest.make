@@ -47,6 +47,15 @@
 #                              An uninstalled tools-xctest to build against
 #                              and run with (its XCTest/obj and source root).
 #
+# Swift test bundles: list the sources in <Bundle>_SWIFT_FILES, as for any
+# Swift target. That needs a gnustep-make with Swift support (gnustep-swift's
+# tools-make, with its GNUSTEP_SWIFT_* profile), which compiles them and
+# links swiftrt.o. xctest.make adds what a bundle loaded into xctest also
+# needs: the libraries the Swift objects ask for (libXCTestSwift, the Swift
+# runtime, ...), which bundle.make doesn't link, and, with
+# XCTEST_INCLUDE_DIR/XCTEST_LIBRARY_DIR, the uninstalled XCTest module map
+# and Swift overlay. Without Swift support, a Swift test bundle is an error.
+#
 
 ifeq ($(strip $(XCTEST_BUNDLE_NAME)),)
   $(error xctest.make: set XCTEST_BUNDLE_NAME to the test bundles to build)
@@ -64,7 +73,32 @@ $(foreach bundle,$(XCTEST_BUNDLE_NAME),\
   $(if $(XCTEST_LIBRARY_DIR),$(eval $(bundle)_LIB_DIRS += -L$(XCTEST_LIBRARY_DIR)))\
   $(if $(XCTEST_INCLUDE_DIR),$(eval $(bundle)_INCLUDE_DIRS += -I$(XCTEST_INCLUDE_DIR))))
 
+# Swift test bundles. SWIFT_AUTOLINK_ARGS is gnustep-make's, per instance:
+# the @-files listing the libraries each Swift object asks for.
+_XCTEST_SWIFT_BUNDLES = $(strip $(foreach bundle,$(XCTEST_BUNDLE_NAME),$(if $(strip $($(bundle)_SWIFT_FILES)),$(bundle))))
+$(foreach bundle,$(_XCTEST_SWIFT_BUNDLES),\
+  $(eval $(bundle)_BUNDLE_LIBS += $$(SWIFT_AUTOLINK_ARGS))\
+  $(if $(XCTEST_INCLUDE_DIR),$(eval $(bundle)_SWIFT_INCLUDE_DIRS += $(XCTEST_INCLUDE_DIR))\
+    $(eval $(bundle)_SWIFT_CLANG_MODULEMAPS += $(XCTEST_INCLUDE_DIR)/XCTest/module.modulemap))\
+  $(if $(XCTEST_LIBRARY_DIR),$(eval $(bundle)_SWIFT_INCLUDE_DIRS += $(XCTEST_LIBRARY_DIR))))
+# gnustep-swift's tools-make fixes a Swift instance's library directories
+# before adding <Bundle>_LIB_DIRS, so the uninstalled library's directory
+# goes in AUXILIARY_LIB_DIRS too (ahead of the installed libraries).
+ifneq ($(and $(_XCTEST_SWIFT_BUNDLES),$(XCTEST_LIBRARY_DIR)),)
+  AUXILIARY_LIB_DIRS += -L$(XCTEST_LIBRARY_DIR)
+endif
+
 include $(GNUSTEP_MAKEFILES)/bundle.make
+
+ifneq ($(_XCTEST_SWIFT_BUNDLES),)
+  ifeq ($(origin SWIFT_RUNTIME_OBJ_FILE),undefined)
+    $(error xctest.make: $(_XCTEST_SWIFT_BUNDLES) has Swift sources, but this gnustep-make ($(GNUSTEP_MAKEFILES)) can't build Swift; use gnustep-swift's tools-make)
+  endif
+  # bundle.make links the Swift objects but not the libraries they list.
+  ifneq ($(filter $(GNUSTEP_INSTANCE),$(_XCTEST_SWIFT_BUNDLES)),)
+$(BUNDLE_FILE): $(SWIFT_AUTOLINK_FILES)
+  endif
+endif
 
 # Runs every bundle, then fails if any of them failed.
 _XCTEST_ENV = $(if $(XCTEST_LIBRARY_DIR),LD_LIBRARY_PATH="$(XCTEST_LIBRARY_DIR)$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}")

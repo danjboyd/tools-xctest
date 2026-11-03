@@ -22,6 +22,12 @@ Objective-C interop:
   with the signatures and messages of Apple's XCTest. It builds only with a
   GNUstep-interop `swiftc` (gnustep-make `XCTEST_SWIFTC`, Meson
   `-Dswift=enabled`), so Objective-C-only builds are unchanged.
+- `xctest.make` builds Swift test bundles from `<Bundle>_SWIFT_FILES`, with
+  gnustep-swift's tools-make: it links the libraries the Swift objects ask
+  for (which `bundle.make` doesn't) and, with `XCTEST_INCLUDE_DIR` and
+  `XCTEST_LIBRARY_DIR`, an uninstalled tools-xctest's module map and Swift
+  overlay. With a gnustep-make that can't build Swift, such a bundle is an
+  error.
 - A throwing test, `-setUpWithError:` or `-tearDownWithError:` can return
   an `NSError` in `_XCT_CONTROL_FLOW_ERROR_DOMAIN` to skip the test, or to
   end it without recording the error again (Swift's `XCTSkip` and
