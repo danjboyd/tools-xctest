@@ -1,6 +1,9 @@
 #import <Foundation/Foundation.h>
 
-FOUNDATION_EXPORT NSString * const XCTestErrorDomain;
+/* Not FOUNDATION_EXPORT: that is gnustep-base's GS_EXPORT, which on Windows
+ * is __declspec(dllimport) outside gnustep-base, so the XCTest DLL never
+ * exported the constant and clients failed to link. */
+extern NSString * const XCTestErrorDomain;
 typedef NS_ENUM(NSInteger, XCTestErrorCode) {
     XCTestErrorCodeTimeoutWhileWaiting = 0,
     XCTestErrorCodeFailureWhileWaiting = 1
