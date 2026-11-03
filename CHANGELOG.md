@@ -27,6 +27,8 @@ Objective-C interop:
   completion block is called. With an extended block signature saying the
   block takes an `NSError *` (`async throws`), that error fails or skips the
   test.
+  `continueAfterFailure = false` records the failure without stopping the
+  body, because unwinding through `@MainActor`'s main queue hangs later tests.
 - `xctest.make` builds Swift test bundles from `<Bundle>_SWIFT_FILES`, with
   gnustep-swift's tools-make: it links the libraries the Swift objects ask
   for (which `bundle.make` doesn't) and, with `XCTEST_INCLUDE_DIR` and
