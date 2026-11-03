@@ -44,13 +44,19 @@ include $(GNUSTEP_MAKEFILES)/library.make
 # the headers must be this tree's.
 ifneq ($(XCTEST_SWIFTC),)
 XCTEST_SWIFT_SOURCES = Swift/Bridge.swift Swift/Assertions.swift Swift/Errors.swift
+# The overlay's -lobjc (autolinked) must be the libobjc libXCTest uses, from
+# the gnustep-swift profile or GNUstep's library directories: left to the
+# Swift driver, it can find GCC's libobjc.so.4, and loading a test bundle
+# then crashes in the runtime's class loader.
+_XCTEST_SWIFT_OBJC_LIB_DIRS = $(if $(GNUSTEP_SWIFT_LIBOBJC2_LIBDIR),-L$(GNUSTEP_SWIFT_LIBOBJC2_LIBDIR)) \
+  $(GNUSTEP_LIBRARIES_FLAGS)
 
 after-all:: obj/libXCTestSwift$(SHARED_LIBEXT)
 
 obj/libXCTestSwift$(SHARED_LIBEXT): $(XCTEST_SWIFT_SOURCES) obj/libXCTest$(SHARED_LIBEXT) $(XCTest_HEADER_FILES)
 	$(ECHO_NOTHING)echo " Compiling the Swift overlay ..."; \
 	$(XCTEST_SWIFTC) -I.. -Xcc -I.. -Xcc -fmodule-map-file=$(CURDIR)/module.modulemap \
-	  $(XCTEST_SWIFTFLAGS) -parse-as-library \
+	  $(_XCTEST_SWIFT_OBJC_LIB_DIRS) $(XCTEST_SWIFTFLAGS) -parse-as-library \
 	  -module-name XCTest -module-link-name XCTestSwift \
 	  -emit-library -emit-module -emit-module-path obj/XCTest.swiftmodule \
 	  $(XCTEST_SWIFT_SOURCES) -L./obj -lXCTest -o $@$(END_ECHO)
