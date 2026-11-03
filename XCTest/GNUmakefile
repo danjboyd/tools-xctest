@@ -38,6 +38,10 @@ include $(GNUSTEP_MAKEFILES)/library.make
 # -Xfrontend -disable-objc-attr-requires-foundation-module). It is a
 # Swift module named XCTest over the Clang module of the same name, so
 # `import XCTest` gives both, and importing it links libXCTestSwift.
+# The source tree comes first, and its module map is named explicitly:
+# with an older tools-xctest installed where XCTEST_SWIFTFLAGS points,
+# there are two maps defining XCTest, which clang otherwise rejects, and
+# the headers must be this tree's.
 ifneq ($(XCTEST_SWIFTC),)
 XCTEST_SWIFT_SOURCES = Swift/Bridge.swift Swift/Assertions.swift Swift/Errors.swift
 
@@ -45,11 +49,11 @@ after-all:: obj/libXCTestSwift$(SHARED_LIBEXT)
 
 obj/libXCTestSwift$(SHARED_LIBEXT): $(XCTEST_SWIFT_SOURCES) obj/libXCTest$(SHARED_LIBEXT) $(XCTest_HEADER_FILES)
 	$(ECHO_NOTHING)echo " Compiling the Swift overlay ..."; \
-	$(XCTEST_SWIFTC) $(XCTEST_SWIFTFLAGS) -parse-as-library \
+	$(XCTEST_SWIFTC) -I.. -Xcc -I.. -Xcc -fmodule-map-file=$(CURDIR)/module.modulemap \
+	  $(XCTEST_SWIFTFLAGS) -parse-as-library \
 	  -module-name XCTest -module-link-name XCTestSwift \
 	  -emit-library -emit-module -emit-module-path obj/XCTest.swiftmodule \
-	  -I.. -Xcc -I.. $(XCTEST_SWIFT_SOURCES) \
-	  -L./obj -lXCTest -o $@$(END_ECHO)
+	  $(XCTEST_SWIFT_SOURCES) -L./obj -lXCTest -o $@$(END_ECHO)
 
 after-install::
 	$(MKDIRS) $(DESTDIR)$(GNUSTEP_HEADERS) $(DESTDIR)$(GNUSTEP_LIBRARIES)

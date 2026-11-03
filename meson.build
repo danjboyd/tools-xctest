@@ -129,10 +129,13 @@ if swiftc.found()
     input: swift_overlay_sources,
     output: ['lib' + 'XCTestSwift.' + (host_machine.system() == 'darwin' ? 'dylib' : 'so'),
              'XCTest.swiftmodule', 'XCTest.swiftdoc'],
-    command: [swiftc, get_option('xctest_swift_flags'), '-parse-as-library',
+    # This tree's headers and module map first, and the map named
+    # explicitly, so an installed tools-xctest's map doesn't clash.
+    command: [swiftc, '-I', meson.current_source_dir(), '-Xcc', '-I' + meson.current_source_dir(),
+              '-Xcc', '-fmodule-map-file=' + join_paths(meson.current_source_dir(), 'XCTest', 'module.modulemap'),
+              get_option('xctest_swift_flags'), '-parse-as-library',
               '-module-name', 'XCTest', '-module-link-name', 'XCTestSwift',
               '-emit-library', '-emit-module', '-emit-module-path', '@OUTPUT1@',
-              '-I', meson.current_source_dir(), '-Xcc', '-I' + meson.current_source_dir(),
               '@INPUT@', '-L' + meson.current_build_dir(), '-lXCTest', '-o', '@OUTPUT0@'],
     depends: xctest_lib,
     install: true,
