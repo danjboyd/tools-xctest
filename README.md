@@ -492,14 +492,82 @@ test('MyTests', xctest, args: [my_tests.full_path()], depends: [my_tests])
 ```
 
 The headers are installed with a Clang module map, so `@import XCTest;` (with
-`-fmodules`), or `import XCTest` from Swift, needs only the header directory on
-the include path. GNUstep's runner is a separate submodule,
-`XCTest.GSXCTestRunner`.
+`-fmodules`), or `import XCTest` from Swift (see [Swift tests](#swift-tests)),
+needs only the header directory on the include path. GNUstep's runner is a
+separate submodule, `XCTest.GSXCTestRunner`.
 
 To build and run the test targets of an Xcode project, use `buildtool test`
 from [libs-xcode](https://github.com/gnustep/libs-xcode); it runs each
 `.xctest` bundle with `xctest`, inside the app named by the target's
 `TEST_HOST` if it has one.
+
+## Swift tests
+
+Swift test bundles need a Swift toolchain with GNUstep's Objective-C
+interop (`-gnustep-objc-interop`). A stock Linux Swift can't import
+Objective-C, so it can't use XCTest here. Tests are written as on Apple's
+platforms:
+
+```swift
+import XCTest
+
+class ParserTests: XCTestCase {
+    var parser: Parser!
+
+    override func setUpWithError() throws {
+        try XCTSkipUnless(Parser.isAvailable, "no parser here")
+        parser = Parser()
+    }
+
+    func testEmptyInput() throws {
+        let result = try XCTUnwrap(parser.parse(""))
+        XCTAssertEqual(result.count, 0)
+        XCTAssertEqual(result.score, 0.5, accuracy: 0.01)
+    }
+}
+```
+
+- **Discovery.** `func testX()` methods, including `throws` ones, are found
+  through the Objective-C runtime, as for Objective-C tests. They don't need
+  `@objc`, and the class doesn't need `@objc(Name)`. A throwing test that
+  throws fails with the error's description.
+- **Names.** Swift registers the class as `Module.Class`. Output and reports
+  show that (`-[MyTests.ParserTests testEmptyInput]`), while identifiers
+  leave the module out, as Apple's do:
+  `-only-testing:MyTests/ParserTests/testEmptyInput`. The full name also
+  selects it. In `-XCTest`'s dot form, write `MyTests.ParserTests.testEmptyInput`.
+- **`import XCTest`** finds the headers' module map with the header
+  directory on the include path (`-I <Headers>`, and `-Xcc -I <Headers>`).
+- **Assertions.** The Swift overlay provides `XCTAssert`,
+  `XCTAssertTrue`/`False`, `XCTAssertNil`/`NotNil`, `XCTAssertEqual`/`NotEqual`
+  (with `accuracy:`), `XCTAssertGreaterThan`/`LessThan` (and `OrEqual`),
+  `XCTAssertIdentical`/`NotIdentical`, `XCTAssertThrowsError`/`NoThrow`,
+  `XCTFail`, `XCTUnwrap`, `XCTSkip`, `XCTSkipIf` and `XCTSkipUnless`. They
+  have Apple's signatures and messages, and failures are reported at the
+  caller's file and line.
+
+  The overlay is a Swift module named `XCTest` over the Objective-C one, so
+  the same `import XCTest` gives both. Importing it links `libXCTestSwift`.
+  It's built only on request, with the interop `swiftc` and that toolchain's
+  flags:
+
+  ```sh
+  make XCTEST_SWIFTC=/path/to/swiftc XCTEST_SWIFTFLAGS="-gnustep-objc-interop ..."
+  meson setup build -Dswift=enabled -Dswiftc=/path/to/swiftc -Dxctest_swift_flags=...
+  ```
+
+  It installs `XCTest.swiftmodule` next to the headers' `XCTest/` directory
+  and `libXCTestSwift` with the libraries.
+- **Not supported:** `async` tests and `await fulfillment(of:)`, and
+  `NSLog` from Swift (use `print`; GNUstep's
+  Foundation overlay doesn't have it yet). Whether `continueAfterFailure =
+  false` can stop a Swift test is still being tested. swift-corelibs-xctest
+  ignores it.
+
+`xctest.make` doesn't compile Swift yet, so Swift test bundles are built
+directly with the toolchain: compile with `-parse-as-library`, link as a
+shared library with `-lXCTestSwift -lXCTest`, and put it in a bundle whose
+`Resources/Info-gnustep.plist` names it as `NSExecutable`.
 
 ## Running tests
 
