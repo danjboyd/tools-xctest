@@ -190,6 +190,7 @@ if host_machine.system() != 'darwin'
     ['make-helper', 'run-make-helper-tests.sh'],
     ['throwing', 'run-throwing-tests.sh'],
     ['module-map', 'run-module-map-tests.sh'],
+    ['module-name', 'run-module-name-tests.sh'],
   ]
   if host_machine.system() != 'windows'
     xctest_tests += [['hosted', 'run-hosted-tests.sh']]

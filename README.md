@@ -148,6 +148,11 @@ executables are `<Name>.dll`.
   how a Swift `func testFoo() throws` appears to Objective-C, is a test named
   `testFoo` (in output, reports and `-only-testing:`). Returning `NO` fails
   it with the error's description.
+- Swift test classes, which the Swift runtime registers under
+  module-qualified names (`MyTests.FooTests`): identifiers (`-list-tests`,
+  `-only-testing:`, `-skip-testing:`, `-XCTest`) leave the module out, as
+  Apple's do (`MyTests/FooTests/testBar`). The full name also selects them,
+  and output and reports show it (`-[MyTests.FooTests testBar]`).
 - Class `+setUp` / `+tearDown` and instance `-setUp` / `-tearDown`, plus
   `-setUpWithError:`, `-tearDownWithError:` and `-addTeardownBlock:`. Instance
   teardown runs even when setup or the test throws; class teardown runs after
@@ -508,6 +513,10 @@ xctest MyTests.bundle -skip-testing:MyTests/SlowTests
 
 Test identifiers use the form `TestTarget[/TestClass[/TestMethod]]`, where
 `TestTarget` is the bundle name without its `.bundle` or `.xctest` extension.
+For a Swift class, `TestClass` is the class name without its module, or the
+module-qualified name. In `-XCTest`'s dot form, write a Swift test as
+`Module.Class.method`; `Module.Class` alone reads as `Class.method`, so select
+a whole class by its name.
 
 By default results are logged as `XCTest: ...` lines. Pass `-output-format
 apple` to print them on stdout in the same format as Apple's `xctest`, including

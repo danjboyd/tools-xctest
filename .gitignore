@@ -43,3 +43,5 @@ Tests/Fixture.bundle/
 Tests/obj
 Tests/ThrowingFixture/ThrowingFixture.bundle
 Tests/ThrowingFixture/obj
+Tests/ModuleFixture/ModuleFixture.bundle
+Tests/ModuleFixture/obj
