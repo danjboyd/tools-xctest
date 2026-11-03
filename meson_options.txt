@@ -1,0 +1,10 @@
+# The Swift overlay (XCTest/Swift): XCTAssert* and friends for Swift tests.
+# It needs a swiftc with GNUstep's Objective-C interop; xctest_swift_flags carries
+# that toolchain's own flags. Off by default; Objective-C builds are the same
+# either way.
+option('swift', type: 'feature', value: 'disabled',
+       description: 'Build the Swift overlay')
+option('swiftc', type: 'string', value: 'swiftc',
+       description: 'swiftc with GNUstep Objective-C interop, for the Swift overlay')
+option('xctest_swift_flags', type: 'array', value: [],
+       description: 'Extra swiftc driver flags for the Swift overlay (toolchain resource dir, -gnustep-objc-interop, ...; frontend-only flags as -Xfrontend <flag>)')

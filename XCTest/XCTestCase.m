@@ -424,7 +424,26 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
 
     @try {
         succeeded = block(&error);
-        if (!succeeded) {
+        if (!succeeded && [[error domain] isEqualToString:@"" _XCT_CONTROL_FLOW_ERROR_DOMAIN]) {
+            // Swift's XCTSkip and XCTUnwrap (see XCTestAssertionsImpl.h).
+            if ([error code] == _XCTControlFlowCodeSkip) {
+                // userInfo can be missing: e.g. in a Swift image linked
+                // without swiftrt.o, CustomNSError's userInfo is lost.
+                NSDictionary *info = [error userInfo];
+                NSString *message = [info objectForKey:@"message"];
+
+                [(XCTestCaseRun *)[self testRun] _gsRecordSkip:
+                    [GSXCTestIssue issueWithMessage:([message length] > 0 ? message : @"Test skipped")
+                                           filePath:[info objectForKey:@"file"]
+                                         lineNumber:[[info objectForKey:@"line"] unsignedIntegerValue]
+                                         unexpected:NO]];
+            } else if ([error code] != _XCTControlFlowCodeAlreadyRecorded) {
+                [self _gsRecordIssueWithoutInterrupting:
+                    _GSXCTMakeIssue(XCTIssueTypeThrownError,
+                                    [NSString stringWithFormat:@"failed%@ - %@", where, [error localizedDescription]],
+                                    nil, 0, error)];
+            }
+        } else if (!succeeded) {
             [self _gsRecordIssueWithoutInterrupting:
                 _GSXCTMakeIssue(XCTIssueTypeThrownError,
                                 [NSString stringWithFormat:@"failed%@ - %@", where,

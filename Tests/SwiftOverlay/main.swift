@@ -1,0 +1,174 @@
+// Checks the Swift overlay's assertions (XCTest/Swift) against the stub in
+// Stub.swift: what each records, with which file and line, and what the
+// skip and unwrap errors look like to the runner.
+
+import Foundation
+
+var failures = 0
+
+func report(_ ok: Bool, _ what: String, _ detail: @autoclosure () -> String = "") {
+    if ok {
+        print("PASS  \(what)")
+    } else {
+        failures += 1
+        print("FAIL  \(what)\(detail().isEmpty ? "" : ": \(detail())")")
+    }
+}
+
+// Runs body, which must sit on the caller's line, and checks what it
+// recorded: nothing (description nil), or one failure at that line.
+func check(_ what: String, records description: String?, expected: Bool = true,
+           file: StaticString = #filePath, line: UInt = #line, _ body: () throws -> Void) {
+    recordedFailures = []
+    // Swift infers a closure as throwing from any `try` in it, even inside
+    // an autoclosure argument; none of these throws out of an assertion.
+    do {
+        try body()
+    } catch {
+        report(false, what, "threw \(error)")
+        return
+    }
+    if let description = description {
+        let want = RecordedFailure(description: description, expected: expected,
+                                   file: String(describing: file), line: line)
+        report(recordedFailures == [want], what, "recorded \(recordedFailures)")
+    } else {
+        report(recordedFailures.isEmpty, what, "recorded \(recordedFailures)")
+    }
+}
+
+enum TestError: Error { case boom }
+func boom() throws -> Int { throw TestError.boom }
+final class Box {}
+
+// Booleans and nil
+check("XCTAssert passes", records: nil) { XCTAssert(true) }
+check("XCTAssertTrue fails", records: "XCTAssertTrue failed") { XCTAssertTrue(false) }
+check("a message follows ' - '", records: "XCTAssertTrue failed - why") { XCTAssertTrue(false, "why") }
+check("XCTAssertFalse fails", records: "XCTAssertFalse failed") { XCTAssertFalse(true) }
+check("XCTAssertNil fails", records: "XCTAssertNil failed: \"1\"") { XCTAssertNil(1 as Int?) }
+check("XCTAssertNil passes", records: nil) { XCTAssertNil(nil as Int?) }
+check("XCTAssertNotNil fails", records: "XCTAssertNotNil failed") { XCTAssertNotNil(nil as Int?) }
+
+// Equality
+check("XCTAssertEqual passes", records: nil) { XCTAssertEqual("a", "a") }
+check("XCTAssertEqual fails", records: "XCTAssertEqual failed: (\"1\") is not equal to (\"2\")") { XCTAssertEqual(1, 2) }
+check("XCTAssertNotEqual fails", records: "XCTAssertNotEqual failed: (\"1\") is equal to (\"1\")") { XCTAssertNotEqual(1, 1) }
+check("accuracy: within", records: nil) { XCTAssertEqual(1.0, 1.05, accuracy: 0.1) }
+check("accuracy: outside", records: "XCTAssertEqual failed: (\"1.0\") is not equal to (\"1.2\") +/- (\"0.1\")") { XCTAssertEqual(1.0, 1.2, accuracy: 0.1) }
+check("accuracy: infinity equals itself", records: nil) { XCTAssertEqual(Double.infinity, Double.infinity, accuracy: 0.1) }
+check("accuracy: NaN equals nothing", records: "XCTAssertEqual failed: (\"nan\") is not equal to (\"nan\") +/- (\"0.1\")") { XCTAssertEqual(Double.nan, Double.nan, accuracy: 0.1) }
+check("accuracy: a negative accuracy is its magnitude", records: nil) { XCTAssertEqual(1.0, 1.05, accuracy: -0.1) }
+check("accuracy: integers", records: nil) { XCTAssertEqual(10, 12, accuracy: 3) }
+check("not equal with accuracy fails", records: "XCTAssertNotEqual failed: (\"1.0\") is equal to (\"1.05\") +/- (\"0.1\")") { XCTAssertNotEqual(1.0, 1.05, accuracy: 0.1) }
+
+// Comparison
+check("XCTAssertGreaterThan fails", records: "XCTAssertGreaterThan failed: (\"1\") is not greater than (\"2\")") { XCTAssertGreaterThan(1, 2) }
+check("XCTAssertGreaterThanOrEqual passes", records: nil) { XCTAssertGreaterThanOrEqual(2, 2) }
+check("XCTAssertLessThan fails", records: "XCTAssertLessThan failed: (\"2\") is not less than (\"2\")") { XCTAssertLessThan(2, 2) }
+check("XCTAssertLessThanOrEqual fails", records: "XCTAssertLessThanOrEqual failed: (\"3\") is not less than or equal to (\"2\")") { XCTAssertLessThanOrEqual(3, 2) }
+
+// Identity
+let box = Box()
+check("XCTAssertIdentical passes", records: nil) { XCTAssertIdentical(box, box) }
+check("XCTAssertNotIdentical passes", records: nil) { XCTAssertNotIdentical(box, Box()) }
+recordedFailures = []
+XCTAssertIdentical(box, Box())
+report(recordedFailures.count == 1 && recordedFailures[0].description.hasPrefix("XCTAssertIdentical failed: (")
+       && recordedFailures[0].description.contains(") is not identical to ("), "XCTAssertIdentical fails",
+       "\(recordedFailures)")
+
+// Throwing operands are unexpected failures
+check("an operand that throws", records: "XCTAssertEqual threw error \"boom\"", expected: false) { XCTAssertEqual(try boom(), 1) }
+check("a throwing operand, with a message", records: "XCTAssertTrue threw error \"boom\" - why", expected: false) { XCTAssertTrue(try boom() == 1, "why") }
+
+// Errors
+var handled: Error?
+check("XCTAssertThrowsError passes", records: nil) { XCTAssertThrowsError(try boom()) { handled = $0 } }
+report((handled as? TestError) == .boom, "XCTAssertThrowsError hands the error to its handler")
+check("XCTAssertThrowsError fails", records: "XCTAssertThrowsError failed: did not throw an error") { XCTAssertThrowsError(1) }
+check("XCTAssertNoThrow passes", records: nil) { XCTAssertNoThrow(1) }
+check("XCTAssertNoThrow fails", records: "XCTAssertNoThrow failed: threw error \"boom\"") { XCTAssertNoThrow(try boom()) }
+
+// Fail
+check("XCTFail", records: "failed") { XCTFail() }
+check("XCTFail with a message", records: "failed - why") { XCTFail("why") }
+
+// Operands are evaluated once
+var evaluations = 0
+func counted() -> Int { evaluations += 1; return evaluations }
+recordedFailures = []
+XCTAssertEqual(counted(), 99)
+report(evaluations == 1, "an operand is evaluated once", "\(evaluations) evaluations")
+
+// The message is only built when the assertion fails
+var messageBuilt = false
+func message() -> String { messageBuilt = true; return "m" }
+XCTAssertTrue(true, message())
+report(!messageBuilt, "the message isn't built when the assertion passes")
+
+// XCTUnwrap
+recordedFailures = []
+let unwrapped = try? XCTUnwrap(5 as Int?)
+report(unwrapped == 5 && recordedFailures.isEmpty, "XCTUnwrap returns the value")
+
+var unwrapLine: UInt = 0
+do {
+    unwrapLine = #line; _ = try XCTUnwrap(nil as Int?)
+    report(false, "XCTUnwrap of nil throws")
+} catch {
+    let nsError = error as NSError
+    report(nsError.domain == "org.gnustep.XCTest.ControlFlow" && nsError.code == 1,
+           "XCTUnwrap of nil throws the already-recorded error", "\(nsError.domain) \(nsError.code)")
+    report(recordedFailures == [RecordedFailure(description: "XCTUnwrap failed: expected non-nil value of type \"Int\"",
+                                                expected: true, file: #filePath, line: unwrapLine)],
+           "XCTUnwrap of nil records one failure at its line", "\(recordedFailures)")
+}
+
+recordedFailures = []
+do {
+    _ = try XCTUnwrap(try boom() as Int?)
+} catch {
+    report((error as? TestError) == .boom, "XCTUnwrap rethrows an operand's error as it is")
+    report(recordedFailures.count == 1 && recordedFailures[0].description == "XCTUnwrap threw error \"boom\""
+           && !recordedFailures[0].expected, "XCTUnwrap records an operand's error as unexpected",
+           "\(recordedFailures)")
+}
+
+// XCTSkip, as the runner sees it
+func skipInfo(_ body: () throws -> Void) -> (NSError?, UInt) {
+    do {
+        try body()
+        return (nil, 0)
+    } catch {
+        return (error as NSError, 0)
+    }
+}
+
+let skipLine: UInt = #line; let skip = XCTSkip("not here") as NSError
+report(skip.domain == "org.gnustep.XCTest.ControlFlow" && skip.code == 2, "XCTSkip's domain and code",
+       "\(skip.domain) \(skip.code)")
+report(skip.userInfo["message"] as? String == "Test skipped - not here", "XCTSkip's message",
+       "\(String(describing: skip.userInfo["message"]))")
+report(skip.userInfo["file"] as? String == #filePath, "XCTSkip's file")
+report((skip.userInfo["line"] as? NSNumber)?.uintValue == skipLine, "XCTSkip's line",
+       "\(String(describing: skip.userInfo["line"]))")
+report((XCTSkip("x") as Error as? XCTSkip)?.message == "x", "XCTSkip's message property")
+
+let (skippedIf, _) = skipInfo { try XCTSkipIf(true, "on CI") }
+report(skippedIf?.userInfo["message"] as? String == "Test skipped: required false value but got true - on CI",
+       "XCTSkipIf(true) skips", "\(String(describing: skippedIf?.userInfo["message"]))")
+let (notSkippedIf, _) = skipInfo { try XCTSkipIf(false) }
+report(notSkippedIf == nil, "XCTSkipIf(false) doesn't skip")
+let (skippedUnless, _) = skipInfo { try XCTSkipUnless(false) }
+report(skippedUnless?.userInfo["message"] as? String == "Test skipped: required true value but got false",
+       "XCTSkipUnless(false) skips", "\(String(describing: skippedUnless?.userInfo["message"]))")
+let (skippedThrow, _) = skipInfo { try XCTSkipIf(try boom() == 1) }
+report(skippedThrow?.userInfo["message"] as? String == "Test skipped: threw error \"boom\"",
+       "XCTSkipIf skips when its condition throws", "\(String(describing: skippedThrow?.userInfo["message"]))")
+
+if failures > 0 {
+    print("\(failures) overlay check(s) failed.")
+    exit(1)
+}
+print("All overlay checks passed.")

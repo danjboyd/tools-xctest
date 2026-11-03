@@ -46,6 +46,22 @@
 
 void _XCTSkipHandler(id test, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...);
 
+// Errors that a throwing test, -setUpWithError: or -tearDownWithError: can
+// return to steer the run rather than to fail: Swift's XCTSkip, and the
+// error XCTUnwrap throws after recording its failure. A string macro, not
+// an exported constant, so that Swift imports it and no data symbol is
+// needed (exported data doesn't link on Windows).
+#define _XCT_CONTROL_FLOW_ERROR_DOMAIN "org.gnustep.XCTest.ControlFlow"
+
+typedef NS_ENUM(NSInteger, _XCTControlFlowCode) {
+    // The failure has already been recorded; end the step without
+    // recording the error.
+    _XCTControlFlowCodeAlreadyRecorded = 1,
+    // Skip the test. userInfo has "message", and "file" and "line" when
+    // known, as the skip exception does.
+    _XCTControlFlowCodeSkip = 2,
+};
+
 void _XCTFailureHandler(id test, BOOL expected, const char *filePath, NSUInteger lineNumber, NSString *condition, NSString *format, ...);
 
 void _XCTPreformattedFailureHandler(id test, BOOL expected, NSString *filePath, NSUInteger lineNumber, NSString *condition, NSString *message);

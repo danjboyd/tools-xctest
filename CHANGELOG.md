@@ -17,6 +17,15 @@ Objective-C interop:
   selected as `Class`, as Apple's test identifiers are, and its full name
   still selects it. Output and reports keep the full name. `-XCTest` also
   accepts `Module.Class.method`.
+- A Swift overlay (`XCTest/Swift`) adds `XCTAssert*`, `XCTFail`,
+  `XCTUnwrap`, `XCTSkip`, `XCTSkipIf` and `XCTSkipUnless` for Swift tests,
+  with the signatures and messages of Apple's XCTest. It builds only with a
+  GNUstep-interop `swiftc` (gnustep-make `XCTEST_SWIFTC`, Meson
+  `-Dswift=enabled`), so Objective-C-only builds are unchanged.
+- A throwing test, `-setUpWithError:` or `-tearDownWithError:` can return
+  an `NSError` in `_XCT_CONTROL_FLOW_ERROR_DOMAIN` to skip the test, or to
+  end it without recording the error again (Swift's `XCTSkip` and
+  `XCTUnwrap` do).
 
 ## 0.6.0
 
