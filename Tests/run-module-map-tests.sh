@@ -84,7 +84,9 @@ output=$(cd "$work_dir" && "$cc" -I"$work_dir/Headers" $objc_flags -x objective-
 status=$?
 set -e
 assert_status 0
-stray=$(tr ' \\' '\n\n' < "$work_dir/deps" | grep '/XCTest/' | grep -v "^$work_dir/" || true)
+# Clang writes native paths: on Windows, /tmp/x is C:/msys64/tmp/x.
+stray=$(tr ' \\' '\n\n' < "$work_dir/deps" | grep '/XCTest/' \
+  | grep -v -e "^$work_dir/" -e "^$(native_path "$work_dir")/" || true)
 [ -z "$stray" ] || fail "expected every XCTest header to be installed, but these came from elsewhere: $stray"
 
 # Compile in the work directory: the GNUstep flags include -I., and the
