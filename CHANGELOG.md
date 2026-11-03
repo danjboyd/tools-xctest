@@ -3,6 +3,17 @@
 Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 `vX.Y.Z`; 0.1.x are upstream's (gnustep/tools-xctest).
 
+## Unreleased
+
+For Swift test targets, which need a Swift toolchain with GNUstep's
+Objective-C interop:
+
+- Throwing test methods, `-(BOOL)testFooAndReturnError:(NSError **)`, as a
+  Swift `func testFoo() throws` is seen from Objective-C, are found and run,
+  and reported and selected as `testFoo`. A returned error fails the test.
+- The headers are installed with a `module.modulemap`, so `import XCTest`
+  works from Swift and `@import XCTest;` from Objective-C with modules.
+
 ## 0.6.0
 
 Performance testing: steadier regression checks, hardware counters,

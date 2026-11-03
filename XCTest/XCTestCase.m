@@ -38,24 +38,80 @@ GSXCTestIssue *_GSXCTIssueForSkip(_XCTSkipFailureException *skip)
 // The test being run. Not retained; cleared after each test.
 static XCTestCase *GSCurrentTestCase = nil;
 
+// Whether a method returns one of the given type encodings ("v" for void).
 // Like Apple, only void methods are tests; this skips getters such as a
 // testData property, which also must not be called through a void cast.
-static BOOL GSReturnsVoid(Method method)
+static BOOL GSReturnsType(Method method, const char *const *encodings)
 {
     char *returnType = method_copyReturnType(method);
     const char *type = returnType;
-    BOOL isVoid = NO;
+    BOOL matches = NO;
 
     if (type != NULL) {
         // Skip qualifiers such as oneway ('V').
         while (*type != '\0' && strchr("rnNoORV", *type) != NULL) {
             type++;
         }
-        isVoid = strcmp(type, "v") == 0;
+        for (; *encodings != NULL && !matches; encodings++) {
+            matches = strcmp(type, *encodings) == 0;
+        }
     }
     free(returnType);
 
-    return isVoid;
+    return matches;
+}
+
+static const char *const GSVoidEncodings[] = { "v", NULL };
+// BOOL's encoding varies by target and runtime; Swift's Bool may be a C99 bool.
+static const char *const GSBoolEncodings[] = { @encode(BOOL), "B", NULL };
+
+// A Swift test method that throws, `func testFoo() throws`, reaches the
+// runtime as -(BOOL)testFooAndReturnError:(NSError **)error.
+static NSString *const GSThrowingTestSuffix = @"AndReturnError:";
+
+static BOOL GSIsThrowingTestName(NSString *methodName)
+{
+    return [methodName hasSuffix:GSThrowingTestSuffix];
+}
+
+static BOOL GSIsTestSignature(NSMethodSignature *signature, NSString *methodName)
+{
+    const char *const *encodings = NULL;
+
+    if (signature == nil) {
+        return NO;
+    }
+    if ([signature numberOfArguments] == 2) {
+        return strcmp([signature methodReturnType], @encode(void)) == 0;
+    }
+    if ([signature numberOfArguments] != 3 || !GSIsThrowingTestName(methodName)
+        || [signature getArgumentTypeAtIndex:2][0] != '^') {
+        return NO;
+    }
+    for (encodings = GSBoolEncodings; *encodings != NULL; encodings++) {
+        if (strcmp([signature methodReturnType], *encodings) == 0) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+static BOOL GSIsTestMethod(Method method, NSString *methodName)
+{
+    if (![methodName hasPrefix:@"test"]) {
+        return NO;
+    }
+    if (method_getNumberOfArguments(method) == 2) {
+        return GSReturnsType(method, GSVoidEncodings);
+    }
+    if (method_getNumberOfArguments(method) == 3 && GSIsThrowingTestName(methodName)) {
+        char *argumentType = method_copyArgumentType(method, 2);
+        BOOL isErrorPointer = argumentType != NULL && argumentType[0] == '^';
+
+        free(argumentType);
+        return isErrorPointer && GSReturnsType(method, GSBoolEncodings);
+    }
+    return NO;
 }
 
 // Test methods of a class, including those inherited from superclasses
@@ -76,9 +132,7 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
             Method method = methods[i];
             NSString *methodName = [NSString stringWithUTF8String:sel_getName(method_getName(method))];
 
-            if ([methodName hasPrefix:@"test"]
-                && method_getNumberOfArguments(method) == 2
-                && GSReturnsVoid(method))
+            if (GSIsTestMethod(method, methodName))
             {
                 [names addObject:methodName];
             }
@@ -160,9 +214,9 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     NSMethodSignature *signature = [[self class] instanceMethodSignatureForSelector:selector];
     NSInvocation *invocation = nil;
 
-    // A test method takes no arguments and returns void.
-    if (signature == nil || [signature numberOfArguments] != 2
-        || strcmp([signature methodReturnType], @encode(void)) != 0) {
+    // A test method takes no arguments and returns void, or is a throwing
+    // test (see GSIsThrowingTestName).
+    if (!GSIsTestSignature(signature, NSStringFromSelector(selector))) {
         [self release];
         [NSException raise:NSInvalidArgumentException
                     format:@"Invalid test selector %@", NSStringFromSelector(selector)];
@@ -392,9 +446,12 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
     return succeeded;
 }
 
-- (void)_gsInvokeTestMethod
+// Runs the test method. Returns NO, setting *error, when a throwing test
+// (see GSIsThrowingTestName) returns NO.
+- (BOOL)_gsInvokeTestMethod:(NSError **)error
 {
     SEL selector = [_invocation selector];
+    NSMethodSignature *signature = [_invocation methodSignature];
 
     if (_invocation == nil) {
         [NSException raise:NSInvalidArgumentException format:@"No valid test invocation configured"];
@@ -402,11 +459,16 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
 
     // Plain test methods are called directly; anything else (e.g. a custom
     // invocation with arguments) goes through NSInvocation.
-    if ([[_invocation methodSignature] numberOfArguments] == 2) {
+    if ([signature numberOfArguments] == 2) {
         ((void (*)(id, SEL))[self methodForSelector:selector])(self, selector);
+    } else if ([signature numberOfArguments] == 3
+               && GSIsThrowingTestName(NSStringFromSelector(selector))
+               && [signature methodReturnLength] == sizeof(BOOL)) {
+        return ((BOOL (*)(id, SEL, NSError **))[self methodForSelector:selector])(self, selector, error);
     } else {
         [_invocation invokeWithTarget:self];
     }
+    return YES;
 }
 
 - (void)invokeTest
@@ -433,8 +495,7 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
 
     if (setUpSucceeded) {
         BOOL testCompleted = [self _gsRunPhase:nil block:^BOOL(NSError **error) {
-            [self _gsInvokeTestMethod];
-            return YES;
+            return [self _gsInvokeTestMethod:error];
         }];
 
         // Only a test that ran to the end could have waited on everything.
@@ -536,9 +597,20 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
     GSCurrentTestCase = testCase;
 }
 
+// The test's name as its author wrote it: a throwing Swift test is
+// reported, and selected, as testFoo rather than testFooAndReturnError:.
 - (NSString *)_gsMethodName
 {
-    return _invocation ? NSStringFromSelector([_invocation selector]) : @"(no test method)";
+    NSString *methodName = nil;
+
+    if (_invocation == nil) {
+        return @"(no test method)";
+    }
+    methodName = NSStringFromSelector([_invocation selector]);
+    if ([[_invocation methodSignature] numberOfArguments] == 3 && GSIsThrowingTestName(methodName)) {
+        methodName = [methodName substringToIndex:[methodName length] - [GSThrowingTestSuffix length]];
+    }
+    return methodName;
 }
 
 - (void)_gsFailWithoutRunning:(GSXCTestIssue *)cause

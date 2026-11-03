@@ -1,0 +1,11 @@
+// Lets Clang and Swift `import XCTest` from the installed headers.
+module XCTest [system] {
+  umbrella header "XCTest.h"
+  export *
+
+  // GNUstep's runner: `import XCTest.GSXCTestRunner`.
+  explicit module GSXCTestRunner {
+    header "GSXCTestRunner.h"
+    export *
+  }
+}
