@@ -30,6 +30,14 @@ case " $headers " in
   *" module.modulemap "*) ;;
   *) fail "expected module.modulemap to be installed with the headers" ;;
 esac
+# Meson installs the same set (meson.build's `headers` list).
+meson_headers=$(sed -n '/^headers = \[/,/^\]/p' "$source_root/meson.build" \
+  | grep -o "'XCTest/[^']*'" | tr -d "'" | sed 's|^XCTest/||' | sort)
+make_headers=$(printf '%s\n' $headers | sort)
+[ "$meson_headers" = "$make_headers" ] \
+  || fail "expected meson.build and XCTest/GNUmakefile to install the same headers:
+$(diff <(printf '%s\n' "$make_headers") <(printf '%s\n' "$meson_headers") || true)"
+
 mkdir -p "$work_dir/Headers/XCTest"
 for header in $headers; do
   cp "$source_root/XCTest/$header" "$work_dir/Headers/XCTest/" \
