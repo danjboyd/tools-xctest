@@ -221,7 +221,8 @@ The sections below describe these in more detail.
 Each test gets a fresh instance and runs `-setUpWithError:`, `-setUp`, the test
 method, any blocks registered with `-addTeardownBlock:` (last added first),
 `-tearDown`, then `-tearDownWithError:`. Set `continueAfterFailure = NO` to stop
-a test at its first failed assertion.
+a test at its first failed assertion. A failure in a run loop callback during a
+wait stops the test when the wait returns, not in the callback.
 
 Call `XCTSkip(...)`, `XCTSkipIf(condition, ...)` or `XCTSkipUnless(condition,
 ...)` to skip the rest of a test, for example when it needs a display or a
@@ -596,6 +597,13 @@ class ParserTests: XCTestCase {
   relaunching its test runner after such a test's teardown; this runner stays
   in the same process and carries on with the next test.
 - **Not supported:** `async setUp`/`tearDown` and `await fulfillment(of:)`.
+  A `@MainActor` `async` test can't wait for a main-queue callback either:
+  `wait(forExpectations:timeout:)` compiles there, but the callback doesn't run
+  until the body returns, so the wait times out, and a failure in the late
+  callback is recorded against the next test.
+- **Expectations** use the Objective-C names from Swift for now:
+  `expectation(withDescription:)!` and `wait(forExpectations:timeout:)`, not
+  Apple's `expectation(description:)` and `wait(for:timeout:)`.
 
 With gnustep-make, list the Swift sources in `<Bundle>_SWIFT_FILES` and
 include `xctest.make` as for Objective-C tests (Swift and Objective-C files

@@ -174,7 +174,13 @@ static NSComparisonResult GSCompareFulfillmentOrder(id a, id b, void *context)
                                             [deadline timeIntervalSinceNow] <= 0,
                                             &culprit, &required);
             if (result == 0) {
-                [runLoop runMode:NSDefaultRunLoopMode beforeDate:deadline];
+                _XCTRunLoopWaitWillStart();
+                @try {
+                    [runLoop runMode:NSDefaultRunLoopMode beforeDate:deadline];
+                }
+                @finally {
+                    _XCTRunLoopWaitDidEnd();
+                }
             }
         }
     }
@@ -216,6 +222,9 @@ static NSComparisonResult GSCompareFulfillmentOrder(id a, id b, void *context)
         default:
             break;
     }
+
+    // A callback failed during the wait: stop now that it's safe.
+    _XCTInterruptIfStoppedDuringWait();
 
     return result;
 }

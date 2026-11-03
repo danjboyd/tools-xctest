@@ -24,4 +24,16 @@ assert_contains "API violation - call made to wait without any expectations havi
 assert_not_contains "fixture: AsyncFailureTests continued after timeout"
 assert_contains "AsyncFailureTests: 7/7 tests FAILED"
 
+# A failure in a run loop callback during a wait doesn't unwind the callback:
+# it would leave the main queue stuck, or the timer would swallow it and the
+# wait would time out. The test stops when the wait returns.
+run_fixture AsyncFixture -only-testing:AsyncFixture/AsyncWaitStopTests
+assert_status 1
+assert_contains "fixture: AsyncWaitStopTests callback continued"
+assert_not_contains "fixture: AsyncWaitStopTests continued after the wait"
+assert_not_contains "Asynchronous wait failed"
+assert_contains "fixture: AsyncWaitStopTests next test ran"
+assert_contains "fixture: AsyncWaitStopTests continuing test ran on"
+assert_contains "AsyncWaitStopTests: 2/3 tests FAILED"
+
 echo "Async tests passed."
