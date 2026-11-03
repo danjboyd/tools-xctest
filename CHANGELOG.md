@@ -22,6 +22,11 @@ Objective-C interop:
   with the signatures and messages of Apple's XCTest. It builds only with a
   GNUstep-interop `swiftc` (gnustep-make `XCTEST_SWIFTC`, Meson
   `-Dswift=enabled`), so Objective-C-only builds are unchanged.
+- Async tests: `-testFooWithCompletionHandler:` methods (how a Swift
+  `func testFoo() async` reaches Objective-C) run as `testFoo`, until their
+  completion block is called. With an extended block signature saying the
+  block takes an `NSError *` (`async throws`), that error fails or skips the
+  test. Not yet verified with gnustep-swift's toolchain.
 - A throwing test, `-setUpWithError:` or `-tearDownWithError:` can return
   an `NSError` in `_XCT_CONTROL_FLOW_ERROR_DOMAIN` to skip the test, or to
   end it without recording the error again (Swift's `XCTSkip` and

@@ -48,3 +48,5 @@ Tests/ModuleFixture/obj
 Tests/ControlFlowFixture/ControlFlowFixture.bundle
 Tests/ControlFlowFixture/obj
 Examples/SwiftTests/CalculatorTests.xctest
+Tests/AsyncMethodFixture/AsyncMethodFixture.bundle
+Tests/AsyncMethodFixture/obj
