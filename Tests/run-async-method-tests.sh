@@ -18,6 +18,10 @@ echo "Running async test method regressions..."
 run_fixture AsyncMethodFixture -list-tests
 assert_status 0
 [ "$output" = $'AsyncMethodFixture/AsyncHangTests/testNeverCompletes
+AsyncMethodFixture/AsyncStopTests/testAStopsDuringTheCall
+AsyncMethodFixture/AsyncStopTests/testBContinuesOnTheRunLoop
+AsyncMethodFixture/AsyncStopTests/testCRunsNext
+AsyncMethodFixture/AsyncStopTests/testDPlainTestStops
 AsyncMethodFixture/AsyncTests/testAssertionFails
 AsyncMethodFixture/AsyncTests/testCompletesLater
 AsyncMethodFixture/AsyncTests/testCompletesNow
@@ -28,7 +32,8 @@ AsyncMethodFixture/AsyncTests/testSkips
 AsyncMethodFixture/AsyncTests/testThrows' ] \
   || fail "expected the async tests to be listed without WithCompletionHandler:"
 
-run_fixture AsyncMethodFixture -skip-testing:AsyncMethodFixture/AsyncHangTests -junit-report "$report"
+run_fixture AsyncMethodFixture -skip-testing:AsyncMethodFixture/AsyncHangTests \
+  -skip-testing:AsyncMethodFixture/AsyncStopTests -junit-report "$report"
 assert_status 1
 assert_not_contains "WithCompletionHandler"
 
@@ -69,5 +74,23 @@ run_fixture AsyncMethodFixture -default-test-execution-time-allowance 1 \
 assert_status 1
 assert_contains "fixture: AsyncHangTests.testNeverCompletes"
 assert_contains "testNeverCompletes: Test exceeded execution time allowance of 1 second"
+
+# continueAfterFailure = NO stops an async test during the call, but not
+# from the run loop: that would unwind through whatever is running the body.
+# Here, that's a timer, which swallows the exception, so the test never
+# completes; the allowance turns that hang into a failure. A @MainActor Swift
+# test unwinding through libdispatch's main queue hangs later @MainActor tests.
+# The failures are recorded either way.
+run_fixture AsyncMethodFixture -default-test-execution-time-allowance 20 \
+  -only-testing:AsyncMethodFixture/AsyncStopTests
+assert_status 1
+assert_contains "failed: during the call"
+assert_not_contains "testAStopsDuringTheCall continued"
+assert_contains "failed: on the run loop"
+assert_contains "fixture: AsyncStopTests.testBContinuesOnTheRunLoop continued"
+assert_contains "fixture: AsyncStopTests.testCRunsNext"
+assert_contains "failed: in a plain test"
+assert_not_contains "testDPlainTestStops continued"
+assert_contains "AsyncStopTests: 3/4 tests FAILED"
 
 echo "Async test method regressions passed."

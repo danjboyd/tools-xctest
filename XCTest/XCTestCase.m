@@ -253,6 +253,9 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
 
 @end
 
+// The test whose async body is being waited for on the main thread, if any.
+static XCTestCase *GSAsyncBodyTest = nil;
+
 @implementation XCTestCase
 
 @synthesize continueAfterFailure = _continueAfterFailure;
@@ -595,11 +598,19 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
         ((void (*)(id, SEL, id))imp)(self, selector, [[block copy] autorelease]);
     }
 
-    while (![completion isFinished]) {
-        @autoreleasepool {
-            [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
-                                     beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
+    XCTestCase *previousBodyTest = GSAsyncBodyTest;
+
+    GSAsyncBodyTest = self;
+    @try {
+        while (![completion isFinished]) {
+            @autoreleasepool {
+                [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
+                                         beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
+            }
         }
+    }
+    @finally {
+        GSAsyncBodyTest = previousBodyTest;
     }
     if ([completion error] != nil) {
         if (error != NULL) {
@@ -755,6 +766,16 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
 @end
 
 @implementation XCTestCase (GSXCTestRunnerPrivate)
+
+// Whether the run loop is running this test's async body. A failure can't
+// stop the test then: the exception would unwind through whatever is running
+// the body. From a @MainActor Swift test, that's libdispatch's main queue, and
+// later @MainActor tests then hang. From an NSTimer, the timer swallows it and
+// the completion is never called.
+- (BOOL)_gsIsWaitingForAsyncBody
+{
+    return self == GSAsyncBodyTest;
+}
 
 + (XCTestCase *)_gsCurrentTestCase
 {

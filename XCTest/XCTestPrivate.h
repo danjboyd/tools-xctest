@@ -209,6 +209,7 @@ NSString *_GSXCTDescribeException(NSException *exception);
 // The test case currently being run, or nil.
 + (XCTestCase *) _gsCurrentTestCase;
 + (void) _gsSetCurrentTestCase: (XCTestCase *)testCase;
+- (BOOL) _gsIsWaitingForAsyncBody;
 - (void (^)(void)) _gsPopTeardownBlock;
 // The test method's name, e.g. "testFoo".
 - (NSString *) _gsMethodName;

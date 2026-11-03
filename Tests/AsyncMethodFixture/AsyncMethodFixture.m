@@ -126,3 +126,49 @@ static void NoArgumentIMP(id self, SEL _cmd, void (^completion)(void))
 }
 
 @end
+
+// continueAfterFailure = NO: run on its own. Tests run in this order.
+@interface AsyncStopTests : XCTestCase
+@end
+
+@implementation AsyncStopTests
+
+// In the call itself, nothing but the runner is on the stack: this stops.
+- (void)testAStopsDuringTheCallWithCompletionHandler:(void (^)(void))completion
+{
+    [self setContinueAfterFailure:NO];
+    XCTFail(@"during the call");
+    NSLog(@"fixture: AsyncStopTests.testAStopsDuringTheCall continued");
+    completion();
+}
+
+- (void)failOnRunLoop:(id)completion
+{
+    [self setContinueAfterFailure:NO];
+    XCTFail(@"on the run loop");
+    NSLog(@"fixture: AsyncStopTests.testBContinuesOnTheRunLoop continued");
+    ((void (^)(void))completion)();
+}
+
+// Later, the run loop is on the stack, as it is for a @MainActor Swift test:
+// this must not unwind through it.
+- (void)testBContinuesOnTheRunLoopWithCompletionHandler:(void (^)(void))completion
+{
+    [self performSelector:@selector(failOnRunLoop:) withObject:[[completion copy] autorelease] afterDelay:0.01];
+}
+
+- (void)testCRunsNextWithCompletionHandler:(void (^)(void))completion
+{
+    NSLog(@"fixture: AsyncStopTests.testCRunsNext");
+    completion();
+}
+
+// A plain test still stops once the async test's wait is over.
+- (void)testDPlainTestStops
+{
+    [self setContinueAfterFailure:NO];
+    XCTFail(@"in a plain test");
+    NSLog(@"fixture: AsyncStopTests.testDPlainTestStops continued");
+}
+
+@end

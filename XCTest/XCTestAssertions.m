@@ -42,11 +42,13 @@ static BOOL _XCTIsTestCase(id test)
 void _XCTInterruptIfNeeded(XCTestCase *test)
 {
     // Only the running test can be stopped; a late failure from a finished
-    // test must not interrupt whichever test is running now.
+    // test must not interrupt whichever test is running now. Nor can an async
+    // test's body, on another thread or under the run loop.
     if ([NSThread isMainThread]
         && _XCTIsTestCase(test)
         && test == [XCTestCase _gsCurrentTestCase]
-        && ![test continueAfterFailure]) {
+        && ![test continueAfterFailure]
+        && ![test _gsIsWaitingForAsyncBody]) {
         [[_XCTestCaseInterruptionException exceptionWithName:@"_XCTestCaseInterruptionException"
                                                       reason:@"Test stopped after failure (continueAfterFailure is NO)"
                                                     userInfo:nil] raise];
