@@ -18,7 +18,7 @@ fi
 work_dir=$(mktemp -d)
 trap 'rm -rf "$work_dir"' EXIT
 
-echo "Running Swift overlay checks with $swiftc..."
+echo "Running Swift overlay checks with $swiftc ($("$swiftc" --version 2>&1 | head -n 1))..."
 
 # Bridge.swift without its import of the real (Clang) XCTest module, whose
 # declarations Stub.swift provides.
