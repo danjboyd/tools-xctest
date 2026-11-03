@@ -519,9 +519,14 @@ static NSString *GSSkippedSummary(NSUInteger skipCount)
     if ([test status] == GSXCTestStatusFailed) {
         NSLog(@"XCTest:     %@ FAILED", [test methodName]);
     } else if ([test status] == GSXCTestStatusSkipped) {
-        NSLog(@"XCTest:     %@ SKIPPED at %@:%lu%@", [test methodName],
-            [skip filePath], (unsigned long)[skip lineNumber],
-            [[skip message] length] > 0 ? [@", " stringByAppendingString:[skip message]] : @"");
+        NSString *message = [[skip message] length] > 0 ? [@", " stringByAppendingString:[skip message]] : @"";
+
+        if ([skip filePath] != nil) {
+            NSLog(@"XCTest:     %@ SKIPPED at %@:%lu%@", [test methodName],
+                [skip filePath], (unsigned long)[skip lineNumber], message);
+        } else {
+            NSLog(@"XCTest:     %@ SKIPPED%@", [test methodName], message);
+        }
     }
 }
 

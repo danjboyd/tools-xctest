@@ -7,4 +7,4 @@ option('swift', type: 'feature', value: 'disabled',
 option('swiftc', type: 'string', value: 'swiftc',
        description: 'swiftc with GNUstep Objective-C interop, for the Swift overlay')
 option('xctest_swift_flags', type: 'array', value: [],
-       description: 'Extra swiftc flags for the Swift overlay (toolchain resource dir, -gnustep-objc-interop, ...)')
+       description: 'Extra swiftc driver flags for the Swift overlay (toolchain resource dir, -gnustep-objc-interop, ...; frontend-only flags as -Xfrontend <flag>)')

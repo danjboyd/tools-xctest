@@ -27,6 +27,15 @@ static NSError *ControlFlowError(_XCTControlFlowCode code, NSString *message)
     return NO;
 }
 
+// A skip whose userInfo was lost on the way (as in a Swift image linked
+// without swiftrt.o, where CustomNSError's errorUserInfo isn't seen).
+- (BOOL)testSkipsWithoutInfoAndReturnError:(NSError **)error
+{
+    NSLog(@"fixture: ControlFlowTests.testSkipsWithoutInfo");
+    *error = [NSError errorWithDomain:@"" _XCT_CONTROL_FLOW_ERROR_DOMAIN code:_XCTControlFlowCodeSkip userInfo:nil];
+    return NO;
+}
+
 // XCTUnwrap records its failure, then throws.
 - (BOOL)testAlreadyRecordedAndReturnError:(NSError **)error
 {

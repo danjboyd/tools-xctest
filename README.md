@@ -556,6 +556,8 @@ class ParserTests: XCTestCase {
   meson setup build -Dswift=enabled -Dswiftc=/path/to/swiftc -Dxctest_swift_flags=...
   ```
 
+  The flags are `swiftc` driver flags; pass frontend-only ones with
+  `-Xfrontend` (e.g. `-Xfrontend -disable-objc-attr-requires-foundation-module`).
   It installs `XCTest.swiftmodule` next to the headers' `XCTest/` directory
   and `libXCTestSwift` with the libraries.
 - **Not supported:** `async` tests and `await fulfillment(of:)`, and
@@ -567,7 +569,11 @@ class ParserTests: XCTestCase {
 `xctest.make` doesn't compile Swift yet, so Swift test bundles are built
 directly with the toolchain: compile with `-parse-as-library`, link as a
 shared library with `-lXCTestSwift -lXCTest`, and put it in a bundle whose
-`Resources/Info-gnustep.plist` names it as `NSExecutable`.
+`Resources/Info-gnustep.plist` names it as `NSExecutable`. Link through
+`swiftc`, or, linking with `clang`, put the toolchain's
+`lib/swift/linux/<arch>/swiftrt.o` first: without it the image's Swift
+metadata isn't registered, and protocol casts (including the one that gives
+`XCTSkip` its message and location) fail.
 `Examples/SwiftTests` does this with a short GNUmakefile.
 
 ## Running tests

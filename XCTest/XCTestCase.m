@@ -427,10 +427,13 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
         if (!succeeded && [[error domain] isEqualToString:@"" _XCT_CONTROL_FLOW_ERROR_DOMAIN]) {
             // Swift's XCTSkip and XCTUnwrap (see XCTestAssertionsImpl.h).
             if ([error code] == _XCTControlFlowCodeSkip) {
+                // userInfo can be missing: e.g. in a Swift image linked
+                // without swiftrt.o, CustomNSError's userInfo is lost.
                 NSDictionary *info = [error userInfo];
+                NSString *message = [info objectForKey:@"message"];
 
                 [(XCTestCaseRun *)[self testRun] _gsRecordSkip:
-                    [GSXCTestIssue issueWithMessage:[info objectForKey:@"message"]
+                    [GSXCTestIssue issueWithMessage:([message length] > 0 ? message : @"Test skipped")
                                            filePath:[info objectForKey:@"file"]
                                          lineNumber:[[info objectForKey:@"line"] unsignedIntegerValue]
                                          unexpected:NO]];

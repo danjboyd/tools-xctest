@@ -33,7 +33,9 @@ include $(GNUSTEP_MAKEFILES)/library.make
 # The Swift overlay (Swift/*.swift): XCTAssert* and friends for Swift tests.
 # Built only when XCTEST_SWIFTC names a swiftc with GNUstep's Objective-C
 # interop; XCTEST_SWIFTFLAGS carries that toolchain's own flags (resource
-# directory, -gnustep-objc-interop, libs-base's module map, ...). It is a
+# directory, -gnustep-objc-interop, libs-base's module map, ...). They're
+# swiftc driver flags: pass frontend-only ones as -Xfrontend <flag> (e.g.
+# -Xfrontend -disable-objc-attr-requires-foundation-module). It is a
 # Swift module named XCTest over the Clang module of the same name, so
 # `import XCTest` gives both, and importing it links libXCTestSwift.
 ifneq ($(XCTEST_SWIFTC),)
