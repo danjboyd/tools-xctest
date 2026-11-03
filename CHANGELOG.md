@@ -22,6 +22,11 @@ Objective-C interop:
   with the signatures and messages of Apple's XCTest. It builds only with a
   GNUstep-interop `swiftc` (gnustep-make `XCTEST_SWIFTC`, Meson
   `-Dswift=enabled`), so Objective-C-only builds are unchanged.
+- Async tests: `-testFooWithCompletionHandler:` methods (how a Swift
+  `func testFoo() async` reaches Objective-C) run as `testFoo`, until their
+  completion block is called. With an extended block signature saying the
+  block takes an `NSError *` (`async throws`), that error fails or skips the
+  test.
 - `xctest.make` builds Swift test bundles from `<Bundle>_SWIFT_FILES`, with
   gnustep-swift's tools-make: it links the libraries the Swift objects ask
   for (which `bundle.make` doesn't) and, with `XCTEST_INCLUDE_DIR` and

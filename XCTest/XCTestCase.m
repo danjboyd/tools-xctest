@@ -74,6 +74,58 @@ static BOOL GSIsThrowingTestName(NSString *methodName)
     return [methodName hasSuffix:GSThrowingTestSuffix];
 }
 
+// A Swift `func testFoo() async` reaches the runtime as
+// -(void)testFooWithCompletionHandler:(void (^)(void))completion, and an
+// `async throws` one with a completion block taking an NSError *.
+static NSString *const GSAsyncTestSuffix = @"WithCompletionHandler:";
+
+static BOOL GSIsAsyncTestName(NSString *methodName)
+{
+    return [methodName hasSuffix:GSAsyncTestSuffix];
+}
+
+static BOOL GSIsBlockType(const char *type)
+{
+    // Skip qualifiers, as for return types.
+    while (type != NULL && *type != '\0' && strchr("rnNoORV", *type) != NULL) {
+        type++;
+    }
+    return type != NULL && type[0] == '@' && type[1] == '?';
+}
+
+// Whether an async test's completion block takes an NSError * (async
+// throws). Only an extended block signature says so: @?<v@?@"NSError">, as
+// gnustep-swift's toolchain emits it, or @?<v@?@> (class_addMethod can't
+// take @"..." in libobjc2);
+// without one the block is called as void (^)(void), which is safe either
+// way: a block given an argument it doesn't read ignores it, but one that
+// reads an argument it wasn't given reads garbage.
+static BOOL GSAsyncCompletionTakesError(Class cls, SEL selector)
+{
+    Method method = class_getInstanceMethod(cls, selector);
+    const char *types = method ? method_getTypeEncoding(method) : NULL;
+    const char *signature = types ? strstr(types, "@?<") : NULL;
+
+    if (signature == NULL) {
+        return NO;
+    }
+    // <return type, the block itself (@?), then its parameters>
+    signature += 3;
+    if (*signature == 'v') {
+        signature++;
+    }
+    while (*signature >= '0' && *signature <= '9') {
+        signature++;
+    }
+    if (strncmp(signature, "@?", 2) == 0) {
+        signature += 2;
+    }
+    while (*signature >= '0' && *signature <= '9') {
+        signature++;
+    }
+    return *signature != '>' && *signature != '\0';
+}
+
 static BOOL GSIsTestSignature(NSMethodSignature *signature, NSString *methodName)
 {
     const char *const *encodings = NULL;
@@ -83,6 +135,10 @@ static BOOL GSIsTestSignature(NSMethodSignature *signature, NSString *methodName
     }
     if ([signature numberOfArguments] == 2) {
         return strcmp([signature methodReturnType], @encode(void)) == 0;
+    }
+    if ([signature numberOfArguments] == 3 && GSIsAsyncTestName(methodName)) {
+        return GSIsBlockType([signature getArgumentTypeAtIndex:2])
+            && strcmp([signature methodReturnType], @encode(void)) == 0;
     }
     if ([signature numberOfArguments] != 3 || !GSIsThrowingTestName(methodName)
         || [signature getArgumentTypeAtIndex:2][0] != '^') {
@@ -103,6 +159,13 @@ static BOOL GSIsTestMethod(Method method, NSString *methodName)
     }
     if (method_getNumberOfArguments(method) == 2) {
         return GSReturnsType(method, GSVoidEncodings);
+    }
+    if (method_getNumberOfArguments(method) == 3 && GSIsAsyncTestName(methodName)) {
+        char *argumentType = method_copyArgumentType(method, 2);
+        BOOL isBlock = GSIsBlockType(argumentType);
+
+        free(argumentType);
+        return isBlock && GSReturnsType(method, GSVoidEncodings);
     }
     if (method_getNumberOfArguments(method) == 3 && GSIsThrowingTestName(methodName)) {
         char *argumentType = method_copyArgumentType(method, 2);
@@ -143,6 +206,52 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
 
     return [[names allObjects] sortedArrayUsingSelector:@selector(compare:)];
 }
+
+// Whether an async test's completion block has been called, and with what
+// error. The block may be called on any thread.
+@interface GSXCTAsyncCompletion : NSObject
+{
+    BOOL _finished;
+    NSError *_error;
+}
+- (void)finishWithError:(NSError *)error;
+- (BOOL)isFinished;
+- (NSError *)error;
+@end
+
+@implementation GSXCTAsyncCompletion
+
+- (void)dealloc
+{
+    [_error release];
+    [super dealloc];
+}
+
+- (void)finishWithError:(NSError *)error
+{
+    @synchronized (self) {
+        if (!_finished) {
+            _finished = YES;
+            _error = [error retain];
+        }
+    }
+}
+
+- (BOOL)isFinished
+{
+    @synchronized (self) {
+        return _finished;
+    }
+}
+
+- (NSError *)error
+{
+    @synchronized (self) {
+        return [[_error retain] autorelease];
+    }
+}
+
+@end
 
 @implementation XCTestCase
 
@@ -465,8 +574,45 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
     return succeeded;
 }
 
+// Runs an async test (see GSIsAsyncTestName): calls it with a completion
+// block, then runs the test thread's run loop until the block has been
+// called, from whatever thread. There's no limit of its own: with timeouts
+// enabled, the execution time allowance stops a test that never completes.
+- (BOOL)_gsInvokeAsyncTestMethod:(SEL)selector error:(NSError **)error
+{
+    GSXCTAsyncCompletion *completion = [[[GSXCTAsyncCompletion alloc] init] autorelease];
+    IMP imp = [self methodForSelector:selector];
+
+    if (GSAsyncCompletionTakesError([self class], selector)) {
+        void (^block)(NSError *) = ^(NSError *completionError) {
+            [completion finishWithError:completionError];
+        };
+        ((void (*)(id, SEL, id))imp)(self, selector, [[block copy] autorelease]);
+    } else {
+        void (^block)(void) = ^{
+            [completion finishWithError:nil];
+        };
+        ((void (*)(id, SEL, id))imp)(self, selector, [[block copy] autorelease]);
+    }
+
+    while (![completion isFinished]) {
+        @autoreleasepool {
+            [[NSRunLoop currentRunLoop] runMode:NSDefaultRunLoopMode
+                                     beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.01]];
+        }
+    }
+    if ([completion error] != nil) {
+        if (error != NULL) {
+            *error = [completion error];
+        }
+        return NO;
+    }
+    return YES;
+}
+
 // Runs the test method. Returns NO, setting *error, when a throwing test
-// (see GSIsThrowingTestName) returns NO.
+// (see GSIsThrowingTestName) returns NO, or an async one completes with an
+// error.
 - (BOOL)_gsInvokeTestMethod:(NSError **)error
 {
     SEL selector = [_invocation selector];
@@ -484,6 +630,10 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
                && GSIsThrowingTestName(NSStringFromSelector(selector))
                && [signature methodReturnLength] == sizeof(BOOL)) {
         return ((BOOL (*)(id, SEL, NSError **))[self methodForSelector:selector])(self, selector, error);
+    } else if ([signature numberOfArguments] == 3
+               && GSIsAsyncTestName(NSStringFromSelector(selector))
+               && GSIsBlockType([signature getArgumentTypeAtIndex:2])) {
+        return [self _gsInvokeAsyncTestMethod:selector error:error];
     } else {
         [_invocation invokeWithTarget:self];
     }
@@ -628,6 +778,8 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
     methodName = NSStringFromSelector([_invocation selector]);
     if ([[_invocation methodSignature] numberOfArguments] == 3 && GSIsThrowingTestName(methodName)) {
         methodName = [methodName substringToIndex:[methodName length] - [GSThrowingTestSuffix length]];
+    } else if ([[_invocation methodSignature] numberOfArguments] == 3 && GSIsAsyncTestName(methodName)) {
+        methodName = [methodName substringToIndex:[methodName length] - [GSAsyncTestSuffix length]];
     }
     return methodName;
 }

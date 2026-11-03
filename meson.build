@@ -224,6 +224,7 @@ if host_machine.system() != 'darwin'
     ['module-name', 'run-module-name-tests.sh'],
     ['control-flow', 'run-control-flow-tests.sh'],
     ['swift-overlay', 'run-swift-overlay-tests.sh'],
+    ['async-methods', 'run-async-method-tests.sh'],
     ['make-swift', 'run-make-swift-tests.sh'],
   ]
   if host_machine.system() != 'windows'

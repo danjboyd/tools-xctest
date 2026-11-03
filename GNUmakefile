@@ -48,6 +48,7 @@ XCTEST_TEST_SCRIPTS = cli-filter \
 	module-name \
 	control-flow \
 	swift-overlay \
+	async-method \
 	make-swift
 # There is no -host on Windows (it needs LD_PRELOAD).
 ifneq (,$(findstring mingw,$(GNUSTEP_HOST_OS))$(findstring windows,$(GNUSTEP_HOST_OS)))
