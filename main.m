@@ -745,9 +745,14 @@ int main(int argc, char *argv[]) {
     for (NSString *test in appleSelections) {
         NSString *target = TargetNameForBundlePath(testBundlePath);
 
-        // Class.method is accepted as well as Apple's Class/method.
+        // Class.method is accepted as well as Apple's Class/method, and
+        // Module.Class.method for a Swift class registered as Module.Class.
         if ([test rangeOfString:@"/"].location == NSNotFound) {
-            test = [test stringByReplacingOccurrencesOfString:@"." withString:@"/"];
+            NSRange lastDot = [test rangeOfString:@"." options:NSBackwardsSearch];
+
+            if (lastDot.location != NSNotFound) {
+                test = [test stringByReplacingCharactersInRange:lastDot withString:@"/"];
+            }
         }
         [onlyTestIdentifiers addObject:[NSString stringWithFormat:@"%@/%@", target ? target : @"", test]];
     }

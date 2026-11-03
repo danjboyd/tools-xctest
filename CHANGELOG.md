@@ -13,6 +13,10 @@ Objective-C interop:
   and reported and selected as `testFoo`. A returned error fails the test.
 - The headers are installed with a `module.modulemap`, so `import XCTest`
   works from Swift and `@import XCTest;` from Objective-C with modules.
+- A Swift test class is registered as `Module.Class`. It's listed and
+  selected as `Class`, as Apple's test identifiers are, and its full name
+  still selects it. Output and reports keep the full name. `-XCTest` also
+  accepts `Module.Class.method`.
 
 ## 0.6.0
 

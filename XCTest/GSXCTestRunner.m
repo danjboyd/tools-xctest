@@ -91,6 +91,27 @@ static NSArray *GSParseAppleTestIdentifier(NSString *identifier)
     return components;
 }
 
+// The class part of a test identifier. Swift registers a test class under
+// its module-qualified name, "Module.Class"; an Objective-C class name can't
+// contain a dot. Apple's identifiers (Target/Class/method) leave the module
+// out, so this does too.
+static NSString *GSTestIdentifierClassName(NSString *className)
+{
+    NSRange dot = [className rangeOfString:@"."];
+
+    if (dot.location == NSNotFound || dot.location == 0 || NSMaxRange(dot) >= [className length]) {
+        return className;
+    }
+    return [className substringFromIndex:NSMaxRange(dot)];
+}
+
+// A selected class matches by its identifier name or by its full runtime name.
+static BOOL GSTestClassNameMatches(NSString *selected, NSString *className)
+{
+    return [className isEqualToString:selected] ||
+           [GSTestIdentifierClassName(className) isEqualToString:selected];
+}
+
 static BOOL GSAppleTestIdentifierMatches(NSArray *identifierComponents,
                                          NSString *targetName,
                                          NSString *className,
@@ -100,7 +121,7 @@ static BOOL GSAppleTestIdentifierMatches(NSArray *identifierComponents,
     }
 
     if ([identifierComponents count] >= 2 &&
-        ![className isEqualToString:[identifierComponents objectAtIndex:1]]) {
+        !GSTestClassNameMatches([identifierComponents objectAtIndex:1], className)) {
         return NO;
     }
 
@@ -117,13 +138,22 @@ static BOOL GSLegacyTestNameMatches(NSString *testName,
                                     NSString *methodName) {
     NSArray *tuple = [testName componentsSeparatedByString:@"."];
 
+    // Module.Class.method, for a Swift class.
+    if ([tuple count] == 3) {
+        return [className isEqualToString:[NSString stringWithFormat:@"%@.%@",
+                                           [tuple objectAtIndex:0], [tuple objectAtIndex:1]]] &&
+               [methodName isEqualToString:[tuple objectAtIndex:2]];
+    }
+
+    // Class.method, or a Swift class's Module.Class.
     if ([tuple count] == 2) {
-        return [className isEqualToString:[tuple objectAtIndex:0]] &&
-               [methodName isEqualToString:[tuple objectAtIndex:1]];
+        return (GSTestClassNameMatches([tuple objectAtIndex:0], className) &&
+                [methodName isEqualToString:[tuple objectAtIndex:1]]) ||
+               [className isEqualToString:testName];
     }
 
     if ([tuple count] == 1) {
-        return [className isEqualToString:[tuple objectAtIndex:0]];
+        return GSTestClassNameMatches([tuple objectAtIndex:0], className);
     }
 
     return NO;
@@ -450,7 +480,8 @@ static void GSCollectTestCases(XCTest *test, NSMutableArray *testCases)
     for (XCTestSuite *suite in plan) {
         for (XCTestCase *testCase in [suite tests]) {
             [identifiers addObject:[NSString stringWithFormat:@"%@/%@/%@",
-                targetName ? targetName : @"", NSStringFromClass([testCase class]), [testCase _gsMethodName]]];
+                targetName ? targetName : @"", GSTestIdentifierClassName(NSStringFromClass([testCase class])),
+                [testCase _gsMethodName]]];
         }
     }
 
