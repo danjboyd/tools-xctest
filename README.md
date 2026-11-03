@@ -568,6 +568,7 @@ class ParserTests: XCTestCase {
 directly with the toolchain: compile with `-parse-as-library`, link as a
 shared library with `-lXCTestSwift -lXCTest`, and put it in a bundle whose
 `Resources/Info-gnustep.plist` names it as `NSExecutable`.
+`Examples/SwiftTests` does this with a short GNUmakefile.
 
 ## Running tests
 
