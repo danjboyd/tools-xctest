@@ -221,7 +221,8 @@ The sections below describe these in more detail.
 Each test gets a fresh instance and runs `-setUpWithError:`, `-setUp`, the test
 method, any blocks registered with `-addTeardownBlock:` (last added first),
 `-tearDown`, then `-tearDownWithError:`. Set `continueAfterFailure = NO` to stop
-a test at its first failed assertion.
+a test at its first failed assertion. A failure in a run loop callback during a
+wait stops the test when the wait returns, not in the callback.
 
 Call `XCTSkip(...)`, `XCTSkipIf(condition, ...)` or `XCTSkipUnless(condition,
 ...)` to skip the rest of a test, for example when it needs a display or a

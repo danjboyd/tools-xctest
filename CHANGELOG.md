@@ -40,6 +40,13 @@ Objective-C interop:
   end it without recording the error again (Swift's `XCTSkip` and
   `XCTUnwrap` do).
 
+Fixed:
+
+- With `continueAfterFailure = NO`, a failure in a run loop callback during
+  a wait no longer unwinds the callback, which left libdispatch's main queue
+  stuck, so later waits on it timed out, or was swallowed by an `NSTimer`, so
+  the wait itself timed out. The test now stops when the wait returns.
+
 ## 0.6.0
 
 Performance testing: steadier regression checks, hardware counters,

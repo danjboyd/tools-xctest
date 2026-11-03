@@ -39,19 +39,65 @@ static BOOL _XCTIsTestCase(id test)
         && [test isKindOfClass:[XCTestCase class]];
 }
 
+// How many run loop waits of the runner's are in progress on the main thread,
+// and the test that failed during one with continueAfterFailure = NO.
+static NSUInteger GSRunLoopWaits = 0;
+static XCTestCase *GSTestStoppedDuringWait = nil;
+
+static void GSInterrupt(void)
+{
+    [[_XCTestCaseInterruptionException exceptionWithName:@"_XCTestCaseInterruptionException"
+                                                  reason:@"Test stopped after failure (continueAfterFailure is NO)"
+                                                userInfo:nil] raise];
+}
+
 void _XCTInterruptIfNeeded(XCTestCase *test)
 {
     // Only the running test can be stopped; a late failure from a finished
-    // test must not interrupt whichever test is running now. Nor can an async
-    // test's body, on another thread or under the run loop.
+    // test must not interrupt whichever test is running now.
     if ([NSThread isMainThread]
         && _XCTIsTestCase(test)
         && test == [XCTestCase _gsCurrentTestCase]
-        && ![test continueAfterFailure]
-        && ![test _gsIsWaitingForAsyncBody]) {
-        [[_XCTestCaseInterruptionException exceptionWithName:@"_XCTestCaseInterruptionException"
-                                                      reason:@"Test stopped after failure (continueAfterFailure is NO)"
-                                                    userInfo:nil] raise];
+        && ![test continueAfterFailure]) {
+        // Under a run loop wait, the exception would unwind through whatever
+        // called back: libdispatch's main queue is then stuck, so later work
+        // on it never runs, and an NSTimer swallows the exception.
+        if (GSRunLoopWaits > 0) {
+            GSTestStoppedDuringWait = test;
+        } else {
+            GSInterrupt();
+        }
+    }
+}
+
+void _XCTRunLoopWaitWillStart(void)
+{
+    if ([NSThread isMainThread]) {
+        GSRunLoopWaits++;
+    }
+}
+
+void _XCTRunLoopWaitDidEnd(void)
+{
+    if ([NSThread isMainThread]) {
+        GSRunLoopWaits--;
+    }
+}
+
+void _XCTInterruptIfStoppedDuringWait(void)
+{
+    if ([NSThread isMainThread] && GSRunLoopWaits == 0
+        && GSTestStoppedDuringWait != nil
+        && GSTestStoppedDuringWait == [XCTestCase _gsCurrentTestCase]) {
+        GSTestStoppedDuringWait = nil;
+        GSInterrupt();
+    }
+}
+
+void _XCTForgetStopDuringWait(void)
+{
+    if ([NSThread isMainThread] && GSRunLoopWaits == 0) {
+        GSTestStoppedDuringWait = nil;
     }
 }
 

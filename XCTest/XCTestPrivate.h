@@ -59,6 +59,16 @@ void _XCTRecordFailure(XCTestCase *test, NSString *description);
 // where tests run; a failure on another thread is just recorded.
 void _XCTInterruptIfNeeded(XCTestCase *test);
 
+// Bracket a run of the run loop on behalf of the test. A failure during one
+// doesn't stop the test, because the exception would unwind through whatever
+// the run loop called. Afterwards, a synchronous wait stops the test with
+// _XCTInterruptIfStoppedDuringWait; an async test's wait, whose body can't be
+// stopped, forgets the stop with _XCTForgetStopDuringWait.
+void _XCTRunLoopWaitWillStart(void);
+void _XCTRunLoopWaitDidEnd(void);
+void _XCTInterruptIfStoppedDuringWait(void);
+void _XCTForgetStopDuringWait(void);
+
 // Per-test time limits (GSXCTestWatchdog.m). An allowance of 0 uses the
 // default (600 seconds) or, for the maximum, means none.
 void _GSXCTSetTimeouts(BOOL enabled, NSTimeInterval defaultAllowance, NSTimeInterval maximumAllowance);
@@ -209,7 +219,6 @@ NSString *_GSXCTDescribeException(NSException *exception);
 // The test case currently being run, or nil.
 + (XCTestCase *) _gsCurrentTestCase;
 + (void) _gsSetCurrentTestCase: (XCTestCase *)testCase;
-- (BOOL) _gsIsWaitingForAsyncBody;
 - (void (^)(void)) _gsPopTeardownBlock;
 // The test method's name, e.g. "testFoo".
 - (NSString *) _gsMethodName;

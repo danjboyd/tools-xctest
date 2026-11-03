@@ -237,3 +237,48 @@ static NSString * const FixtureNotification = @"FixtureNotification";
 }
 
 @end
+
+// continueAfterFailure = NO, for a failure in a run loop callback during a wait.
+@interface AsyncWaitStopTests : XCTestCase
+@end
+
+@implementation AsyncWaitStopTests
+
+- (void)failThenFulfill:(XCTestExpectation *)expectation
+{
+    XCTFail(@"in a callback");
+    NSLog(@"fixture: AsyncWaitStopTests callback continued");
+    [expectation fulfill];
+}
+
+// The callback must not be unwound; the test stops when the wait returns.
+- (void)testAStopsAfterTheWait
+{
+    self.continueAfterFailure = NO;
+    XCTestExpectation *expectation = [self expectationWithDescription:@"fulfilled by the callback"];
+
+    [self performSelector:@selector(failThenFulfill:) withObject:expectation afterDelay:0.01];
+    [self waitForExpectationsWithTimeout:5 handler:nil];
+    NSLog(@"fixture: AsyncWaitStopTests continued after the wait");
+}
+
+- (void)testBRunsNext
+{
+    XCTestExpectation *expectation = [self expectationWithDescription:@"next"];
+
+    [expectation performSelector:@selector(fulfill) withObject:nil afterDelay:0.01];
+    [self waitForExpectationsWithTimeout:5 handler:nil];
+    NSLog(@"fixture: AsyncWaitStopTests next test ran");
+}
+
+// With continueAfterFailure left on, the test carries on as usual.
+- (void)testCContinuesWhenAllowed
+{
+    XCTestExpectation *expectation = [self expectationWithDescription:@"fulfilled by the callback"];
+
+    [self performSelector:@selector(failThenFulfill:) withObject:expectation afterDelay:0.01];
+    [self waitForExpectationsWithTimeout:5 handler:nil];
+    NSLog(@"fixture: AsyncWaitStopTests continuing test ran on");
+}
+
+@end
