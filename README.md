@@ -560,11 +560,13 @@ class ParserTests: XCTestCase {
   `-Xfrontend` (e.g. `-Xfrontend -disable-objc-attr-requires-foundation-module`).
   It installs `XCTest.swiftmodule` next to the headers' `XCTest/` directory
   and `libXCTestSwift` with the libraries.
-- **Not supported:** `async` tests and `await fulfillment(of:)`, and
-  `NSLog` from Swift (use `print`; GNUstep's
-  Foundation overlay doesn't have it yet). Whether `continueAfterFailure =
-  false` can stop a Swift test is still being tested. swift-corelibs-xctest
-  ignores it.
+- **`continueAfterFailure = false`** stops a Swift test at its first
+  failure, as on Apple's platforms, and the run carries on. As there, the
+  test's Swift `defer` blocks don't run. (swift-corelibs-xctest ignores the
+  setting.)
+- **`NSLog`** from Swift needs gnustep-swift 4ddb1c6 or later, whose
+  Foundation overlay adds it; with older overlays, use `print`.
+- **Not supported:** `async` tests and `await fulfillment(of:)`.
 
 `xctest.make` doesn't compile Swift yet, so Swift test bundles are built
 directly with the toolchain: compile with `-parse-as-library`, link as a
