@@ -24,6 +24,15 @@
 #include <math.h>
 #include <stdio.h>
 
+
+// " (reason)" for an expected failure's report, or "" without one.
+static NSString *GSExpectedFailureReason(GSXCTestIssue *failure)
+{
+    NSString *reason = [failure context];
+
+    return [reason length] > 0 ? [NSString stringWithFormat:@" (%@)", reason] : @"";
+}
+
 @implementation GSXCTestIssue
 
 @synthesize message = _message;
@@ -458,11 +467,13 @@ static NSString *GSSkippedSummary(NSUInteger skipCount)
 
 - (void) test: (GSXCTestCaseResult *)test didRecordExpectedFailure: (GSXCTestIssue *)failure
 {
+    NSString *reason = GSExpectedFailureReason(failure);
+
     if ([failure filePath] != nil) {
-        NSLog(@"XCTest:     Expected failure (%@) at %@:%lu, %@", [failure context],
+        NSLog(@"XCTest:     Expected failure%@ at %@:%lu, %@", reason,
             [failure filePath], (unsigned long)[failure lineNumber], [failure displayMessage]);
     } else {
-        NSLog(@"XCTest:     Expected failure (%@): %@", [failure context], [failure displayMessage]);
+        NSLog(@"XCTest:     Expected failure%@: %@", reason, [failure displayMessage]);
     }
 }
 
@@ -999,8 +1010,8 @@ static BOOL GSIssuesIncludeUnexpected(NSArray *issues)
             if (hasOutput) {
                 NSMutableArray *lines = [NSMutableArray array];
                 for (GSXCTestIssue *expected in [test expectedFailures]) {
-                    [lines addObject:[NSString stringWithFormat:@"Expected failure (%@): %@",
-                        [expected context], GSJUnitIssueLine(expected)]];
+                    [lines addObject:[NSString stringWithFormat:@"Expected failure%@: %@",
+                        GSExpectedFailureReason(expected), GSJUnitIssueLine(expected)]];
                 }
                 for (GSXCTMeasurement *measurement in [test measurements]) {
                     [lines addObject:[NSString stringWithFormat:

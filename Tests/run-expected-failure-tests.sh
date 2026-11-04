@@ -10,7 +10,10 @@ build_fixture ExpectedFailureFixture
 echo "Running XCTExpectFailure regressions..."
 run_fixture ExpectedFailureFixture -only-testing:ExpectedFailureFixture/ExpectedPassingTests
 assert_status 0
-assert_contains "ExpectedPassingTests: 7 tests PASSED"
+assert_contains "ExpectedPassingTests: 8 tests PASSED"
+# With no reason, the parentheses are left out, not "(null)".
+assert_contains "Expected failure at ExpectedFailureFixture.m:"
+assert_not_contains "(null)"
 assert_contains "Expected failure (known bug 1) at ExpectedFailureFixture.m:"
 assert_contains ", ((NO) is true) failed: broken"
 assert_contains "fixture: testExpectedAssertion continued"
@@ -25,7 +28,9 @@ assert_contains "failed: after block"
 
 run_fixture ExpectedFailureFixture -only-testing:ExpectedFailureFixture/ExpectedFailingTests
 assert_status 1
-assert_contains "ExpectedFailingTests: 5/5 tests FAILED"
+assert_contains "ExpectedFailingTests: 6/6 tests FAILED"
+assert_contains "testNoReasonUnmatched: Failed due to unmatched expected failure"
+assert_not_contains "unmatched expected failure: (null)"
 assert_contains "testStrictUnmatched: Failed due to unmatched expected failure: never happens"
 assert_contains "testBlockStrictUnmatched: Failed due to unmatched expected failure: block never"
 assert_contains "failed: outside the block"

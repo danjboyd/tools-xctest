@@ -324,6 +324,49 @@ report(runTeardownBlock({ throw TestError.boom })?.domain.contains("TestError") 
 report(runTeardownBlock({ throw XCTSkip("x") })?.domain == _XCT_CONTROL_FLOW_ERROR_DOMAIN,
        "an async teardown block's skip keeps its domain")
 
+// XCTExpectFailure's forms.
+let matchAll: (XCTIssue) -> Bool = { _ in true }
+checkCall("XCTExpectFailure(reason), the imported form", "XCTExpectFailure(why)") { XCTExpectFailure("why") }
+checkCall("XCTExpectFailure() with no reason", "options(nil, enabled true strict true matcher none)") {
+    XCTExpectFailure()
+}
+checkCall("XCTExpectFailure(strict:)", "options(why, enabled true strict false matcher none)") {
+    XCTExpectFailure("why", strict: false)
+}
+checkCall("XCTExpectFailure(enabled:)", "options(why, enabled false strict true matcher none)") {
+    XCTExpectFailure("why", enabled: false)
+}
+checkCall("XCTExpectFailure(issueMatcher:)", "options(why, enabled true strict true matcher matches)") {
+    XCTExpectFailure("why", issueMatcher: matchAll)
+}
+checkCall("XCTExpectFailure(options:)", "options(why, enabled true strict true matcher none)") {
+    XCTExpectFailure("why", options: XCTExpectedFailure.Options())
+}
+checkCall("XCTExpectFailure with a trailing failing block", "in block(why, enabled true strict true matcher none)") {
+    var ran = false
+    XCTExpectFailure("why") { ran = true }
+    report(ran, "a failing block runs")
+}
+checkCall("XCTExpectFailure(strict:failingBlock:) returns its result",
+          "in block(why, enabled true strict false matcher none)") {
+    let value = XCTExpectFailure("why", strict: false) { 5 }
+    report(value == 5, "a failing block's result is returned")
+}
+checkCall("XCTExpectFailure(failingBlock:issueMatcher:)", "in block(why, enabled true strict true matcher matches)") {
+    XCTExpectFailure("why", failingBlock: { }, issueMatcher: matchAll)
+}
+checkCall("XCTExpectFailure(options:failingBlock:)", "in block(nil, enabled true strict true matcher none)") {
+    XCTExpectFailure(options: XCTExpectedFailureOptions()) { }
+}
+checkCall("a throwing failing block", "in block(why, enabled true strict true matcher none)") {
+    do {
+        let _: Int = try XCTExpectFailure("why") { try boom() }
+        report(false, "a failing block's error is rethrown")
+    } catch {
+        report(error as? TestError == .boom, "a failing block's error is rethrown", "\(error)")
+    }
+}
+
 if failures > 0 {
     print("\(failures) overlay check(s) failed.")
     exit(1)

@@ -603,9 +603,10 @@ class ParserTests: XCTestCase {
   and `measure(options:block:)`, `XCTMeasureOptions.default`, and non-optional
   `XCTClockMetric()` and the other metrics.
 - **`XCTContext.runActivity(named:block:)`** returns its block's result, and can
-  throw. `XCTExpectFailure` takes a reason, and for options, the imported
-  `XCTExpectFailureWithOptions`; Apple's `strict:` and `failingBlock:` forms aren't
-  there.
+  throw.
+- **`XCTExpectFailure`** has Apple's forms: `enabled:`, `strict:`, `issueMatcher:`,
+  `options:` and `failingBlock:`, or a trailing block. `file:` and `line:` are
+  accepted and not used.
 - **`await fulfillment(of:timeout:enforceOrder:)`** is how an `async` test
   waits, on `XCTestCase` and `XCTWaiter`. It waits on a thread of its own, so
   the test's body suspends, and a `@MainActor` test's main-queue callbacks can

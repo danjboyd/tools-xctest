@@ -50,6 +50,35 @@ func describeWait(_ expectations: [Any]?, _ timeout: Double, _ enforceOrder: Boo
     return "\(names) timeout \(timeout) enforceOrder \(enforceOrder)"
 }
 
+// Public, as the overlay's public functions take them.
+public class XCTIssue: NSObject {}
+
+public class XCTExpectedFailureOptions: NSObject {
+    var isEnabled = true
+    var isStrict = true
+    var issueMatcher: ((XCTIssue?) -> Bool)!
+}
+
+// void XCTExpectFailure(NSString *failureReason): the imported one-argument form.
+func XCTExpectFailure(_ failureReason: String!) {
+    importedCalls.append("XCTExpectFailure(\(failureReason ?? "nil"))")
+}
+
+func describeOptions(_ options: XCTExpectedFailureOptions!) -> String {
+    let matched = options.issueMatcher.map { $0(XCTIssue()) ? "matches" : "no match" } ?? "none"
+    return "enabled \(options.isEnabled) strict \(options.isStrict) matcher \(matched)"
+}
+
+func XCTExpectFailureWithOptions(_ failureReason: String!, _ options: XCTExpectedFailureOptions!) {
+    importedCalls.append("options(\(failureReason ?? "nil"), \(describeOptions(options)))")
+}
+
+func XCTExpectFailureWithOptionsInBlock(_ failureReason: String!, _ options: XCTExpectedFailureOptions!,
+                                        _ failingBlock: (() -> Void)!) {
+    importedCalls.append("in block(\(failureReason ?? "nil"), \(describeOptions(options)))")
+    failingBlock()
+}
+
 protocol XCTMetric {}
 final class XCTClockMetric: XCTMetric {}
 
