@@ -18,6 +18,11 @@ func importedNames(_ attachment: XCTAttachment) {
     let _: XCTMeasureOptions = XCTMeasureOptions.default
 
     // What Helpers.swift and Expectations.swift call.
+    _ = XCTExpectFailureWithOptions(_:_:)
+    _ = XCTExpectFailureWithOptionsInBlock(_:_:_:)
+    _ = \XCTExpectedFailureOptions.isEnabled
+    _ = \XCTExpectedFailureOptions.isStrict
+    _ = \XCTExpectedFailureOptions.issueMatcher
     _ = XCTContext.runActivityNamed(_:block:)
     _ = XCTestCase.measure(withMetrics:block:)
     _ = XCTestCase.measure(withMetrics:options:block:)

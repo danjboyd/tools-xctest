@@ -39,7 +39,8 @@ Objective-C interop:
   Swift `setUp() async throws` and `tearDown() async throws` override, run first
   and last around a test.
 - The Swift overlay has Apple's names for attachments, `measure(metrics:)` and
-  `XCTContext.runActivity(named:block:)`. `XCTAttachmentLifetime` is a Swift enum,
+  `XCTContext.runActivity(named:block:)` and `XCTExpectFailure`'s forms.
+  `XCTAttachmentLifetime` is a Swift enum,
   with `NSInteger` as its underlying type.
 - `addTeardownBlock` takes an `async throws` closure from Swift.
 - `xctest.make` builds Swift test bundles from `<Bundle>_SWIFT_FILES`, with

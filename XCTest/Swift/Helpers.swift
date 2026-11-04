@@ -65,3 +65,75 @@ extension XCTContext {
         return try result!.get()
     }
 }
+
+/// Apple's name for the options, `XCTExpectedFailure.Options`.
+public enum XCTExpectedFailure {
+    public typealias Options = XCTExpectedFailureOptions
+}
+
+private func _gsExpectedFailureOptions(enabled: Bool, strict: Bool,
+                                       issueMatcher: ((XCTIssue) -> Bool)?) -> XCTExpectedFailureOptions {
+    let options: XCTExpectedFailureOptions = XCTExpectedFailureOptions()
+    options.isEnabled = enabled
+    options.isStrict = strict
+    if let issueMatcher = issueMatcher {
+        options.issueMatcher = { issue in issueMatcher(issue!) }
+    }
+    return options
+}
+
+/// Marks failures from here to the end of the test as expected. `file` and
+/// `line` are Apple's, and aren't used: the runner reports the failures' own.
+public func XCTExpectFailure(_ failureReason: String? = nil, enabled: Bool = true, strict: Bool = true,
+                             file: StaticString = #filePath, line: UInt = #line,
+                             issueMatcher: ((XCTIssue) -> Bool)? = nil) {
+    XCTExpectFailureWithOptions(failureReason, _gsExpectedFailureOptions(enabled: enabled, strict: strict,
+                                                                         issueMatcher: issueMatcher))
+}
+
+public func XCTExpectFailure(_ failureReason: String? = nil, options: XCTExpectedFailure.Options) {
+    XCTExpectFailureWithOptions(failureReason, options)
+}
+
+/// Only for failures inside `failingBlock`.
+public func XCTExpectFailure<Result>(_ failureReason: String? = nil, options: XCTExpectedFailure.Options,
+                                     failingBlock: () -> Result) -> Result {
+    var result: Result?
+    withoutActuallyEscaping(failingBlock) { failingBlock in
+        XCTExpectFailureWithOptionsInBlock(failureReason, options) {
+            result = failingBlock()
+        }
+    }
+    return result!
+}
+
+public func XCTExpectFailure<Result>(_ failureReason: String? = nil, options: XCTExpectedFailure.Options,
+                                     failingBlock: () throws -> Result) throws -> Result {
+    var result: Swift.Result<Result, Error>?
+    withoutActuallyEscaping(failingBlock) { failingBlock in
+        XCTExpectFailureWithOptionsInBlock(failureReason, options) {
+            result = Swift.Result { try failingBlock() }
+        }
+    }
+    return try result!.get()
+}
+
+public func XCTExpectFailure<Result>(_ failureReason: String? = nil, enabled: Bool = true, strict: Bool = true,
+                                     file: StaticString = #filePath, line: UInt = #line,
+                                     failingBlock: () -> Result,
+                                     issueMatcher: ((XCTIssue) -> Bool)? = nil) -> Result {
+    return XCTExpectFailure(failureReason,
+                            options: _gsExpectedFailureOptions(enabled: enabled, strict: strict,
+                                                               issueMatcher: issueMatcher),
+                            failingBlock: failingBlock)
+}
+
+public func XCTExpectFailure<Result>(_ failureReason: String? = nil, enabled: Bool = true, strict: Bool = true,
+                                     file: StaticString = #filePath, line: UInt = #line,
+                                     failingBlock: () throws -> Result,
+                                     issueMatcher: ((XCTIssue) -> Bool)? = nil) throws -> Result {
+    return try XCTExpectFailure(failureReason,
+                                options: _gsExpectedFailureOptions(enabled: enabled, strict: strict,
+                                                                   issueMatcher: issueMatcher),
+                                failingBlock: failingBlock)
+}
