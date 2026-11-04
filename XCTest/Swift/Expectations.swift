@@ -23,12 +23,19 @@
 // the imported methods have implicitly unwrapped results, which a `let`
 // would infer as optional.
 //
+// Every method here is @nonobjc. The interop toolchain otherwise gives it an
+// Objective-C thunk with a selector derived from its name: for
+// expectation(description:), that's expectationWithDescription:, which replaces
+// the method it calls, and the two recurse until the stack overflows.
+// run-swift-overlay-tests.sh checks for it, as a stock swiftc can't show this.
+//
 // Where Apple's name is also the imported one, the optional arguments in the
 // calls below select the imported method instead of the method making the call.
 
 import Foundation
 
 extension XCTestCase {
+    @nonobjc
     public func expectation(description: String) -> XCTestExpectation {
         return expectation(withDescription: description)
     }
@@ -57,6 +64,7 @@ extension XCTestCase {
     }
 
     /// GNUstep has no `NSNotification.Name`, so `notificationName` is a string.
+    @nonobjc
     public func expectation(forNotification notificationName: String, object objectToObserve: Any? = nil,
                             notificationCenter: NotificationCenter? = nil,
                             handler: XCNotificationExpectationHandler? = nil) -> XCTestExpectation {
@@ -66,6 +74,7 @@ extension XCTestCase {
         return imported!
     }
 
+    @nonobjc
     public func expectation(for predicate: NSPredicate, evaluatedWith object: Any? = nil,
                             handler: XCPredicateExpectationHandler? = nil) -> XCTestExpectation {
         let imported: XCTestExpectation? = expectation(for: predicate as NSPredicate?, evaluatedWith: object,
@@ -73,6 +82,7 @@ extension XCTestCase {
         return imported!
     }
 
+    @nonobjc
     public func keyValueObservingExpectation(for objectToObserve: Any, keyPath: String,
                                              expectedValue: Any?) -> XCTestExpectation {
         let imported: XCTestExpectation? = keyValueObservingExpectation(for: objectToObserve as Any?,
@@ -81,6 +91,7 @@ extension XCTestCase {
         return imported!
     }
 
+    @nonobjc
     public func keyValueObservingExpectation(for objectToObserve: Any, keyPath: String,
                                              handler: XCKVOExpectationHandler? = nil) -> XCTestExpectation {
         let imported: XCTestExpectation? = keyValueObservingExpectation(for: objectToObserve as Any?,
