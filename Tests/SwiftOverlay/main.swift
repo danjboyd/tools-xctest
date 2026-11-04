@@ -2,6 +2,7 @@
 // Stub.swift: what each records, with which file and line, and what the
 // skip and unwrap errors look like to the runner.
 
+import Dispatch
 import Foundation
 
 var failures = 0
@@ -234,6 +235,36 @@ checkCall("XCTWaiter().wait(for:timeout:)",
 checkCall("XCTWaiter.wait(for:timeout:enforceOrder:)",
           "class wait(forExpectations: [\"second\"] timeout 1.0 enforceOrder true)") {
     report(XCTWaiter.wait(for: [second], timeout: 1, enforceOrder: true) == .completed, "XCTWaiter.Result from the class")
+}
+
+// fulfillment(of:), which suspends until the background wait completes.
+func checkAsyncCall(_ what: String, _ want: String, _ body: @escaping () async -> Void) {
+    importedCalls = []
+    let done = DispatchSemaphore(value: 0)
+    Task {
+        await body()
+        done.signal()
+    }
+    done.wait()
+    report(importedCalls == [want], what, "called \(importedCalls)")
+}
+
+checkAsyncCall("fulfillment(of:)", "background wait(forExpectations: [\"first\"] timeout inf enforceOrder false)") {
+    await testCase.fulfillment(of: [first])
+}
+checkAsyncCall("fulfillment(of:timeout:enforceOrder:)",
+               "background wait(forExpectations: [\"first\", \"second\"] timeout 2.0 enforceOrder true)") {
+    await testCase.fulfillment(of: [first, second], timeout: 2, enforceOrder: true)
+}
+checkAsyncCall("XCTWaiter().fulfillment(of:)",
+               "waiter background wait(forExpectations: [\"first\"] timeout 1.0 enforceOrder false)") {
+    let result = await XCTWaiter().fulfillment(of: [first], timeout: 1)
+    report(result == .incorrectOrder, "XCTWaiter().fulfillment(of:) returns the result")
+}
+checkAsyncCall("XCTWaiter.fulfillment(of:)",
+               "waiter background wait(forExpectations: [\"second\"] timeout inf enforceOrder true)") {
+    let result = await XCTWaiter.fulfillment(of: [second], enforceOrder: true)
+    report(result == .incorrectOrder, "XCTWaiter.fulfillment(of:) returns the result")
 }
 
 if failures > 0 {

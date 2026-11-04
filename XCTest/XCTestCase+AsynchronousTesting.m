@@ -132,6 +132,26 @@ static NSString *GSQuotedDescriptions(NSArray *expectations)
     [waiter waitForExpectations:expectations timeout:seconds enforceOrder:enforceOrderOfFulfillment];
 }
 
+- (void) _gsWaitInBackgroundForExpectations: (NSArray *)expectations
+                                    timeout: (NSTimeInterval)seconds
+                               enforceOrder: (BOOL)enforceOrderOfFulfillment
+                                 completion: (void (^)(void))completion
+{
+    XCTWaiter *waiter = [[[XCTWaiter alloc] initWithDelegate:self] autorelease];
+    void (^copied)(void) = [[completion copy] autorelease];
+
+    for (XCTestExpectation *expectation in expectations) {
+        [expectation _gsSetHasBeenWaitedOn:YES];
+    }
+
+    [waiter _gsWaitInBackgroundForExpectations:expectations
+                                       timeout:seconds
+                                  enforceOrder:enforceOrderOfFulfillment
+                                    completion:^(XCTWaiterResult result) {
+        copied();
+    }];
+}
+
 - (XCTestExpectation *) expectationForNotification: (NSString *)notificationName
                                             object: (id)objectToObserve
                                            handler: (XCNotificationExpectationHandler)handler

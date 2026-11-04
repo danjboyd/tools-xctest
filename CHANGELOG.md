@@ -33,6 +33,8 @@ Objective-C interop:
   `expectation(description:)` and `wait(for:timeout:enforceOrder:)`.
   `XCTWaiterResult` is now a Swift enum (`.completed`), with `NSInteger` as its
   underlying type, and `XCTestExpectation.h` has nullability annotations.
+- `await fulfillment(of:timeout:enforceOrder:)` for Swift `async` tests waits
+  without blocking, so a `@MainActor` test's main-queue callbacks can run.
 - `xctest.make` builds Swift test bundles from `<Bundle>_SWIFT_FILES`, with
   gnustep-swift's tools-make: it links the libraries the Swift objects ask
   for (which `bundle.make` doesn't) and, with `XCTEST_INCLUDE_DIR` and
