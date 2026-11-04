@@ -109,10 +109,11 @@ NS_ASSUME_NONNULL_BEGIN
 + (instancetype) attachmentWithImage: (NSImage *)image;
 + (instancetype) attachmentWithImage: (NSImage *)image quality: (XCTImageQuality)quality;
 
-NS_ASSUME_NONNULL_END
-
 /*! e.g. "public.png". */
 @property (readonly, copy) NSString *uniformTypeIdentifier;
+
+NS_ASSUME_NONNULL_END
+
 /*! Used to name the saved file; nil for a default name. */
 @property (copy) NSString *name;
 @property (copy) NSDictionary *userInfo;

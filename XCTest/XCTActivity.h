@@ -22,6 +22,8 @@
 
 @class XCTAttachment;
 
+NS_ASSUME_NONNULL_BEGIN
+
 /*! A named step of a test, created by +[XCTContext runActivityNamed:block:]. */
 @protocol XCTActivity <NSObject>
 
@@ -31,3 +33,5 @@
 - (void) addAttachment: (XCTAttachment *)attachment;
 
 @end
+
+NS_ASSUME_NONNULL_END
