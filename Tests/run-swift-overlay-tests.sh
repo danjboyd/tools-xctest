@@ -5,6 +5,13 @@ set -euo pipefail
 . "$(dirname "$0")/test-helpers.sh"
 parse_test_args "$@"
 
+# Without @nonobjc, these replace the Objective-C methods they call, on the
+# interop toolchain; see Expectations.swift. A stock swiftc can't show that.
+output=$(awk '/^[[:space:]]+public (class )?func / && !nonobjc { print FILENAME ":" FNR ": " $0 }
+              { if ($0 ~ /@nonobjc/) nonobjc = 1; else if ($0 !~ /^[[:space:]]+@/) nonobjc = 0 }' \
+  "$source_root/XCTest/Swift/Expectations.swift")
+[ -z "$output" ] || fail "expected @nonobjc on:"
+
 # Builds the Swift overlay (XCTest/Swift) with a stock Swift toolchain and a
 # stub of the Objective-C side, and checks what each assertion records. A
 # GNUstep-interop toolchain isn't needed. Skipped when there's no swiftc
@@ -30,6 +37,7 @@ set +e
 output=$("$swiftc" -swift-version 5 -warnings-as-errors -module-name XCTest \
   "$source_root/Tests/SwiftOverlay/Stub.swift" "$work_dir/Bridge.swift" \
   "$source_root/XCTest/Swift/Assertions.swift" "$source_root/XCTest/Swift/Errors.swift" \
+  "$source_root/XCTest/Swift/Expectations.swift" \
   "$source_root/Tests/SwiftOverlay/main.swift" -o "$work_dir/overlay-check" 2>&1)
 status=$?
 set -e

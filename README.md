@@ -598,12 +598,18 @@ class ParserTests: XCTestCase {
   in the same process and carries on with the next test.
 - **Not supported:** `async setUp`/`tearDown` and `await fulfillment(of:)`.
   A `@MainActor` `async` test can't wait for a main-queue callback either:
-  `wait(forExpectations:timeout:)` compiles there, but the callback doesn't run
+  `wait(for:timeout:)` compiles there, but the callback doesn't run
   until the body returns, so the wait times out, and a failure in the late
   callback is recorded against the next test.
-- **Expectations** use the Objective-C names from Swift for now:
-  `expectation(withDescription:)!` and `wait(forExpectations:timeout:)`, not
-  Apple's `expectation(description:)` and `wait(for:timeout:)`.
+- **Expectations** have Apple's Swift names: `expectation(description:)`,
+  `wait(for:timeout:enforceOrder:)`, `waitForExpectations(timeout:handler:)`,
+  `expectation(forNotification:object:notificationCenter:handler:)`,
+  `expectation(for:evaluatedWith:handler:)`,
+  `keyValueObservingExpectation(for:keyPath:expectedValue:)` and
+  `keyValueObservingExpectation(for:keyPath:handler:)`; `XCTWaiter`'s
+  `wait(for:timeout:enforceOrder:)`, as a class and an instance method, with
+  `XCTWaiter.Result`; and `XCTestExpectation(description:)`. One difference: a
+  notification name is a `String`, because GNUstep has no `NSNotification.Name`.
 
 With gnustep-make, list the Swift sources in `<Bundle>_SWIFT_FILES` and
 include `xctest.make` as for Objective-C tests (Swift and Objective-C files

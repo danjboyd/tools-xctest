@@ -23,7 +23,13 @@
 @class XCTestExpectation;
 @class XCTWaiter;
 
-typedef enum {
+// The attribute is what makes this a Swift enum, with cases like .completed;
+// gnustep-base's NS_ENUM doesn't add it.
+#if defined(__clang__)
+enum __attribute__((enum_extensibility(open))) XCTWaiterResult : NSInteger {
+#else
+enum XCTWaiterResult {
+#endif
     /*! All expectations were fulfilled (and no inverted one was). */
     XCTWaiterResultCompleted = 1,
     /*! The timeout passed with expectations still unfulfilled. */
@@ -34,7 +40,8 @@ typedef enum {
     XCTWaiterResultInvertedFulfillment = 4,
     /*! Reserved; not currently produced. */
     XCTWaiterResultInterrupted = 5,
-} XCTWaiterResult;
+};
+typedef enum XCTWaiterResult XCTWaiterResult;
 
 @protocol XCTWaiterDelegate <NSObject>
 @optional

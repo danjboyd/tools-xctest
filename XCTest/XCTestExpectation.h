@@ -20,6 +20,16 @@
 
 #import <Foundation/Foundation.h>
 
+// For Swift: an expectation's initializers import as non-optional, and these
+// parameters and properties as optional.
+#if defined(__clang__)
+#  define GS_XCT_NULLABLE _Nullable
+#else
+#  define GS_XCT_NULLABLE
+#endif
+
+NS_ASSUME_NONNULL_BEGIN
+
 /*!
  * An expected outcome of an asynchronous test. Call -fulfill when the
  * outcome happens; XCTWaiter or XCTestCase waits for it. -fulfill may be
@@ -70,15 +80,15 @@ typedef BOOL (^XCNotificationExpectationHandler)(NSNotification *notification);
 }
 
 - (id)initWithName:(NSString *)notificationName;
-- (id)initWithName:(NSString *)notificationName object:(id)object;
+- (id)initWithName:(NSString *)notificationName object:(id GS_XCT_NULLABLE)object;
 - (id)initWithName:(NSString *)notificationName
-             object:(id)object
- notificationCenter:(NSNotificationCenter *)notificationCenter;
+             object:(id GS_XCT_NULLABLE)object
+ notificationCenter:(NSNotificationCenter * GS_XCT_NULLABLE)notificationCenter;
 
 @property (readonly, copy) NSString *notificationName;
-@property (readonly, retain) id observedObject;
+@property (readonly, retain) id GS_XCT_NULLABLE observedObject;
 @property (readonly, retain) NSNotificationCenter *notificationCenter;
-@property (copy) XCNotificationExpectationHandler handler;
+@property (copy) XCNotificationExpectationHandler GS_XCT_NULLABLE handler;
 
 @end
 
@@ -99,12 +109,12 @@ typedef BOOL (^XCKVOExpectationHandler)(id observedObject, NSDictionary *change)
 - (id)initWithKeyPath:(NSString *)keyPath object:(id)object;
 - (id)initWithKeyPath:(NSString *)keyPath
                 object:(id)object
-         expectedValue:(id)expectedValue;
+         expectedValue:(id GS_XCT_NULLABLE)expectedValue;
 
 @property (readonly, copy) NSString *keyPath;
 @property (readonly, retain) id observedObject;
-@property (readonly, retain) id expectedValue;
-@property (copy) XCKVOExpectationHandler handler;
+@property (readonly, retain) id GS_XCT_NULLABLE expectedValue;
+@property (copy) XCKVOExpectationHandler GS_XCT_NULLABLE handler;
 
 @end
 
@@ -120,10 +130,12 @@ typedef BOOL (^XCPredicateExpectationHandler)(void);
     XCPredicateExpectationHandler _handler;
 }
 
-- (id)initWithPredicate:(NSPredicate *)predicate object:(id)object;
+- (id)initWithPredicate:(NSPredicate *)predicate object:(id GS_XCT_NULLABLE)object;
 
 @property (readonly, copy) NSPredicate *predicate;
-@property (readonly, retain) id object;
-@property (copy) XCPredicateExpectationHandler handler;
+@property (readonly, retain) id GS_XCT_NULLABLE object;
+@property (copy) XCPredicateExpectationHandler GS_XCT_NULLABLE handler;
 
 @end
+
+NS_ASSUME_NONNULL_END

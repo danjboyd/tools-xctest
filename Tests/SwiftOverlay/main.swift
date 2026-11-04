@@ -167,6 +167,75 @@ let (skippedThrow, _) = skipInfo { try XCTSkipIf(try boom() == 1) }
 report(skippedThrow?.userInfo["message"] as? String == "Test skipped: threw error \"boom\"",
        "XCTSkipIf skips when its condition throws", "\(String(describing: skippedThrow?.userInfo["message"]))")
 
+// Apple's expectation names (Expectations.swift), each calling the imported
+// Objective-C method it stands for, and not itself.
+func checkCall(_ what: String, _ want: String, _ body: () -> Void) {
+    importedCalls = []
+    body()
+    report(importedCalls == [want], what, "called \(importedCalls)")
+}
+
+let testCase = XCTestCase()
+let first = XCTestExpectation(description: "first")
+let second = XCTestExpectation(description: "second")
+let center = NotificationCenter()
+let handledNotification: XCNotificationExpectationHandler = { _ in true }
+
+checkCall("expectation(description:)", "expectation(withDescription: x)") {
+    // Non-optional, or `.expectationDescription` wouldn't compile.
+    let expectation = testCase.expectation(description: "x")
+    report(expectation.expectationDescription == "x", "expectation(description:) keeps its description")
+}
+checkCall("wait(for:timeout:)", "wait(forExpectations: [\"first\", \"second\"] timeout 2.0 enforceOrder false)") {
+    testCase.wait(for: [first, second], timeout: 2)
+}
+checkCall("wait(for:timeout:enforceOrder:)", "wait(forExpectations: [\"first\"] timeout 2.0 enforceOrder true)") {
+    testCase.wait(for: [first], timeout: 2, enforceOrder: true)
+}
+checkCall("waitForExpectations(timeout:)", "waitForExpectations(withTimeout: 3.0, handler: false)") {
+    testCase.waitForExpectations(timeout: 3)
+}
+checkCall("waitForExpectations(timeout:handler:)", "waitForExpectations(withTimeout: 3.0, handler: true)") {
+    testCase.waitForExpectations(timeout: 3) { _ in }
+}
+checkCall("expectation(forNotification:)",
+          "expectation(forNotification: n, object: false, notificationCenter: false, handler: false)") {
+    let expectation = testCase.expectation(forNotification: "n")
+    _ = expectation.expectationDescription
+}
+checkCall("expectation(forNotification:object:notificationCenter:handler:)",
+          "expectation(forNotification: n, object: true, notificationCenter: true, handler: true)") {
+    let expectation = testCase.expectation(forNotification: "n", object: first, notificationCenter: center,
+                                           handler: handledNotification)
+    _ = expectation.expectationDescription
+}
+checkCall("expectation(for:)", "expectation(for: predicate, evaluatedWith: false, handler: false)") {
+    let expectation = testCase.expectation(for: NSPredicate(value: true))
+    _ = expectation.expectationDescription
+}
+checkCall("expectation(for:evaluatedWith:handler:)", "expectation(for: predicate, evaluatedWith: true, handler: true)") {
+    let expectation = testCase.expectation(for: NSPredicate(value: true), evaluatedWith: first) { true }
+    _ = expectation.expectationDescription
+}
+checkCall("keyValueObservingExpectation(for:keyPath:expectedValue:)",
+          "keyValueObservingExpectation(keyPath: k, expectedValue: true)") {
+    let expectation = testCase.keyValueObservingExpectation(for: first, keyPath: "k", expectedValue: 1)
+    _ = expectation.expectationDescription
+}
+checkCall("keyValueObservingExpectation(for:keyPath:handler:)",
+          "keyValueObservingExpectation(keyPath: k, handler: false)") {
+    let expectation = testCase.keyValueObservingExpectation(for: first, keyPath: "k")
+    _ = expectation.expectationDescription
+}
+checkCall("XCTWaiter().wait(for:timeout:)",
+          "instance wait(forExpectations: [\"first\"] timeout 1.0 enforceOrder false)") {
+    report(XCTWaiter().wait(for: [first], timeout: 1) == XCTWaiter.Result.timedOut, "XCTWaiter.Result from an instance")
+}
+checkCall("XCTWaiter.wait(for:timeout:enforceOrder:)",
+          "class wait(forExpectations: [\"second\"] timeout 1.0 enforceOrder true)") {
+    report(XCTWaiter.wait(for: [second], timeout: 1, enforceOrder: true) == .completed, "XCTWaiter.Result from the class")
+}
+
 if failures > 0 {
     print("\(failures) overlay check(s) failed.")
     exit(1)
