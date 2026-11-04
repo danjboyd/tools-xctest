@@ -24,10 +24,14 @@ AsyncMethodFixture/AsyncFulfillmentTests/testDChecksOrder
 AsyncMethodFixture/AsyncFulfillmentTests/testEWaiterGivesItsResult
 AsyncMethodFixture/AsyncFulfillmentTests/testFWaitedOnExpectationCounts
 AsyncMethodFixture/AsyncHangTests/testNeverCompletes
+AsyncMethodFixture/AsyncLifecycleTests/testBody
+AsyncMethodFixture/AsyncSetUpFailsTests/testBody
+AsyncMethodFixture/AsyncSetUpSkipsTests/testBody
 AsyncMethodFixture/AsyncStopTests/testAStopsDuringTheCall
 AsyncMethodFixture/AsyncStopTests/testBContinuesOnTheRunLoop
 AsyncMethodFixture/AsyncStopTests/testCRunsNext
 AsyncMethodFixture/AsyncStopTests/testDPlainTestStops
+AsyncMethodFixture/AsyncTearDownFailsTests/testBody
 AsyncMethodFixture/AsyncTests/testAssertionFails
 AsyncMethodFixture/AsyncTests/testCompletesLater
 AsyncMethodFixture/AsyncTests/testCompletesNow
@@ -40,6 +44,8 @@ AsyncMethodFixture/AsyncTests/testThrows' ] \
 
 run_fixture AsyncMethodFixture -skip-testing:AsyncMethodFixture/AsyncHangTests \
   -skip-testing:AsyncMethodFixture/AsyncStopTests -skip-testing:AsyncMethodFixture/AsyncFulfillmentTests \
+  -skip-testing:AsyncMethodFixture/AsyncLifecycleTests -skip-testing:AsyncMethodFixture/AsyncSetUpFailsTests \
+  -skip-testing:AsyncMethodFixture/AsyncSetUpSkipsTests -skip-testing:AsyncMethodFixture/AsyncTearDownFailsTests \
   -junit-report "$report"
 assert_status 1
 assert_not_contains "WithCompletionHandler"
@@ -113,5 +119,29 @@ assert_contains "Failed due to expectation fulfilled in incorrect order: require
 assert_contains "fixture: AsyncFulfillmentTests.testE result 1"
 assert_not_contains "unwaited"
 assert_contains "AsyncFulfillmentTests: 2/6 tests FAILED"
+
+# Asynchronous set up comes first and tear down last, each waited for.
+run_fixture AsyncMethodFixture -only-testing:AsyncMethodFixture/AsyncLifecycleTests
+assert_status 0
+lifecycle=$(printf '%s\n' "$output" | grep -o 'fixture: lifecycle .*' | sed 's/fixture: lifecycle //' | tr '\n' ',')
+[ "$lifecycle" = "setUpWithCompletionHandler:,async step finished on the run loop,setUpWithError:,setUp,test,tearDown,tearDownWithError:,tearDownWithCompletionHandler:," ] \
+  || fail "unexpected lifecycle order: $lifecycle"
+
+# An error from async set up fails the test without running it; tear down still runs.
+run_fixture AsyncMethodFixture -only-testing:AsyncMethodFixture/AsyncSetUpFailsTests
+assert_status 1
+assert_contains "async set up error"
+assert_not_contains "fixture: AsyncSetUpFailsTests test ran"
+assert_contains "fixture: AsyncSetUpFailsTests tearDown ran"
+
+run_fixture AsyncMethodFixture -only-testing:AsyncMethodFixture/AsyncSetUpSkipsTests
+assert_status 0
+assert_contains "testBody SKIPPED at /src/AsyncSetUp.swift:9, Test skipped - async set up skip"
+assert_not_contains "fixture: AsyncSetUpSkipsTests test ran"
+
+run_fixture AsyncMethodFixture -only-testing:AsyncMethodFixture/AsyncTearDownFailsTests
+assert_status 1
+assert_contains "fixture: AsyncTearDownFailsTests test ran"
+assert_contains "async tear down error"
 
 echo "Async test method regressions passed."

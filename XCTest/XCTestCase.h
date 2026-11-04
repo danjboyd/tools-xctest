@@ -100,6 +100,15 @@
  */
 @property BOOL continueAfterFailure;
 
+/*!
+ * Asynchronous set up and tear down, which a Swift `setUp() async throws` and
+ * `tearDown() async throws` override. Call the completion when finished, from
+ * any thread, with an error to fail or skip the test as -setUpWithError: does.
+ * The test thread's run loop runs until then. The defaults do nothing.
+ */
+- (void)setUpWithCompletionHandler:(void (^)(NSError *error))completion;
+- (void)tearDownWithCompletionHandler:(void (^)(NSError *error))completion;
+
 /**
  * GNUstep extension: the number of failures (assertion failures and
  * unexpected exceptions) in the test's latest run.
@@ -128,8 +137,9 @@
 /*
  * The instance methods -setUpWithError:, -setUp, -tearDown and
  * -tearDownWithError: (declared by XCTest) are called around each test
- * method by -invokeTest, in the order setUpWithError:, setUp, the test,
- * teardown blocks (last added runs first), tearDown, tearDownWithError:.
+ * method by -invokeTest, in the order setUpWithCompletionHandler:,
+ * setUpWithError:, setUp, the test, teardown blocks (last added runs first),
+ * tearDown, tearDownWithError:, tearDownWithCompletionHandler:.
  * Teardown always runs, even if set up or the test failed.
  */
 

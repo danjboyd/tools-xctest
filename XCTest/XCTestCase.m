@@ -294,6 +294,16 @@ static NSArray *GSTestMethodNames(Class testCaseClass)
     return [[[self alloc] initWithSelector:selector] autorelease];
 }
 
+- (void)setUpWithCompletionHandler:(void (^)(NSError *error))completion
+{
+    completion(nil);
+}
+
+- (void)tearDownWithCompletionHandler:(void (^)(NSError *error))completion
+{
+    completion(nil);
+}
+
 + (void)setUp
 {
 }
@@ -580,10 +590,17 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
 // enabled, the execution time allowance stops a test that never completes.
 - (BOOL)_gsInvokeAsyncTestMethod:(SEL)selector error:(NSError **)error
 {
+    return [self _gsInvokeAsyncMethod:selector
+                 completionTakesError:GSAsyncCompletionTakesError([self class], selector)
+                                error:error];
+}
+
+- (BOOL)_gsInvokeAsyncMethod:(SEL)selector completionTakesError:(BOOL)takesError error:(NSError **)error
+{
     GSXCTAsyncCompletion *completion = [[[GSXCTAsyncCompletion alloc] init] autorelease];
     IMP imp = [self methodForSelector:selector];
 
-    if (GSAsyncCompletionTakesError([self class], selector)) {
+    if (takesError) {
         void (^block)(NSError *) = ^(NSError *completionError) {
             [completion finishWithError:completionError];
         };
@@ -660,9 +677,19 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
         return;
     }
 
-    BOOL setUpSucceeded = [self _gsRunPhase:@"setUpWithError:" block:^BOOL(NSError **error) {
-        return [self setUpWithError:error];
+    // As on Apple's platforms, the async set up comes first and the async
+    // tear down last. Their completion blocks always take an error.
+    BOOL setUpSucceeded = [self _gsRunPhase:@"setUpWithCompletionHandler:" block:^BOOL(NSError **error) {
+        return [self _gsInvokeAsyncMethod:@selector(setUpWithCompletionHandler:)
+                     completionTakesError:YES
+                                    error:error];
     }];
+
+    if (setUpSucceeded) {
+        setUpSucceeded = [self _gsRunPhase:@"setUpWithError:" block:^BOOL(NSError **error) {
+            return [self setUpWithError:error];
+        }];
+    }
 
     if (setUpSucceeded) {
         setUpSucceeded = [self _gsRunPhase:@"setUp" block:^BOOL(NSError **error) {
@@ -700,6 +727,12 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
 
     [self _gsRunPhase:@"tearDownWithError:" block:^BOOL(NSError **error) {
         return [self tearDownWithError:error];
+    }];
+
+    [self _gsRunPhase:@"tearDownWithCompletionHandler:" block:^BOOL(NSError **error) {
+        return [self _gsInvokeAsyncMethod:@selector(tearDownWithCompletionHandler:)
+                     completionTakesError:YES
+                                    error:error];
     }];
 }
 
