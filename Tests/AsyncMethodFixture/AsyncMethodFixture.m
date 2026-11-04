@@ -385,3 +385,42 @@ static void NoArgumentIMP(id self, SEL _cmd, void (^completion)(void))
 }
 
 @end
+
+// Teardown blocks that finish later, as Swift's async addTeardownBlock adds
+// them, in one last-added-first queue with the plain ones, before tearDown.
+@interface AsyncTeardownBlockTests : XCTestCase
+@end
+
+@implementation AsyncTeardownBlockTests
+
+- (void)finishLater:(id)completion
+{
+    NSLog(@"fixture: teardown async block finished on the run loop");
+    ((void (^)(NSError *))completion)(nil);
+}
+
+- (void)testAOrder
+{
+    [self addTeardownBlock:^{ NSLog(@"fixture: teardown first added"); }];
+    [self _gsAddAsyncTeardownBlock:^(void (^completion)(NSError *)) {
+        NSLog(@"fixture: teardown async block started");
+        [self performSelector:@selector(finishLater:) withObject:[[completion copy] autorelease] afterDelay:0.01];
+    }];
+    [self addTeardownBlock:^{ NSLog(@"fixture: teardown last added"); }];
+    NSLog(@"fixture: teardown test body");
+}
+
+- (void)testBAsyncBlockError
+{
+    [self addTeardownBlock:^{ NSLog(@"fixture: teardown ran after the error"); }];
+    [self _gsAddAsyncTeardownBlock:^(void (^completion)(NSError *)) {
+        completion(AsyncFixtureError(@"async teardown block error"));
+    }];
+}
+
+- (void)tearDown
+{
+    NSLog(@"fixture: teardown tearDown");
+}
+
+@end

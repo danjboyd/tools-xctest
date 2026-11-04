@@ -38,6 +38,7 @@ Objective-C interop:
 - `-setUpWithCompletionHandler:` and `-tearDownWithCompletionHandler:`, which a
   Swift `setUp() async throws` and `tearDown() async throws` override, run first
   and last around a test.
+- `addTeardownBlock` takes an `async throws` closure from Swift.
 - `xctest.make` builds Swift test bundles from `<Bundle>_SWIFT_FILES`, with
   gnustep-swift's tools-make: it links the libraries the Swift objects ask
   for (which `bundle.make` doesn't) and, with `XCTEST_INCLUDE_DIR` and

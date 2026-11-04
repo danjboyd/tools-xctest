@@ -149,6 +149,13 @@
 - (void)addTeardownBlock:(void (^)(void))block;
 
 /*!
+ * For the Swift overlay's async addTeardownBlock: a teardown block that finishes
+ * when it calls its completion, from any thread, with any error. The test
+ * thread's run loop runs until then.
+ */
+- (void)_gsAddAsyncTeardownBlock:(void (^)(void (^completion)(NSError *error)))block;
+
+/*!
  * Keeps \a attachment with the test's results (in the innermost
  * XCTContext activity running on this thread, if any). See XCTAttachment.
  */

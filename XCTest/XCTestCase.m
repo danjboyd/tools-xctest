@@ -612,6 +612,12 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
         ((void (*)(id, SEL, id))imp)(self, selector, [[block copy] autorelease]);
     }
 
+    return [self _gsWaitForAsyncCompletion:completion error:error];
+}
+
+// Runs the test thread's run loop until the completion has been called.
+- (BOOL)_gsWaitForAsyncCompletion:(GSXCTAsyncCompletion *)completion error:(NSError **)error
+{
     // A failure from here on can't stop the test (see _XCTRunLoopWaitWillStart):
     // the body carries on.
     _XCTRunLoopWaitWillStart();
@@ -776,6 +782,29 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
 - (void)addAttachment:(XCTAttachment *)attachment
 {
     _GSXCTAddAttachment(self, attachment, _GSXCTCurrentActivityPath());
+}
+
+- (void)_gsAddAsyncTeardownBlock:(void (^)(void (^completion)(NSError *error)))block
+{
+    if (block == nil) {
+        return;
+    }
+
+    // Not retained: the block runs and is released while this test runs.
+    __block XCTestCase *test = self;
+    void (^copied)(void (^)(NSError *)) = [[block copy] autorelease];
+
+    // With the plain teardown blocks, in one last-added-first queue.
+    [self addTeardownBlock:^{
+        [test _gsRunPhase:@"a teardown block" block:^BOOL(NSError **error) {
+            GSXCTAsyncCompletion *completion = [[[GSXCTAsyncCompletion alloc] init] autorelease];
+
+            copied(^(NSError *completionError) {
+                [completion finishWithError:completionError];
+            });
+            return [test _gsWaitForAsyncCompletion:completion error:error];
+        }];
+    }];
 }
 
 - (void)addTeardownBlock:(void (^)(void))block
