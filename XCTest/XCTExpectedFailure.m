@@ -216,7 +216,9 @@ void XCTExpectFailureWithOptionsInBlock(NSString *failureReason, XCTExpectedFail
     _gsRecordingUnmatched = YES;
     @try {
         [self recordIssue:_GSXCTMakeIssue(XCTIssueTypeUnmatchedExpectedFailure,
-                                          [NSString stringWithFormat:@"Failed due to unmatched expected failure: %@", reason],
+                                          ([reason length] > 0
+                                           ? [NSString stringWithFormat:@"Failed due to unmatched expected failure: %@", reason]
+                                           : @"Failed due to unmatched expected failure"),
                                           nil, 0, nil)];
     }
     @catch (_XCTestCaseInterruptionException *interruption) {

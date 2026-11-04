@@ -7,6 +7,13 @@
 
 @implementation ExpectedPassingTests
 
+// Swift's XCTExpectFailure() passes no reason.
+- (void)testNoReason
+{
+    XCTExpectFailure(nil);
+    XCTFail(@"without a reason");
+}
+
 - (void)testExpectedAssertion
 {
     XCTExpectFailure(@"known bug 1");
@@ -67,6 +74,11 @@
 @end
 
 @implementation ExpectedFailingTests
+
+- (void)testNoReasonUnmatched
+{
+    XCTExpectFailure(nil);
+}
 
 - (void)testStrictUnmatched
 {
