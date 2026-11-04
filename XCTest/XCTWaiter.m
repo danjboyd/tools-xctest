@@ -21,6 +21,7 @@
 #include <math.h>
 
 #import <XCTest/XCTWaiter.h>
+#import <XCTest/GSXCTestSwiftOverlay.h>
 #import <XCTest/XCTestExpectation.h>
 #import <XCTest/XCTestPrivate.h>
 

@@ -1,6 +1,8 @@
 // Lets Clang and Swift `import XCTest` from the installed headers.
 module XCTest [system] {
   umbrella header "XCTest.h"
+  // For the Swift overlay; nothing in XCTest.h includes it.
+  header "GSXCTestSwiftOverlay.h"
   export *
 
   // GNUstep's runner: `import XCTest.GSXCTestRunner`.

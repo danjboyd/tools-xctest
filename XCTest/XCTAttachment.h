@@ -19,35 +19,18 @@
 */
 
 #import <Foundation/Foundation.h>
+#import <XCTest/GSXCTestSwift.h>
 
-// Parts of this header are annotated for Swift; clang would warn about the rest.
-#if defined(__clang__)
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wnullability-completeness"
-#endif
+GS_XCT_PARTLY_ANNOTATED_BEGIN
 
 @class NSImage;
 
-// For Swift: the attribute makes this an enum with cases like .keepAlways;
-// gnustep-base's NS_ENUM doesn't add it.
-#if defined(__clang__)
-enum __attribute__((enum_extensibility(open))) XCTAttachmentLifetime : NSInteger {
-#else
-enum XCTAttachmentLifetime {
-#endif
+GS_XCT_ENUM_BEGIN(XCTAttachmentLifetime)
     /*! Saved whatever the outcome of the test. */
     XCTAttachmentLifetimeKeepAlways = 0,
     /*! Saved only if the test fails (the default). */
     XCTAttachmentLifetimeDeleteOnSuccess = 1,
-};
-typedef enum XCTAttachmentLifetime XCTAttachmentLifetime;
-
-// For Swift: Apple's name, where the imported one would differ.
-#if defined(__clang__)
-#  define GS_XCT_SWIFT_NAME(name) __attribute__((swift_name(#name)))
-#else
-#  define GS_XCT_SWIFT_NAME(name)
-#endif
+GS_XCT_ENUM_END(XCTAttachmentLifetime)
 
 typedef enum {
     /*! Lossless (PNG). */
@@ -82,7 +65,7 @@ typedef enum {
                                    payload: (NSData *)payload
                                   userInfo: (NSDictionary *)userInfo;
 
-NS_ASSUME_NONNULL_BEGIN
+GS_XCT_ASSUME_NONNULL_BEGIN
 
 /*! Data, as "public.data" unless given a type. */
 + (instancetype) attachmentWithData: (NSData *)payload;
@@ -112,7 +95,7 @@ NS_ASSUME_NONNULL_BEGIN
 /*! e.g. "public.png". */
 @property (readonly, copy) NSString *uniformTypeIdentifier;
 
-NS_ASSUME_NONNULL_END
+GS_XCT_ASSUME_NONNULL_END
 
 /*! Used to name the saved file; nil for a default name. */
 @property (copy) NSString *name;
@@ -122,6 +105,4 @@ NS_ASSUME_NONNULL_END
 
 @end
 
-#if defined(__clang__)
-#pragma clang diagnostic pop
-#endif
+GS_XCT_PARTLY_ANNOTATED_END

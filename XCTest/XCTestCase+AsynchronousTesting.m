@@ -19,6 +19,7 @@
 */
 
 #import <XCTest/XCTestCase+AsynchronousTesting.h>
+#import <XCTest/GSXCTestSwiftOverlay.h>
 #import <XCTest/XCTestPrivate.h>
 
 NSString * const XCTestErrorDomain = @"com.apple.XCTestErrorDomain";

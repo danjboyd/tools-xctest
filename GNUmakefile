@@ -23,6 +23,7 @@ include $(GNUSTEP_MAKEFILES)/tool.make
 
 # Regression scripts, in order; each takes the same four arguments.
 XCTEST_TEST_SCRIPTS = cli-filter \
+	swift-separation \
 	lifecycle \
 	assertion \
 	async \

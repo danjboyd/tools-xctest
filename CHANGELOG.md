@@ -31,8 +31,7 @@ Objective-C interop:
   body, because unwinding through `@MainActor`'s main queue hangs later tests.
 - The Swift overlay has Apple's names for expectations and waits, such as
   `expectation(description:)` and `wait(for:timeout:enforceOrder:)`.
-  `XCTWaiterResult` is now a Swift enum (`.completed`), with `NSInteger` as its
-  underlying type, and `XCTestExpectation.h` has nullability annotations.
+  `XCTWaiterResult` is a Swift enum (`.completed`).
 - `await fulfillment(of:timeout:enforceOrder:)` for Swift `async` tests waits
   without blocking, so a `@MainActor` test's main-queue callbacks can run.
 - `-setUpWithCompletionHandler:` and `-tearDownWithCompletionHandler:`, which a
@@ -40,9 +39,12 @@ Objective-C interop:
   and last around a test.
 - The Swift overlay has Apple's names for attachments, `measure(metrics:)` and
   `XCTContext.runActivity(named:block:)` and `XCTExpectFailure`'s forms.
-  `XCTAttachmentLifetime` is a Swift enum,
-  with `NSInteger` as its underlying type.
+  `XCTAttachmentLifetime` is a Swift enum (`.keepAlways`).
 - `addTeardownBlock` takes an `async throws` closure from Swift.
+- What Swift needs from the headers is kept in `GSXCTestSwift.h` (macros) and
+  `GSXCTestSwiftOverlay.h` (methods only the overlay calls). The other headers
+  are plain Objective-C unless Swift imports them; the enums keep their
+  `unsigned int` size either way.
 - `xctest.make` builds Swift test bundles from `<Bundle>_SWIFT_FILES`, with
   gnustep-swift's tools-make: it links the libraries the Swift objects ask
   for (which `bundle.make` doesn't) and, with `XCTEST_INCLUDE_DIR` and
