@@ -19,10 +19,11 @@
 */
 
 #import <Foundation/Foundation.h>
+#import <XCTest/GSXCTestSwift.h>
 
 @class XCTAttachment;
 
-NS_ASSUME_NONNULL_BEGIN
+GS_XCT_ASSUME_NONNULL_BEGIN
 
 /*! A named step of a test, created by +[XCTContext runActivityNamed:block:]. */
 @protocol XCTActivity <NSObject>
@@ -34,4 +35,4 @@ NS_ASSUME_NONNULL_BEGIN
 
 @end
 
-NS_ASSUME_NONNULL_END
+GS_XCT_ASSUME_NONNULL_END

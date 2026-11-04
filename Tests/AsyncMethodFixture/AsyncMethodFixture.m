@@ -1,5 +1,6 @@
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
+#import <XCTest/GSXCTestSwiftOverlay.h>
 #include <math.h>
 #include <objc/runtime.h>
 

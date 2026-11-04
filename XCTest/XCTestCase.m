@@ -19,6 +19,7 @@
 */
 
 #import <XCTest/XCTestCase.h>
+#import <XCTest/GSXCTestSwiftOverlay.h>
 #import <XCTest/XCTestPrivate.h>
 #import <XCTest/XCTestAssertionsImpl.h>
 

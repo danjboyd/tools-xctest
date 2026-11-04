@@ -64,7 +64,7 @@ for passing in testCompletesNow testCompletesLater testCompletesOnAnotherThread 
 done
 
 # A failure inside an async test is that test's, at its line.
-assert_contains "AsyncTests.testAssertionFails: AsyncMethodFixture.m:52: failed: async assertion"
+assert_contains "AsyncTests.testAssertionFails: AsyncMethodFixture.m:53: failed: async assertion"
 
 # A completion error (async throws) fails the test with its description,
 # and a control-flow error skips it, at its location.

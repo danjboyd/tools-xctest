@@ -47,17 +47,6 @@ typedef void (^XCWaitCompletionHandler)(NSError *error);
                      timeout: (NSTimeInterval)seconds
                 enforceOrder: (BOOL)enforceOrderOfFulfillment;
 
-/*!
- * For the Swift overlay's fulfillment(of:): waits as above, but on a thread of
- * its own, and calls the completion there. The caller's thread and run loop
- * stay free, so a @MainActor test's main-queue callbacks can run. A failed
- * wait is a test failure, but doesn't stop the test.
- */
-- (void) _gsWaitInBackgroundForExpectations: (NSArray *)expectations
-                                    timeout: (NSTimeInterval)seconds
-                               enforceOrder: (BOOL)enforceOrderOfFulfillment
-                                 completion: (void (^)(void))completion;
-
 - (XCTestExpectation *) expectationForNotification: (NSString *)notificationName
                                             object: (id)objectToObserve
                                            handler: (XCNotificationExpectationHandler)handler;

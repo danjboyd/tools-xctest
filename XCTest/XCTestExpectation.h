@@ -19,16 +19,9 @@
 */
 
 #import <Foundation/Foundation.h>
+#import <XCTest/GSXCTestSwift.h>
 
-// For Swift: an expectation's initializers import as non-optional, and these
-// parameters and properties as optional.
-#if defined(__clang__)
-#  define GS_XCT_NULLABLE _Nullable
-#else
-#  define GS_XCT_NULLABLE
-#endif
-
-NS_ASSUME_NONNULL_BEGIN
+GS_XCT_ASSUME_NONNULL_BEGIN
 
 /*!
  * An expected outcome of an asynchronous test. Call -fulfill when the
@@ -138,4 +131,4 @@ typedef BOOL (^XCPredicateExpectationHandler)(void);
 
 @end
 
-NS_ASSUME_NONNULL_END
+GS_XCT_ASSUME_NONNULL_END

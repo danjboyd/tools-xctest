@@ -101,8 +101,8 @@
 @property BOOL continueAfterFailure;
 
 /*!
- * Asynchronous set up and tear down, which a Swift `setUp() async throws` and
- * `tearDown() async throws` override. Call the completion when finished, from
+ * Asynchronous set up and tear down, as in Apple's XCTest. Call the
+ * completion when finished, from
  * any thread, with an error to fail or skip the test as -setUpWithError: does.
  * The test thread's run loop runs until then. The defaults do nothing.
  */
@@ -147,13 +147,6 @@
  * Registers a block to run after the current test method, before tearDown.
  */
 - (void)addTeardownBlock:(void (^)(void))block;
-
-/*!
- * For the Swift overlay's async addTeardownBlock: a teardown block that finishes
- * when it calls its completion, from any thread, with any error. The test
- * thread's run loop runs until then.
- */
-- (void)_gsAddAsyncTeardownBlock:(void (^)(void (^completion)(NSError *error)))block;
 
 /*!
  * Keeps \a attachment with the test's results (in the innermost
