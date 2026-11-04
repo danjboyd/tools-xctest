@@ -28,7 +28,6 @@ func _XCTPreformattedFailureHandler(_ test: Any!, _ expected: Bool, _ filePath: 
 // #define _XCT_CONTROL_FLOW_ERROR_DOMAIN "org.gnustep.XCTest.ControlFlow"
 let _XCT_CONTROL_FLOW_ERROR_DOMAIN = "org.gnustep.XCTest.ControlFlow"
 
-typealias NSNotificationCenter = NotificationCenter
 typealias XCWaitCompletionHandler = (NSError?) -> Void
 typealias XCNotificationExpectationHandler = (Notification?) -> Bool
 typealias XCPredicateExpectationHandler = () -> Bool
@@ -71,7 +70,7 @@ class XCTestCase: NSObject {
         completion()
     }
 
-    func expectation(forNotification name: String!, object: Any!, notificationCenter: NSNotificationCenter!,
+    func expectation(forNotification name: String!, object: Any!, notificationCenter: NotificationCenter!,
                      handler: XCNotificationExpectationHandler!) -> XCTestExpectation! {
         importedCalls.append("expectation(forNotification: \(name!), object: \(object != nil), "
                              + "notificationCenter: \(notificationCenter != nil), handler: \(handler != nil))")
