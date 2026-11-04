@@ -50,7 +50,39 @@ func describeWait(_ expectations: [Any]?, _ timeout: Double, _ enforceOrder: Boo
     return "\(names) timeout \(timeout) enforceOrder \(enforceOrder)"
 }
 
+protocol XCTMetric {}
+final class XCTClockMetric: XCTMetric {}
+
+class XCTMeasureOptions: NSObject {
+    static var `default`: XCTMeasureOptions { XCTMeasureOptions() }
+}
+
+protocol XCTActivity {}
+final class StubActivity: XCTActivity {}
+
+class XCTContext: NSObject {
+    class func runActivityNamed(_ name: String!, block: ((XCTActivity?) -> Void)!) {
+        importedCalls.append("runActivityNamed(\(name!))")
+        block(StubActivity())
+    }
+}
+
 class XCTestCase: NSObject {
+    func measure(withMetrics metrics: [Any]!, block: (() -> Void)!) {
+        importedCalls.append("measure(withMetrics: \(metrics.count))")
+        block()
+    }
+
+    func measure(withMetrics metrics: [Any]!, options: XCTMeasureOptions!, block: (() -> Void)!) {
+        importedCalls.append("measure(withMetrics: \(metrics.count), options)")
+        block()
+    }
+
+    func measure(with options: XCTMeasureOptions!, block: (() -> Void)!) {
+        importedCalls.append("measure(with: options)")
+        block()
+    }
+
     func expectation(withDescription description: String!) -> XCTestExpectation! {
         importedCalls.append("expectation(withDescription: \(description!))")
         return XCTestExpectation(description: description)

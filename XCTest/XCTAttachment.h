@@ -20,14 +20,34 @@
 
 #import <Foundation/Foundation.h>
 
+// Parts of this header are annotated for Swift; clang would warn about the rest.
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnullability-completeness"
+#endif
+
 @class NSImage;
 
-typedef enum {
+// For Swift: the attribute makes this an enum with cases like .keepAlways;
+// gnustep-base's NS_ENUM doesn't add it.
+#if defined(__clang__)
+enum __attribute__((enum_extensibility(open))) XCTAttachmentLifetime : NSInteger {
+#else
+enum XCTAttachmentLifetime {
+#endif
     /*! Saved whatever the outcome of the test. */
     XCTAttachmentLifetimeKeepAlways = 0,
     /*! Saved only if the test fails (the default). */
     XCTAttachmentLifetimeDeleteOnSuccess = 1,
-} XCTAttachmentLifetime;
+};
+typedef enum XCTAttachmentLifetime XCTAttachmentLifetime;
+
+// For Swift: Apple's name, where the imported one would differ.
+#if defined(__clang__)
+#  define GS_XCT_SWIFT_NAME(name) __attribute__((swift_name(#name)))
+#else
+#  define GS_XCT_SWIFT_NAME(name)
+#endif
 
 typedef enum {
     /*! Lossless (PNG). */
@@ -62,28 +82,34 @@ typedef enum {
                                    payload: (NSData *)payload
                                   userInfo: (NSDictionary *)userInfo;
 
+NS_ASSUME_NONNULL_BEGIN
+
 /*! Data, as "public.data" unless given a type. */
-+ (id) attachmentWithData: (NSData *)payload;
-+ (id) attachmentWithData: (NSData *)payload uniformTypeIdentifier: (NSString *)identifier;
++ (instancetype) attachmentWithData: (NSData *)payload;
++ (instancetype) attachmentWithData: (NSData *)payload uniformTypeIdentifier: (NSString *)identifier;
 
 /*! A file's contents, read now; named after the file. */
-+ (id) attachmentWithContentsOfFileAtURL: (NSURL *)url;
-+ (id) attachmentWithContentsOfFileAtURL: (NSURL *)url uniformTypeIdentifier: (NSString *)identifier;
++ (instancetype) attachmentWithContentsOfFileAtURL: (NSURL *)url
+    GS_XCT_SWIFT_NAME(init(contentsOfFile:));
++ (instancetype) attachmentWithContentsOfFileAtURL: (NSURL *)url uniformTypeIdentifier: (NSString *)identifier
+    GS_XCT_SWIFT_NAME(init(contentsOfFile:uniformTypeIdentifier:));
 
 /*! UTF-8 text. */
-+ (id) attachmentWithString: (NSString *)string;
++ (instancetype) attachmentWithString: (NSString *)string;
 
 /*! An object archived with NSKeyedArchiver. */
-+ (id) attachmentWithArchivableObject: (id<NSCoding>)object;
-+ (id) attachmentWithArchivableObject: (id<NSCoding>)object uniformTypeIdentifier: (NSString *)identifier;
++ (instancetype) attachmentWithArchivableObject: (id<NSCoding>)object;
++ (instancetype) attachmentWithArchivableObject: (id<NSCoding>)object uniformTypeIdentifier: (NSString *)identifier;
 
 /*! A property list, as XML. */
-+ (id) attachmentWithPlistObject: (id)object;
++ (instancetype) attachmentWithPlistObject: (id)object;
 
 /*! An image, as PNG (or JPEG for lower qualities). Needs AppKit to be
  * loaded, as it is in tests that use NSImage. */
-+ (id) attachmentWithImage: (NSImage *)image;
-+ (id) attachmentWithImage: (NSImage *)image quality: (XCTImageQuality)quality;
++ (instancetype) attachmentWithImage: (NSImage *)image;
++ (instancetype) attachmentWithImage: (NSImage *)image quality: (XCTImageQuality)quality;
+
+NS_ASSUME_NONNULL_END
 
 /*! e.g. "public.png". */
 @property (readonly, copy) NSString *uniformTypeIdentifier;
@@ -94,3 +120,7 @@ typedef enum {
 @property XCTAttachmentLifetime lifetime;
 
 @end
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif

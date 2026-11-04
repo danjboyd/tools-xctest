@@ -43,7 +43,7 @@ include $(GNUSTEP_MAKEFILES)/library.make
 # there are two maps defining XCTest, which clang otherwise rejects, and
 # the headers must be this tree's.
 ifneq ($(XCTEST_SWIFTC),)
-XCTEST_SWIFT_SOURCES = Swift/Bridge.swift Swift/Assertions.swift Swift/Errors.swift Swift/Expectations.swift
+XCTEST_SWIFT_SOURCES = Swift/Bridge.swift Swift/Assertions.swift Swift/Errors.swift Swift/Expectations.swift Swift/Helpers.swift
 # The overlay's -lobjc (autolinked) must be the libobjc libXCTest uses, from
 # the gnustep-swift profile or GNUstep's library directories: left to the
 # Swift driver, it can find GCC's libobjc.so.4, and loading a test bundle

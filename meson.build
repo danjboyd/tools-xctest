@@ -124,7 +124,8 @@ install_headers(
 swiftc = find_program(get_option('swiftc'), required: get_option('swift'))
 if swiftc.found()
   swift_overlay_sources = files('XCTest/Swift/Bridge.swift', 'XCTest/Swift/Assertions.swift',
-                                'XCTest/Swift/Errors.swift', 'XCTest/Swift/Expectations.swift')
+                                'XCTest/Swift/Errors.swift', 'XCTest/Swift/Expectations.swift',
+                                'XCTest/Swift/Helpers.swift')
   # The overlay's -lobjc (autolinked) must be the libobjc libXCTest links:
   # left to the Swift driver, it can find GCC's libobjc.so.4.
   swift_overlay_lib_dirs = []

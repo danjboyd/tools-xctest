@@ -267,6 +267,39 @@ checkAsyncCall("XCTWaiter.fulfillment(of:)",
     report(result == .incorrectOrder, "XCTWaiter.fulfillment(of:) returns the result")
 }
 
+// Helpers.swift: measure and activities.
+var measured = 0
+checkCall("measure(metrics:block:)", "measure(withMetrics: 1)") {
+    testCase.measure(metrics: [XCTClockMetric()]) { measured += 1 }
+}
+checkCall("measure(metrics:options:block:)", "measure(withMetrics: 1, options)") {
+    testCase.measure(metrics: [XCTClockMetric()], options: XCTMeasureOptions.default) { measured += 1 }
+}
+checkCall("measure(options:block:)", "measure(with: options)") {
+    testCase.measure(options: .default) { measured += 1 }
+}
+report(measured == 3, "measure runs its blocks")
+
+checkCall("runActivity(named:block:)", "runActivityNamed(step)") {
+    let value: Int = XCTContext.runActivity(named: "step") { _ in 7 }
+    report(value == 7, "runActivity returns its block's result")
+}
+checkCall("a runActivity block with no result", "runActivityNamed(step)") {
+    XCTContext.runActivity(named: "step") { _ in }
+}
+checkCall("a throwing runActivity block", "runActivityNamed(step)") {
+    do {
+        let _: Int = try XCTContext.runActivity(named: "step") { _ in try boom() }
+        report(false, "runActivity rethrows its block's error")
+    } catch {
+        report(error as? TestError == .boom, "runActivity rethrows its block's error", "\(error)")
+    }
+}
+checkCall("a runActivity block using try that doesn't throw", "runActivityNamed(step)") {
+    let value = try? XCTContext.runActivity(named: "step") { _ -> Int in try XCTUnwrap(Optional(3)) }
+    report(value == 3, "runActivity returns a throwing block's result")
+}
+
 if failures > 0 {
     print("\(failures) overlay check(s) failed.")
     exit(1)
