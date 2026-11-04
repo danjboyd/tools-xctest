@@ -300,6 +300,30 @@ checkCall("a runActivity block using try that doesn't throw", "runActivityNamed(
     report(value == 3, "runActivity returns a throwing block's result")
 }
 
+// Swift's async addTeardownBlock: the completion gets what the block threw,
+// so that a skip keeps its control-flow domain.
+func runTeardownBlock(_ block: @escaping @Sendable () async throws -> Void) -> NSError? {
+    let test = XCTestCase()
+    test.addTeardownBlock(block)
+    report(test.asyncTeardownBlocks.count == 1, "async addTeardownBlock adds one block")
+
+    let done = DispatchSemaphore(value: 0)
+    final class Box: @unchecked Sendable { var error: NSError? }
+    let box = Box()
+    test.asyncTeardownBlocks[0]({ error in
+        box.error = error
+        done.signal()
+    })
+    done.wait()
+    return box.error
+}
+
+report(runTeardownBlock({ try await Task.sleep(nanoseconds: 1_000) }) == nil, "an async teardown block finishes without an error")
+report(runTeardownBlock({ throw TestError.boom })?.domain.contains("TestError") == true,
+       "an async teardown block's error reaches the completion")
+report(runTeardownBlock({ throw XCTSkip("x") })?.domain == _XCT_CONTROL_FLOW_ERROR_DOMAIN,
+       "an async teardown block's skip keeps its domain")
+
 if failures > 0 {
     print("\(failures) overlay check(s) failed.")
     exit(1)

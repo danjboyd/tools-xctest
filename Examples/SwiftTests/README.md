@@ -1,6 +1,7 @@
 # Swift test bundle example
 
-`CalculatorTests.swift` is an ordinary XCTest test case in Swift. The
+`CalculatorTests.swift` has ordinary XCTest test cases in Swift, including
+`async` tests and expectations. The
 `GNUmakefile` builds it into `CalculatorTests.xctest` with gnustep-make and
 `xctest.make`, and `make check` runs it with `xctest`.
 

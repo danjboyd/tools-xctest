@@ -96,6 +96,12 @@ class XCTestCase: NSObject {
         importedCalls.append("waitForExpectations(withTimeout: \(timeout), handler: \(handler != nil))")
     }
 
+    var asyncTeardownBlocks: [(((NSError?) -> Void)?) -> Void] = []
+
+    func _gsAddAsyncTeardownBlock(_ block: ((((NSError?) -> Void)?) -> Void)!) {
+        asyncTeardownBlocks.append(block)
+    }
+
     func _gsWaitInBackground(forExpectations expectations: [Any]!, timeout: Double, enforceOrder: Bool,
                              completion: (() -> Void)!) {
         importedCalls.append("background wait(forExpectations: \(describeWait(expectations, timeout, enforceOrder)))")

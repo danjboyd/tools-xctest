@@ -616,8 +616,13 @@ class ParserTests: XCTestCase {
   callback is recorded against the next test.
 - **`setUp() async throws` and `tearDown() async throws`** are called first and
   last, around `setUpWithError()` and the rest, and waited for as an `async` test
-  is. An error from `setUp` fails or skips the test without running it. Async
-  teardown blocks aren't supported.
+  is. An error from `setUp` fails or skips the test without running it.
+- **`addTeardownBlock` with an `async throws` closure** runs with the plain
+  teardown blocks, last added first, before `tearDown()`.
+- **Failures in callbacks that outlive their test** are recorded on the test
+  running then. Swift's `XCTFail` takes no test argument, so nothing can tell
+  which test a `DispatchQueue` callback belongs to; swift-corelibs-xctest behaves
+  the same. Have a test wait for its callbacks with `await fulfillment(of:)`.
 - **Expectations** have Apple's Swift names: `expectation(description:)`,
   `wait(for:timeout:enforceOrder:)`, `waitForExpectations(timeout:handler:)`,
   `expectation(forNotification:object:notificationCenter:handler:)`,
