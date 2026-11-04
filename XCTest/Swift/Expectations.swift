@@ -58,7 +58,7 @@ extension XCTestCase {
 
     /// GNUstep has no `NSNotification.Name`, so `notificationName` is a string.
     public func expectation(forNotification notificationName: String, object objectToObserve: Any? = nil,
-                            notificationCenter: NSNotificationCenter? = nil,
+                            notificationCenter: NotificationCenter? = nil,
                             handler: XCNotificationExpectationHandler? = nil) -> XCTestExpectation {
         let imported: XCTestExpectation? = expectation(forNotification: notificationName as String?,
                                                        object: objectToObserve,
