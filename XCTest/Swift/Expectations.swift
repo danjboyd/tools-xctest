@@ -40,12 +40,14 @@ extension XCTestCase {
         return expectation(withDescription: description)
     }
 
+    @nonobjc
     @available(*, noasync, message: "Use await fulfillment(of:timeout:enforceOrder:) instead.")
     public func wait(for expectations: [XCTestExpectation], timeout seconds: Double,
                      enforceOrder enforceOrderOfFulfillment: Bool = false) {
         wait(forExpectations: expectations, timeout: seconds, enforceOrder: enforceOrderOfFulfillment)
     }
 
+    @nonobjc
     @available(*, noasync, message: "Use await fulfillment(of:timeout:enforceOrder:) instead.")
     public func waitForExpectations(timeout: Double, handler: XCWaitCompletionHandler? = nil) {
         waitForExpectations(withTimeout: timeout, handler: handler)
@@ -53,6 +55,7 @@ extension XCTestCase {
 
     /// Waits without blocking a thread, so a `@MainActor` test's main-queue
     /// callbacks can run. The wait itself runs on a thread of its own.
+    @nonobjc
     public func fulfillment(of expectations: [XCTestExpectation], timeout seconds: Double = .infinity,
                             enforceOrder enforceOrderOfFulfillment: Bool = false) async {
         await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
@@ -104,6 +107,7 @@ extension XCTestCase {
 extension XCTWaiter {
     public typealias Result = XCTWaiterResult
 
+    @nonobjc
     @available(*, noasync, message: "Use await fulfillment(of:timeout:enforceOrder:) instead.")
     @discardableResult
     public func wait(for expectations: [XCTestExpectation], timeout seconds: Double,
@@ -111,6 +115,7 @@ extension XCTWaiter {
         return wait(forExpectations: expectations, timeout: seconds, enforceOrder: enforceOrderOfFulfillment)
     }
 
+    @nonobjc
     @available(*, noasync, message: "Use await fulfillment(of:timeout:enforceOrder:) instead.")
     @discardableResult
     public class func wait(for expectations: [XCTestExpectation], timeout seconds: Double,
@@ -119,6 +124,7 @@ extension XCTWaiter {
     }
 
     /// Waits without blocking a thread, on a thread of its own.
+    @nonobjc
     public func fulfillment(of expectations: [XCTestExpectation], timeout seconds: Double = .infinity,
                             enforceOrder enforceOrderOfFulfillment: Bool = false) async -> Result {
         return await withCheckedContinuation { (continuation: CheckedContinuation<Result, Never>) in
@@ -129,6 +135,7 @@ extension XCTWaiter {
         }
     }
 
+    @nonobjc
     public class func fulfillment(of expectations: [XCTestExpectation], timeout seconds: Double = .infinity,
                                   enforceOrder enforceOrderOfFulfillment: Bool = false) async -> Result {
         return await XCTWaiter().fulfillment(of: expectations, timeout: seconds, enforceOrder: enforceOrderOfFulfillment)
