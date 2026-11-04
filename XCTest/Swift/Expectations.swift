@@ -108,6 +108,7 @@ extension XCTestCase {
     /// A teardown block that can await and throw. It runs with the plain ones,
     /// last added first, before `tearDown()`. A thrown error is recorded, and
     /// the rest of the tear down still runs.
+    @nonobjc
     public func addTeardownBlock(_ block: @escaping @Sendable () async throws -> Void) {
         _gsAddAsyncTeardownBlock { completion in
             Task {
