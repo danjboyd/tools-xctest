@@ -538,6 +538,11 @@ static XCTPerformanceMeasurement *GSMeasurement(NSString *identifier, NSString *
 
 @implementation XCTClockMetric
 
+- (instancetype) init
+{
+    return [super init];
+}
+
 - (id) copyWithZone: (NSZone *)zone
 {
     return [[[self class] allocWithZone:zone] init];
@@ -746,6 +751,11 @@ static XCTPerformanceMeasurement *GSMeasurement(NSString *identifier, NSString *
 
 @implementation XCTMemoryMetric
 
+- (instancetype) init
+{
+    return [super init];
+}
+
 - (id) copyWithZone: (NSZone *)zone
 {
     return [[[self class] allocWithZone:zone] init];
@@ -804,6 +814,11 @@ static XCTPerformanceMeasurement *GSMeasurement(NSString *identifier, NSString *
 @end
 
 @implementation XCTStorageMetric
+
+- (instancetype) init
+{
+    return [super init];
+}
 
 - (id) copyWithZone: (NSZone *)zone
 {

@@ -9,7 +9,7 @@ parse_test_args "$@"
 # interop toolchain; see Expectations.swift. A stock swiftc can't show that.
 output=$(awk '/^[[:space:]]+public (class )?func / && !nonobjc { print FILENAME ":" FNR ": " $0 }
               { if ($0 ~ /@nonobjc/) nonobjc = 1; else if ($0 !~ /^[[:space:]]+@/) nonobjc = 0 }' \
-  "$source_root/XCTest/Swift/Expectations.swift")
+  "$source_root/XCTest/Swift/Expectations.swift" "$source_root/XCTest/Swift/Helpers.swift")
 [ -z "$output" ] || fail "expected @nonobjc on:"
 
 # Builds the Swift overlay (XCTest/Swift) with a stock Swift toolchain and a
@@ -38,6 +38,7 @@ output=$("$swiftc" -swift-version 5 -warnings-as-errors -module-name XCTest \
   "$source_root/Tests/SwiftOverlay/Stub.swift" "$work_dir/Bridge.swift" \
   "$source_root/XCTest/Swift/Assertions.swift" "$source_root/XCTest/Swift/Errors.swift" \
   "$source_root/XCTest/Swift/Expectations.swift" \
+  "$source_root/XCTest/Swift/Helpers.swift" \
   "$source_root/Tests/SwiftOverlay/main.swift" -o "$work_dir/overlay-check" 2>&1)
 status=$?
 set -e
@@ -50,5 +51,30 @@ set -e
 printf '%s\n' "$output" | grep -v '^PASS' || true
 assert_status 0
 assert_contains "All overlay checks passed."
+
+# The stub above is written by hand, so check what these actually import as, from
+# the real headers. Stock Swift's bridged types differ from the interop
+# toolchain's, so this only looks at names and non-optional results.
+if objc_flags=$(gnustep-config --objc-flags 2>/dev/null); then
+  clang_args=(-Xcc "-I$source_root")
+  for flag in $objc_flags; do
+    case "$flag" in -D*|-I*|-fobjc*|-fblocks|-fconstant*) clang_args+=(-Xcc "$flag") ;; esac
+  done
+  set +e
+  output=$("$swiftc" -frontend -typecheck -enable-objc-interop -disable-objc-attr-requires-foundation-module \
+    -module-name XCTest -import-underlying-module -module-cache-path "$work_dir/modules" \
+    -I "$source_root" "${clang_args[@]}" -Xcc -fmodules \
+    -Xcc "-fmodule-map-file=$source_root/XCTest/module.modulemap" \
+    "$source_root/Tests/SwiftOverlay/ImportedNames.swift" 2>&1)
+  status=$?
+  set -e
+  # A crash is the compiler's own, on GNUstep's headers, and says nothing here.
+  if [ "$status" -ge 128 ]; then
+    echo "Skipping the check of imported names: $swiftc crashed on the headers."
+  else
+    assert_status 0
+    echo "Imported names checked against the headers."
+  fi
+fi
 
 echo "Swift overlay checks passed."

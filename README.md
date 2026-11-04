@@ -596,6 +596,16 @@ class ParserTests: XCTestCase {
   [describes](https://developer.apple.com/forums/thread/809989) it ending and
   relaunching its test runner after such a test's teardown; this runner stays
   in the same process and carries on with the next test.
+- **Attachments** have Apple's initializers: `XCTAttachment(string:)`, `(data:)`,
+  `(contentsOfFile:)`, `(plistObject:)` and `(archivableObject:)`, some with
+  `uniformTypeIdentifier:`, and `.lifetime = .keepAlways`.
+- **Measuring** has `measure(metrics:block:)`, `measure(metrics:options:block:)`
+  and `measure(options:block:)`, `XCTMeasureOptions.default`, and non-optional
+  `XCTClockMetric()` and the other metrics.
+- **`XCTContext.runActivity(named:block:)`** returns its block's result, and can
+  throw. `XCTExpectFailure` takes a reason, and for options, the imported
+  `XCTExpectFailureWithOptions`; Apple's `strict:` and `failingBlock:` forms aren't
+  there.
 - **`await fulfillment(of:timeout:enforceOrder:)`** is how an `async` test
   waits, on `XCTestCase` and `XCTWaiter`. It waits on a thread of its own, so
   the test's body suspends, and a `@MainActor` test's main-queue callbacks can

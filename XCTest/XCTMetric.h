@@ -21,6 +21,12 @@
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTestCase.h>
 
+// Parts of this header are annotated for Swift; clang would warn about the rest.
+#if defined(__clang__)
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnullability-completeness"
+#endif
+
 /*! A point in time for measurements: a monotonic clock reading (in
  * nanoseconds, where Apple uses mach_absolute_time) and the date. */
 @interface XCTPerformanceMeasurementTimestamp : NSObject {
@@ -93,8 +99,11 @@ typedef enum {
 @end
 
 /*! Elapsed time on the monotonic clock ("Clock Monotonic Time", s). */
+NS_ASSUME_NONNULL_BEGIN
 @interface XCTClockMetric : NSObject <XCTMetric>
+- (instancetype) init;
 @end
+NS_ASSUME_NONNULL_END
 
 /*!
  * CPU time (user + system) used by the process, or only the measuring
@@ -105,6 +114,7 @@ typedef enum {
  * (or only the measuring thread). Instruction counts vary much less from
  * run to run than times, so they make steadier baselines.
  */
+NS_ASSUME_NONNULL_BEGIN
 @interface XCTCPUMetric : NSObject <XCTMetric> {
     BOOL _currentThreadOnly;
     double _startCPUTime;
@@ -112,9 +122,10 @@ typedef enum {
     id _gsCounters;
     BOOL _gsCountersOpened;
 }
-- (id) init;
-- (id) initLimitingToCurrentThread: (BOOL)limitToCurrentThread;
+- (instancetype) init;
+- (instancetype) initLimitingToCurrentThread: (BOOL)limitToCurrentThread;
 @end
+NS_ASSUME_NONNULL_END
 
 /*!
  * GNUstep's: hardware counts Apple's metrics don't report: last-level cache
@@ -142,19 +153,25 @@ typedef enum {
 /*! The process's resident memory: its change over the run ("Memory
  * Physical", kB) and its peak during the run ("Memory Peak Physical", kB;
  * the peak is reset at the start of each run where Linux allows it). */
+NS_ASSUME_NONNULL_BEGIN
 @interface XCTMemoryMetric : NSObject <XCTMetric> {
     double _startResident;
     double _stopResident;
     double _peakResident;
 }
+- (instancetype) init;
 @end
+NS_ASSUME_NONNULL_END
 
 /*! Data the process wrote through write calls ("Disk Logical Writes", kB). */
+NS_ASSUME_NONNULL_BEGIN
 @interface XCTStorageMetric : NSObject <XCTMetric> {
     double _startWritten;
     double _stopWritten;
 }
+- (instancetype) init;
 @end
+NS_ASSUME_NONNULL_END
 
 typedef enum {
     XCTMeasurementInvocationNone = 0,
@@ -168,8 +185,12 @@ typedef enum {
     XCTMeasurementInvocationOptions _invocationOptions;
     NSUInteger _iterationCount;
 }
-/*! Automatic start and stop, 5 iterations. */
+/*! Automatic start and stop, 5 iterations. Swift calls it `default`. */
+#if defined(__clang__)
+@property (class, readonly, copy) XCTMeasureOptions * _Nonnull defaultOptions __attribute__((swift_name("default")));
+#else
 + (XCTMeasureOptions *) defaultOptions;
+#endif
 @property XCTMeasurementInvocationOptions invocationOptions;
 /*! How many times the block runs. Defaults to 5. */
 @property NSUInteger iterationCount;
@@ -195,3 +216,7 @@ typedef enum {
 - (void) measureWithOptions: (XCTMeasureOptions *)options block: (void (^)(void))block;
 
 @end
+
+#if defined(__clang__)
+#pragma clang diagnostic pop
+#endif

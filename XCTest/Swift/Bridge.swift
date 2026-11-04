@@ -23,8 +23,8 @@
 // `import XCTest` gives a test both the Objective-C classes and these
 // functions.
 //
-// This file and Expectations.swift are the overlay's only contact with the
-// Objective-C side; the other files use just what this one declares.
+// This file, Expectations.swift and Helpers.swift are the overlay's only contact
+// with the Objective-C side; the other files use just what this one declares.
 
 @_exported import XCTest
 import Foundation

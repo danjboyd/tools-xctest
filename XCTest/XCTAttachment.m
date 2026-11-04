@@ -93,7 +93,7 @@ static NSString *GSTypeForExtension(NSString *extension)
     return self;
 }
 
-+ (id) attachmentWithUniformTypeIdentifier: (NSString *)identifier
++ (instancetype) attachmentWithUniformTypeIdentifier: (NSString *)identifier
                                       name: (NSString *)name
                                    payload: (NSData *)payload
                                   userInfo: (NSDictionary *)userInfo
@@ -111,23 +111,23 @@ static NSString *GSTypeForExtension(NSString *extension)
     [super dealloc];
 }
 
-+ (id) attachmentWithData: (NSData *)payload
++ (instancetype) attachmentWithData: (NSData *)payload
 {
     return [self attachmentWithData:payload uniformTypeIdentifier:@"public.data"];
 }
 
-+ (id) attachmentWithData: (NSData *)payload uniformTypeIdentifier: (NSString *)identifier
++ (instancetype) attachmentWithData: (NSData *)payload uniformTypeIdentifier: (NSString *)identifier
 {
     return [self attachmentWithUniformTypeIdentifier:identifier name:nil payload:payload userInfo:nil];
 }
 
-+ (id) attachmentWithContentsOfFileAtURL: (NSURL *)url
++ (instancetype) attachmentWithContentsOfFileAtURL: (NSURL *)url
 {
     return [self attachmentWithContentsOfFileAtURL:url
                              uniformTypeIdentifier:GSTypeForExtension([[url path] pathExtension])];
 }
 
-+ (id) attachmentWithContentsOfFileAtURL: (NSURL *)url uniformTypeIdentifier: (NSString *)identifier
++ (instancetype) attachmentWithContentsOfFileAtURL: (NSURL *)url uniformTypeIdentifier: (NSString *)identifier
 {
     NSString *path = [url path];
     XCTAttachment *attachment = [self attachmentWithUniformTypeIdentifier:identifier
@@ -139,24 +139,24 @@ static NSString *GSTypeForExtension(NSString *extension)
     return attachment;
 }
 
-+ (id) attachmentWithString: (NSString *)string
++ (instancetype) attachmentWithString: (NSString *)string
 {
     return [self attachmentWithData:[string dataUsingEncoding:NSUTF8StringEncoding]
               uniformTypeIdentifier:@"public.plain-text"];
 }
 
-+ (id) attachmentWithArchivableObject: (id<NSCoding>)object
++ (instancetype) attachmentWithArchivableObject: (id<NSCoding>)object
 {
     return [self attachmentWithArchivableObject:object uniformTypeIdentifier:@"com.apple.binary-property-list"];
 }
 
-+ (id) attachmentWithArchivableObject: (id<NSCoding>)object uniformTypeIdentifier: (NSString *)identifier
++ (instancetype) attachmentWithArchivableObject: (id<NSCoding>)object uniformTypeIdentifier: (NSString *)identifier
 {
     return [self attachmentWithData:[NSKeyedArchiver archivedDataWithRootObject:object]
               uniformTypeIdentifier:identifier];
 }
 
-+ (id) attachmentWithPlistObject: (id)object
++ (instancetype) attachmentWithPlistObject: (id)object
 {
     NSData *data = [NSPropertyListSerialization dataWithPropertyList:object
                                                               format:NSPropertyListXMLFormat_v1_0
@@ -166,12 +166,12 @@ static NSString *GSTypeForExtension(NSString *extension)
     return [self attachmentWithData:data uniformTypeIdentifier:@"com.apple.property-list"];
 }
 
-+ (id) attachmentWithImage: (NSImage *)image
++ (instancetype) attachmentWithImage: (NSImage *)image
 {
     return [self attachmentWithImage:image quality:XCTImageQualityOriginal];
 }
 
-+ (id) attachmentWithImage: (NSImage *)image quality: (XCTImageQuality)quality
++ (instancetype) attachmentWithImage: (NSImage *)image quality: (XCTImageQuality)quality
 {
     // AppKit isn't linked; use it through the runtime.
     Class bitmapClass = NSClassFromString(@"NSBitmapImageRep");
