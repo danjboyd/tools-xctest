@@ -30,6 +30,7 @@ set +e
 output=$("$swiftc" -swift-version 5 -warnings-as-errors -module-name XCTest \
   "$source_root/Tests/SwiftOverlay/Stub.swift" "$work_dir/Bridge.swift" \
   "$source_root/XCTest/Swift/Assertions.swift" "$source_root/XCTest/Swift/Errors.swift" \
+  "$source_root/XCTest/Swift/Expectations.swift" \
   "$source_root/Tests/SwiftOverlay/main.swift" -o "$work_dir/overlay-check" 2>&1)
 status=$?
 set -e
