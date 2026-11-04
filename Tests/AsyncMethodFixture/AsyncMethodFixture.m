@@ -268,3 +268,120 @@ static void NoArgumentIMP(id self, SEL _cmd, void (^completion)(void))
 }
 
 @end
+
+// Asynchronous set up and tear down, as a Swift `setUp() async throws` reaches
+// Objective-C, with the rest of the lifecycle to show the order.
+@interface AsyncLifecycleTests : XCTestCase
+@end
+
+@implementation AsyncLifecycleTests
+
+- (void)finishLater:(id)completion
+{
+    NSLog(@"fixture: lifecycle async step finished on the run loop");
+    ((void (^)(NSError *))completion)(nil);
+}
+
+- (void)setUpWithCompletionHandler:(void (^)(NSError *))completion
+{
+    NSLog(@"fixture: lifecycle setUpWithCompletionHandler:");
+    [self performSelector:@selector(finishLater:) withObject:[[completion copy] autorelease] afterDelay:0.01];
+}
+
+- (BOOL)setUpWithError:(NSError **)error
+{
+    NSLog(@"fixture: lifecycle setUpWithError:");
+    return YES;
+}
+
+- (void)setUp
+{
+    NSLog(@"fixture: lifecycle setUp");
+}
+
+- (void)testBody
+{
+    NSLog(@"fixture: lifecycle test");
+}
+
+- (void)tearDown
+{
+    NSLog(@"fixture: lifecycle tearDown");
+}
+
+- (BOOL)tearDownWithError:(NSError **)error
+{
+    NSLog(@"fixture: lifecycle tearDownWithError:");
+    return YES;
+}
+
+- (void)tearDownWithCompletionHandler:(void (^)(NSError *))completion
+{
+    NSLog(@"fixture: lifecycle tearDownWithCompletionHandler:");
+    completion(nil);
+}
+
+@end
+
+@interface AsyncSetUpFailsTests : XCTestCase
+@end
+
+@implementation AsyncSetUpFailsTests
+
+- (void)setUpWithCompletionHandler:(void (^)(NSError *))completion
+{
+    completion(AsyncFixtureError(@"async set up error"));
+}
+
+- (void)testBody
+{
+    NSLog(@"fixture: AsyncSetUpFailsTests test ran");
+}
+
+- (void)tearDown
+{
+    NSLog(@"fixture: AsyncSetUpFailsTests tearDown ran");
+}
+
+@end
+
+@interface AsyncSetUpSkipsTests : XCTestCase
+@end
+
+@implementation AsyncSetUpSkipsTests
+
+- (void)setUpWithCompletionHandler:(void (^)(NSError *))completion
+{
+    NSDictionary *info = [NSDictionary dictionaryWithObjectsAndKeys:
+        @"Test skipped - async set up skip", @"message",
+        @"/src/AsyncSetUp.swift", @"file",
+        [NSNumber numberWithUnsignedInteger:9], @"line",
+        nil];
+
+    completion([NSError errorWithDomain:@"" _XCT_CONTROL_FLOW_ERROR_DOMAIN
+                                   code:_XCTControlFlowCodeSkip userInfo:info]);
+}
+
+- (void)testBody
+{
+    NSLog(@"fixture: AsyncSetUpSkipsTests test ran");
+}
+
+@end
+
+@interface AsyncTearDownFailsTests : XCTestCase
+@end
+
+@implementation AsyncTearDownFailsTests
+
+- (void)tearDownWithCompletionHandler:(void (^)(NSError *))completion
+{
+    completion(AsyncFixtureError(@"async tear down error"));
+}
+
+- (void)testBody
+{
+    NSLog(@"fixture: AsyncTearDownFailsTests test ran");
+}
+
+@end

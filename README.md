@@ -604,7 +604,10 @@ class ParserTests: XCTestCase {
   `async` function: on `@MainActor` the callback doesn't
   run until the body returns, so the wait times out, and a failure in that late
   callback is recorded against the next test.
-- **Not supported:** `async setUp`/`tearDown`.
+- **`setUp() async throws` and `tearDown() async throws`** are called first and
+  last, around `setUpWithError()` and the rest, and waited for as an `async` test
+  is. An error from `setUp` fails or skips the test without running it. Async
+  teardown blocks aren't supported.
 - **Expectations** have Apple's Swift names: `expectation(description:)`,
   `wait(for:timeout:enforceOrder:)`, `waitForExpectations(timeout:handler:)`,
   `expectation(forNotification:object:notificationCenter:handler:)`,
