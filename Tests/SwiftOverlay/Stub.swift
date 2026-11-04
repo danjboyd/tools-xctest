@@ -65,6 +65,12 @@ class XCTestCase: NSObject {
         importedCalls.append("waitForExpectations(withTimeout: \(timeout), handler: \(handler != nil))")
     }
 
+    func _gsWaitInBackground(forExpectations expectations: [Any]!, timeout: Double, enforceOrder: Bool,
+                             completion: (() -> Void)!) {
+        importedCalls.append("background wait(forExpectations: \(describeWait(expectations, timeout, enforceOrder)))")
+        completion()
+    }
+
     func expectation(forNotification name: String!, object: Any!, notificationCenter: NSNotificationCenter!,
                      handler: XCNotificationExpectationHandler!) -> XCTestExpectation! {
         importedCalls.append("expectation(forNotification: \(name!), object: \(object != nil), "
@@ -91,6 +97,12 @@ class XCTestCase: NSObject {
 }
 
 class XCTWaiter: NSObject {
+    func _gsWaitInBackground(forExpectations expectations: [Any]!, timeout: Double, enforceOrder: Bool,
+                             completion: ((XCTWaiterResult) -> Void)!) {
+        importedCalls.append("waiter background wait(forExpectations: \(describeWait(expectations, timeout, enforceOrder)))")
+        completion(.incorrectOrder)
+    }
+
     func wait(forExpectations expectations: [Any]!, timeout: Double, enforceOrder: Bool) -> XCTWaiterResult {
         importedCalls.append("instance wait(forExpectations: \(describeWait(expectations, timeout, enforceOrder)))")
         return .timedOut

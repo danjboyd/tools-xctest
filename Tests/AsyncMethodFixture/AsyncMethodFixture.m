@@ -1,5 +1,6 @@
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
+#include <math.h>
 #include <objc/runtime.h>
 
 // A Swift `func testFoo() async` reaches the Objective-C runtime as
@@ -169,6 +170,101 @@ static void NoArgumentIMP(id self, SEL _cmd, void (^completion)(void))
     [self setContinueAfterFailure:NO];
     XCTFail(@"in a plain test");
     NSLog(@"fixture: AsyncStopTests.testDPlainTestStops continued");
+}
+
+@end
+
+// The wait behind Swift's await fulfillment(of:), from the run loop, where a
+// @MainActor test's body runs. The body returns while the wait goes on, so
+// run loop work like these timers can fulfill its expectations.
+@interface AsyncFulfillmentTests : XCTestCase
+@end
+
+@implementation AsyncFulfillmentTests
+
+- (void)testAFulfilledFromTheRunLoopWithCompletionHandler:(void (^)(void))completion
+{
+    XCTestExpectation *expectation = [self expectationWithDescription:@"from the run loop"];
+    void (^done)(void) = [[completion copy] autorelease];
+
+    [expectation performSelector:@selector(fulfill) withObject:nil afterDelay:0.05];
+    [self _gsWaitInBackgroundForExpectations:[NSArray arrayWithObject:expectation]
+                                     timeout:5
+                                enforceOrder:NO
+                                  completion:^{
+        NSLog(@"fixture: AsyncFulfillmentTests.testA waited, on main thread: %d", (int)[NSThread isMainThread]);
+        done();
+    }];
+    NSLog(@"fixture: AsyncFulfillmentTests.testA returned to the run loop");
+}
+
+- (void)testBNoLimitByDefaultWithCompletionHandler:(void (^)(void))completion
+{
+    XCTestExpectation *expectation = [self expectationWithDescription:@"no limit"];
+    void (^done)(void) = [[completion copy] autorelease];
+
+    [expectation performSelector:@selector(fulfill) withObject:nil afterDelay:0.05];
+    [self _gsWaitInBackgroundForExpectations:[NSArray arrayWithObject:expectation]
+                                     timeout:INFINITY
+                                enforceOrder:NO
+                                  completion:^{ done(); }];
+}
+
+- (void)testCTimesOutWithCompletionHandler:(void (^)(void))completion
+{
+    XCTestExpectation *expectation = [self expectationWithDescription:@"never"];
+    void (^done)(void) = [[completion copy] autorelease];
+
+    [self _gsWaitInBackgroundForExpectations:[NSArray arrayWithObject:expectation]
+                                     timeout:0.05
+                                enforceOrder:NO
+                                  completion:^{
+        NSLog(@"fixture: AsyncFulfillmentTests.testC completed after the timeout");
+        done();
+    }];
+}
+
+- (void)testDChecksOrderWithCompletionHandler:(void (^)(void))completion
+{
+    XCTestExpectation *first = [self expectationWithDescription:@"first"];
+    XCTestExpectation *second = [self expectationWithDescription:@"second"];
+    void (^done)(void) = [[completion copy] autorelease];
+
+    [second fulfill];
+    [first fulfill];
+    [self _gsWaitInBackgroundForExpectations:[NSArray arrayWithObjects:first, second, nil]
+                                     timeout:5
+                                enforceOrder:YES
+                                  completion:^{ done(); }];
+}
+
+- (void)testEWaiterGivesItsResultWithCompletionHandler:(void (^)(void))completion
+{
+    XCTestExpectation *expectation = [[[XCTestExpectation alloc] initWithDescription:@"waiter"] autorelease];
+    XCTWaiter *waiter = [[[XCTWaiter alloc] init] autorelease];
+    void (^done)(void) = [[completion copy] autorelease];
+
+    [expectation performSelector:@selector(fulfill) withObject:nil afterDelay:0.01];
+    [waiter _gsWaitInBackgroundForExpectations:[NSArray arrayWithObject:expectation]
+                                       timeout:5
+                                  enforceOrder:NO
+                                    completion:^(XCTWaiterResult result) {
+        NSLog(@"fixture: AsyncFulfillmentTests.testE result %d", (int)result);
+        done();
+    }];
+}
+
+// A forgotten wait fails the test, so a waited-on expectation must not.
+- (void)testFWaitedOnExpectationCountsWithCompletionHandler:(void (^)(void))completion
+{
+    XCTestExpectation *expectation = [self expectationWithDescription:@"waited"];
+    void (^done)(void) = [[completion copy] autorelease];
+
+    [expectation fulfill];
+    [self _gsWaitInBackgroundForExpectations:[NSArray arrayWithObject:expectation]
+                                     timeout:5
+                                enforceOrder:NO
+                                  completion:^{ done(); }];
 }
 
 @end

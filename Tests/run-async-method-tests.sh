@@ -17,7 +17,13 @@ echo "Running async test method regressions..."
 # the names they were written with.
 run_fixture AsyncMethodFixture -list-tests
 assert_status 0
-[ "$output" = $'AsyncMethodFixture/AsyncHangTests/testNeverCompletes
+[ "$output" = $'AsyncMethodFixture/AsyncFulfillmentTests/testAFulfilledFromTheRunLoop
+AsyncMethodFixture/AsyncFulfillmentTests/testBNoLimitByDefault
+AsyncMethodFixture/AsyncFulfillmentTests/testCTimesOut
+AsyncMethodFixture/AsyncFulfillmentTests/testDChecksOrder
+AsyncMethodFixture/AsyncFulfillmentTests/testEWaiterGivesItsResult
+AsyncMethodFixture/AsyncFulfillmentTests/testFWaitedOnExpectationCounts
+AsyncMethodFixture/AsyncHangTests/testNeverCompletes
 AsyncMethodFixture/AsyncStopTests/testAStopsDuringTheCall
 AsyncMethodFixture/AsyncStopTests/testBContinuesOnTheRunLoop
 AsyncMethodFixture/AsyncStopTests/testCRunsNext
@@ -33,7 +39,8 @@ AsyncMethodFixture/AsyncTests/testThrows' ] \
   || fail "expected the async tests to be listed without WithCompletionHandler:"
 
 run_fixture AsyncMethodFixture -skip-testing:AsyncMethodFixture/AsyncHangTests \
-  -skip-testing:AsyncMethodFixture/AsyncStopTests -junit-report "$report"
+  -skip-testing:AsyncMethodFixture/AsyncStopTests -skip-testing:AsyncMethodFixture/AsyncFulfillmentTests \
+  -junit-report "$report"
 assert_status 1
 assert_not_contains "WithCompletionHandler"
 
@@ -48,7 +55,7 @@ for passing in testCompletesNow testCompletesLater testCompletesOnAnotherThread 
 done
 
 # A failure inside an async test is that test's, at its line.
-assert_contains "AsyncTests.testAssertionFails: AsyncMethodFixture.m:51: failed: async assertion"
+assert_contains "AsyncTests.testAssertionFails: AsyncMethodFixture.m:52: failed: async assertion"
 
 # A completion error (async throws) fails the test with its description,
 # and a control-flow error skips it, at its location.
@@ -92,5 +99,19 @@ assert_contains "fixture: AsyncStopTests.testCRunsNext"
 assert_contains "failed: in a plain test"
 assert_not_contains "testDPlainTestStops continued"
 assert_contains "AsyncStopTests: 3/4 tests FAILED"
+
+# The wait behind Swift's await fulfillment(of:) leaves the run loop free,
+# reports failed waits as a test's other waits do, and completes either way.
+run_fixture AsyncMethodFixture -default-test-execution-time-allowance 20 \
+  -only-testing:AsyncMethodFixture/AsyncFulfillmentTests
+assert_status 1
+assert_contains "fixture: AsyncFulfillmentTests.testA returned to the run loop"
+assert_contains "fixture: AsyncFulfillmentTests.testA waited, on main thread: 0"
+assert_contains 'Asynchronous wait failed: Exceeded timeout of 0.05 seconds, with unfulfilled expectations: "never".'
+assert_contains "fixture: AsyncFulfillmentTests.testC completed after the timeout"
+assert_contains "Failed due to expectation fulfilled in incorrect order: requires 'first', actually fulfilled 'second'."
+assert_contains "fixture: AsyncFulfillmentTests.testE result 1"
+assert_not_contains "unwaited"
+assert_contains "AsyncFulfillmentTests: 2/6 tests FAILED"
 
 echo "Async test method regressions passed."

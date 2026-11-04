@@ -80,4 +80,13 @@ typedef enum XCTWaiterResult XCTWaiterResult;
                                 timeout: (NSTimeInterval)seconds
                            enforceOrder: (BOOL)enforceOrderOfFulfillment;
 
+/*!
+ * For the Swift overlay's fulfillment(of:): waits on a thread of its own, and
+ * calls the completion there. The caller's thread and run loop stay free.
+ */
+- (void) _gsWaitInBackgroundForExpectations: (NSArray *)expectations
+                                    timeout: (NSTimeInterval)seconds
+                               enforceOrder: (BOOL)enforceOrderOfFulfillment
+                                 completion: (void (^)(XCTWaiterResult result))completion;
+
 @end

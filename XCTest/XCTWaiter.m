@@ -18,6 +18,8 @@
  Boston, MA 02110-1301, USA.
 */
 
+#include <math.h>
+
 #import <XCTest/XCTWaiter.h>
 #import <XCTest/XCTestExpectation.h>
 #import <XCTest/XCTestPrivate.h>
@@ -150,7 +152,8 @@ static NSComparisonResult GSCompareFulfillmentOrder(id a, id b, void *context)
                                 timeout: (NSTimeInterval)seconds
                            enforceOrder: (BOOL)enforceOrderOfFulfillment
 {
-    NSDate *deadline = [NSDate dateWithTimeIntervalSinceNow:seconds];
+    // fulfillment(of:)'s default timeout is infinite.
+    NSDate *deadline = isinf(seconds) ? [NSDate distantFuture] : [NSDate dateWithTimeIntervalSinceNow:seconds];
     NSRunLoop *runLoop = [NSRunLoop currentRunLoop];
     NSTimer *pollTimer = [NSTimer timerWithTimeInterval:GSWaiterPollInterval
                                                  target:self
@@ -227,6 +230,33 @@ static NSComparisonResult GSCompareFulfillmentOrder(id a, id b, void *context)
     _XCTInterruptIfStoppedDuringWait();
 
     return result;
+}
+
+- (void) _gsBackgroundWait: (NSArray *)arguments
+{
+    @autoreleasepool {
+        void (^completion)(XCTWaiterResult) = [arguments objectAtIndex:3];
+        XCTWaiterResult result = [self waitForExpectations:[arguments objectAtIndex:0]
+                                                   timeout:[[arguments objectAtIndex:1] doubleValue]
+                                              enforceOrder:[[arguments objectAtIndex:2] boolValue]];
+
+        completion(result);
+    }
+}
+
+- (void) _gsWaitInBackgroundForExpectations: (NSArray *)expectations
+                                    timeout: (NSTimeInterval)seconds
+                               enforceOrder: (BOOL)enforceOrderOfFulfillment
+                                 completion: (void (^)(XCTWaiterResult result))completion
+{
+    NSArray *arguments = [NSArray arrayWithObjects:expectations,
+                                                   [NSNumber numberWithDouble:seconds],
+                                                   [NSNumber numberWithBool:enforceOrderOfFulfillment],
+                                                   [[completion copy] autorelease],
+                                                   nil];
+
+    // The new thread keeps this waiter and the arguments alive until it ends.
+    [NSThread detachNewThreadSelector:@selector(_gsBackgroundWait:) toTarget:self withObject:arguments];
 }
 
 + (XCTWaiterResult) waitForExpectations: (NSArray *)expectations

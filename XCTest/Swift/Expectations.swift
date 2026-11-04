@@ -33,13 +33,27 @@ extension XCTestCase {
         return expectation(withDescription: description)
     }
 
+    @available(*, noasync, message: "Use await fulfillment(of:timeout:enforceOrder:) instead.")
     public func wait(for expectations: [XCTestExpectation], timeout seconds: Double,
                      enforceOrder enforceOrderOfFulfillment: Bool = false) {
         wait(forExpectations: expectations, timeout: seconds, enforceOrder: enforceOrderOfFulfillment)
     }
 
+    @available(*, noasync, message: "Use await fulfillment(of:timeout:enforceOrder:) instead.")
     public func waitForExpectations(timeout: Double, handler: XCWaitCompletionHandler? = nil) {
         waitForExpectations(withTimeout: timeout, handler: handler)
+    }
+
+    /// Waits without blocking a thread, so a `@MainActor` test's main-queue
+    /// callbacks can run. The wait itself runs on a thread of its own.
+    public func fulfillment(of expectations: [XCTestExpectation], timeout seconds: Double = .infinity,
+                            enforceOrder enforceOrderOfFulfillment: Bool = false) async {
+        await withCheckedContinuation { (continuation: CheckedContinuation<Void, Never>) in
+            _gsWaitInBackground(forExpectations: expectations, timeout: seconds,
+                                enforceOrder: enforceOrderOfFulfillment) {
+                continuation.resume()
+            }
+        }
     }
 
     /// GNUstep has no `NSNotification.Name`, so `notificationName` is a string.
@@ -79,15 +93,33 @@ extension XCTestCase {
 extension XCTWaiter {
     public typealias Result = XCTWaiterResult
 
+    @available(*, noasync, message: "Use await fulfillment(of:timeout:enforceOrder:) instead.")
     @discardableResult
     public func wait(for expectations: [XCTestExpectation], timeout seconds: Double,
                      enforceOrder enforceOrderOfFulfillment: Bool = false) -> Result {
         return wait(forExpectations: expectations, timeout: seconds, enforceOrder: enforceOrderOfFulfillment)
     }
 
+    @available(*, noasync, message: "Use await fulfillment(of:timeout:enforceOrder:) instead.")
     @discardableResult
     public class func wait(for expectations: [XCTestExpectation], timeout seconds: Double,
                            enforceOrder enforceOrderOfFulfillment: Bool = false) -> Result {
         return wait(forExpectations: expectations, timeout: seconds, enforceOrder: enforceOrderOfFulfillment)
+    }
+
+    /// Waits without blocking a thread, on a thread of its own.
+    public func fulfillment(of expectations: [XCTestExpectation], timeout seconds: Double = .infinity,
+                            enforceOrder enforceOrderOfFulfillment: Bool = false) async -> Result {
+        return await withCheckedContinuation { (continuation: CheckedContinuation<Result, Never>) in
+            _gsWaitInBackground(forExpectations: expectations, timeout: seconds,
+                                enforceOrder: enforceOrderOfFulfillment) { result in
+                continuation.resume(returning: result)
+            }
+        }
+    }
+
+    public class func fulfillment(of expectations: [XCTestExpectation], timeout seconds: Double = .infinity,
+                                  enforceOrder enforceOrderOfFulfillment: Bool = false) async -> Result {
+        return await XCTWaiter().fulfillment(of: expectations, timeout: seconds, enforceOrder: enforceOrderOfFulfillment)
     }
 }

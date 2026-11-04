@@ -596,11 +596,15 @@ class ParserTests: XCTestCase {
   [describes](https://developer.apple.com/forums/thread/809989) it ending and
   relaunching its test runner after such a test's teardown; this runner stays
   in the same process and carries on with the next test.
-- **Not supported:** `async setUp`/`tearDown` and `await fulfillment(of:)`.
-  A `@MainActor` `async` test can't wait for a main-queue callback either:
-  `wait(for:timeout:)` compiles there, but the callback doesn't run
-  until the body returns, so the wait times out, and a failure in the late
+- **`await fulfillment(of:timeout:enforceOrder:)`** is how an `async` test
+  waits, on `XCTestCase` and `XCTWaiter`. It waits on a thread of its own, so
+  the test's body suspends, and a `@MainActor` test's main-queue callbacks can
+  run. A predicate expectation is therefore evaluated on that thread. A failed
+  wait fails the test but doesn't stop it. `wait(for:timeout:)` warns in an
+  `async` function: on `@MainActor` the callback doesn't
+  run until the body returns, so the wait times out, and a failure in that late
   callback is recorded against the next test.
+- **Not supported:** `async setUp`/`tearDown`.
 - **Expectations** have Apple's Swift names: `expectation(description:)`,
   `wait(for:timeout:enforceOrder:)`, `waitForExpectations(timeout:handler:)`,
   `expectation(forNotification:object:notificationCenter:handler:)`,
