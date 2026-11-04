@@ -504,10 +504,9 @@ from [libs-xcode](https://github.com/gnustep/libs-xcode); it runs each
 
 ## Swift tests
 
-Swift test bundles need a Swift toolchain with GNUstep's Objective-C
-interop (`-gnustep-objc-interop`). A stock Linux Swift can't import
-Objective-C, so it can't use XCTest here. Tests are written as on Apple's
-platforms:
+Swift test bundles need a Swift toolchain with GNUstep's Objective-C interop
+(`-gnustep-objc-interop`). A stock Linux Swift can't import Objective-C, so it
+can't use XCTest here. Tests are written as on Apple's platforms:
 
 ```swift
 import XCTest
@@ -515,128 +514,102 @@ import XCTest
 class ParserTests: XCTestCase {
     var parser: Parser!
 
-    override func setUpWithError() throws {
+    override func setUp() async throws {
         try XCTSkipUnless(Parser.isAvailable, "no parser here")
         parser = Parser()
     }
 
     func testEmptyInput() throws {
         let result = try XCTUnwrap(parser.parse(""))
-        XCTAssertEqual(result.count, 0)
         XCTAssertEqual(result.score, 0.5, accuracy: 0.01)
+    }
+
+    @MainActor
+    func testCallback() async {
+        let called = expectation(description: "called back")
+        parser.parse("x") { _ in called.fulfill() }
+        await fulfillment(of: [called], timeout: 5)
     }
 }
 ```
 
-- **Discovery.** `func testX()` methods, including `throws` ones, are found
-  through the Objective-C runtime, as for Objective-C tests. They don't need
-  `@objc`, and the class doesn't need `@objc(Name)`. A throwing test that
-  throws fails with the error's description.
-- **Names.** Swift registers the class as `Module.Class`. Output and reports
-  show that (`-[MyTests.ParserTests testEmptyInput]`), while identifiers
-  leave the module out, as Apple's do:
-  `-only-testing:MyTests/ParserTests/testEmptyInput`. The full name also
-  selects it. In `-XCTest`'s dot form, write `MyTests.ParserTests.testEmptyInput`.
-- **`import XCTest`** finds the headers' module map with the header
-  directory on the include path (`-I <Headers>`, and `-Xcc -I <Headers>`).
-- **Assertions.** The Swift overlay provides `XCTAssert`,
-  `XCTAssertTrue`/`False`, `XCTAssertNil`/`NotNil`, `XCTAssertEqual`/`NotEqual`
-  (with `accuracy:`), `XCTAssertGreaterThan`/`LessThan` (and `OrEqual`),
-  `XCTAssertIdentical`/`NotIdentical`, `XCTAssertThrowsError`/`NoThrow`,
-  `XCTFail`, `XCTUnwrap`, `XCTSkip`, `XCTSkipIf` and `XCTSkipUnless`. They
-  have Apple's signatures and messages, and failures are reported at the
-  caller's file and line.
+### Opting in
 
-  The overlay is a Swift module named `XCTest` over the Objective-C one, so
-  the same `import XCTest` gives both. Importing it links `libXCTestSwift`.
-  It's built only on request, with the interop `swiftc` and that toolchain's
-  flags:
+Swift support is built only on request, so an Objective-C-only build is
+unchanged:
 
-  ```sh
-  make XCTEST_SWIFTC=/path/to/swiftc XCTEST_SWIFTFLAGS="-gnustep-objc-interop ..."
-  meson setup build -Dswift=enabled -Dswiftc=/path/to/swiftc -Dxctest_swift_flags=...
-  ```
+```sh
+make XCTEST_SWIFTC=/path/to/swiftc XCTEST_SWIFTFLAGS="-gnustep-objc-interop ..."
+meson setup build -Dswift=enabled -Dswiftc=/path/to/swiftc -Dxctest_swift_flags=...
+```
 
-  The overlay is linked against the libobjc in GNUstep's library
-  directories (or the gnustep-swift profile's `GNUSTEP_SWIFT_LIBOBJC2_LIBDIR`),
-  so that the Swift driver doesn't pick GCC's `libobjc.so.4`. If libobjc2
-  is elsewhere, add `-L<its directory>` to the flags.
-  The flags are `swiftc` driver flags; pass frontend-only ones with
-  `-Xfrontend` (e.g. `-Xfrontend -disable-objc-attr-requires-foundation-module`).
-  It installs `XCTest.swiftmodule` next to the headers' `XCTest/` directory
-  and `libXCTestSwift` with the libraries.
-- **`continueAfterFailure = false`** stops a synchronous Swift test at its
-  first failure, as on Apple's platforms, and the run carries on. As there, the
-  test's Swift `defer` blocks don't run. (swift-corelibs-xctest ignores the
-  setting.)
-- **`NSLog`** from Swift needs gnustep-swift 4ddb1c6 or later, whose
-  Foundation overlay adds it; with older overlays, use `print`.
-- **`async` tests.** The runner runs
-  `-testFooWithCompletionHandler:` methods as the test `testFoo`. That is
-  how a Swift `func testFoo() async` reaches Objective-C on Apple's
-  platforms. It calls the method with a completion block, then runs the test
-  thread's run loop until the block has been called, from any thread. With
-  `-test-timeouts-enabled`, the execution time allowance stops one that
-  never completes. For `async throws`, the error passed to the completion
-  fails the test, or skips it, as from a throwing test. The block can only
-  take that error if the method's type encoding says so with an extended
-  block signature (`@?<v@?@>`). Otherwise it's called as `void (^)(void)`,
-  and an `async throws` test's error isn't seen. gnustep-swift's toolchain
-  emits both: `@?<v@?>` for `async`, and `@?<v@?@"NSError">` for
-  `async throws`, with or without `@objc`. Their completions run under the
-  run loop, mostly on another thread, and `@MainActor` ones on the main
-  thread.
-  **`continueAfterFailure = false` doesn't stop an `async` test's body:** the
-  failure is recorded and the body carries on. Stopping a test takes an
-  exception, which can't safely unwind through whatever runs the body: from
-  `@MainActor`, later `@MainActor` tests would hang. Use `try XCTUnwrap`, or
-  `return` or throw, to end one early. (An Objective-C
-  `-testFooWithCompletionHandler:` still stops during the call itself.)
-  Apple's XCTest has the same limit. From Xcode 26, an Apple engineer
-  [describes](https://developer.apple.com/forums/thread/809989) it ending and
-  relaunching its test runner after such a test's teardown; this runner stays
-  in the same process and carries on with the next test.
-- **Attachments** have Apple's initializers: `XCTAttachment(string:)`, `(data:)`,
-  `(contentsOfFile:)`, `(plistObject:)` and `(archivableObject:)`, some with
-  `uniformTypeIdentifier:`, and `.lifetime = .keepAlways`.
-- **Measuring** has `measure(metrics:block:)`, `measure(metrics:options:block:)`
-  and `measure(options:block:)`, `XCTMeasureOptions.default`, and non-optional
-  `XCTClockMetric()` and the other metrics.
-- **`XCTContext.runActivity(named:block:)`** returns its block's result, and can
-  throw.
-- **`XCTExpectFailure`** has Apple's forms: `enabled:`, `strict:`, `issueMatcher:`,
-  `options:` and `failingBlock:`, or a trailing block. `file:` and `line:` are
-  accepted and not used.
-- **`await fulfillment(of:timeout:enforceOrder:)`** is how an `async` test
-  waits, on `XCTestCase` and `XCTWaiter`. It waits on a thread of its own, so
-  the test's body suspends, and a `@MainActor` test's main-queue callbacks can
-  run. A predicate expectation is therefore evaluated on that thread. A failed
-  wait fails the test but doesn't stop it. `wait(for:timeout:)` warns in an
-  `async` function: on `@MainActor` the callback doesn't
-  run until the body returns, so the wait times out, and a failure in that late
-  callback is recorded against the next test.
-- **`setUp() async throws` and `tearDown() async throws`** are called first and
-  last, around `setUpWithError()` and the rest, and waited for as an `async` test
-  is. An error from `setUp` fails or skips the test without running it.
-- **`addTeardownBlock` with an `async throws` closure** runs with the plain
-  teardown blocks, last added first, before `tearDown()`.
-- **Failures in callbacks that outlive their test** are recorded on the test
-  running then. Swift's `XCTFail` takes no test argument, so nothing can tell
-  which test a `DispatchQueue` callback belongs to; swift-corelibs-xctest behaves
-  the same. Have a test wait for its callbacks with `await fulfillment(of:)`.
-- **Expectations** have Apple's Swift names: `expectation(description:)`,
+The flags are the toolchain's `swiftc` driver flags; pass frontend-only ones
+with `-Xfrontend`. This builds a Swift module named `XCTest` over the
+Objective-C one, so one `import XCTest` gives both. It installs
+`XCTest.swiftmodule` next to the headers' `XCTest/` directory, and
+`libXCTestSwift` with the libraries. The overlay links the libobjc in
+GNUstep's library directories (or `GNUSTEP_SWIFT_LIBOBJC2_LIBDIR`), not GCC's
+`libobjc.so.4`; if libobjc2 is elsewhere, add `-L<its directory>`.
+
+What Swift needs from the headers lives in `XCTest/GSXCTestSwift.h` (macros
+that take effect only when Swift imports the headers) and
+`XCTest/GSXCTestSwiftOverlay.h` (methods only the overlay calls). To an
+Objective-C compiler, the other headers are plain Objective-C.
+
+### What works
+
+- **Discovery and names.** `func testX()`, `throws` and `async` tests are found
+  through the Objective-C runtime, with no `@objc`. Classes register as
+  `Module.Class`. Output shows that, while selection leaves the module out, as
+  Apple's does: `-only-testing:MyTests/ParserTests/testEmptyInput`.
+- **Assertions:** `XCTAssert*`, `XCTFail`, `XCTUnwrap`, `XCTSkip`, `XCTSkipIf`
+  and `XCTSkipUnless`, with Apple's signatures and messages. Failures are
+  reported at the caller's file and line.
+- **Async:** `async` and `async throws` tests; `setUp() async throws` and
+  `tearDown() async throws`, which run first and last; and `addTeardownBlock`
+  with an `async throws` closure.
+- **Expectations,** with Apple's names: `expectation(description:)`,
   `wait(for:timeout:enforceOrder:)`, `waitForExpectations(timeout:handler:)`,
-  `expectation(forNotification:object:notificationCenter:handler:)`,
-  `expectation(for:evaluatedWith:handler:)`,
-  `keyValueObservingExpectation(for:keyPath:expectedValue:)` and
-  `keyValueObservingExpectation(for:keyPath:handler:)`; `XCTWaiter`'s
-  `wait(for:timeout:enforceOrder:)`, as a class and an instance method, with
-  `XCTWaiter.Result`; and `XCTestExpectation(description:)`. One difference: a
-  notification name is a `String`, because GNUstep has no `NSNotification.Name`.
+  and the notification, predicate and KVO forms. `XCTWaiter` has them as class
+  and instance methods, with `XCTWaiter.Result`.
+- **`await fulfillment(of:timeout:enforceOrder:)`** waits on a thread of its
+  own, so a `@MainActor` test's main-queue callbacks run while it waits.
+  `wait(for:)` warns in `async` code.
+- **`XCTAttachment(string:)`** and the `data:`, `contentsOfFile:`,
+  `plistObject:` and `archivableObject:` forms, with `.lifetime`.
+- **Measuring:** `measure { }`, `measure(metrics:)`, `measure(options:)`, and
+  `XCTMeasureOptions.default`.
+- **`XCTContext.runActivity(named:block:)`,** which returns its block's result
+  and can throw.
+- **`XCTExpectFailure`** with `strict:`, `enabled:`, `issueMatcher:`,
+  `options:` and a failing block.
 
-With gnustep-make, list the Swift sources in `<Bundle>_SWIFT_FILES` and
-include `xctest.make` as for Objective-C tests (Swift and Objective-C files
-can share a bundle):
+### Not supported, or different
+
+- **`continueAfterFailure = false` doesn't stop an `async` test's body.** The
+  failure is recorded and the body carries on, because stopping a test takes
+  an exception, which can't unwind safely through Swift's executor. End one
+  early with `try XCTUnwrap`, `return` or `throw`. Synchronous tests stop as
+  usual. Apple's XCTest has the same limit: from Xcode 26, an Apple engineer
+  [describes](https://developer.apple.com/forums/thread/809989) it relaunching
+  its runner after such a test, where this runner carries on in the same
+  process.
+- **Failures in callbacks that outlive their test** are recorded on whichever
+  test is running then. Swift's `XCTFail` takes no test argument, so nothing
+  can tell which test a `DispatchQueue` callback belongs to. swift-corelibs-xctest
+  does the same. Have each test wait for its callbacks.
+- **A notification name is a `String`,** because GNUstep has no
+  `NSNotification.Name`.
+- **`XCTExpectFailure`'s `file:` and `line:`** are accepted and not used; a
+  failure is reported at its own location.
+- **`NSLog` from Swift** needs a Foundation overlay that provides it; otherwise
+  use `print`.
+
+### Building a test bundle
+
+With gnustep-make, list the Swift sources in `<Bundle>_SWIFT_FILES` and include
+`xctest.make`, as for Objective-C tests. Swift and Objective-C files can share a
+bundle:
 
 ```make
 include $(GNUSTEP_MAKEFILES)/common.make
@@ -647,21 +620,19 @@ ParserTests_SWIFT_FILES = ParserTests.swift
 include $(GNUSTEP_MAKEFILES)/Auxiliary/xctest.make
 ```
 
-This needs a gnustep-make that compiles Swift: gnustep-swift's tools-make,
-with its `GNUSTEP_SWIFT_*` profile. That builds the sources and links
-`swiftrt.o`; `xctest.make` adds the libraries the Swift objects ask for
-(`libXCTestSwift`, the Swift runtime, ...), which `bundle.make` doesn't link
-for bundles. With a gnustep-make that can't build Swift, a bundle with
-`_SWIFT_FILES` is an error rather than a bundle without its tests.
-`Examples/SwiftTests` is such a bundle.
+This needs a gnustep-make that compiles `_SWIFT_FILES` and links `swiftrt.o`.
+`xctest.make` adds the libraries the Swift objects ask for (`libXCTestSwift`,
+the Swift runtime, ...), which `bundle.make` doesn't link for bundles. With a
+gnustep-make that can't build Swift, a bundle with `_SWIFT_FILES` is an error
+rather than a bundle without its tests. `Examples/SwiftTests` is such a
+bundle.
 
-Without gnustep-make, build the bundle with the toolchain: compile with
-`-parse-as-library`, link as a shared library with `-lXCTestSwift -lXCTest`,
-and put it in a bundle whose `Resources/Info-gnustep.plist` names it as
-`NSExecutable`. Link through `swiftc`, or, linking with `clang`, put the
-toolchain's `lib/swift/linux/<arch>/swiftrt.o` first: without it the image's
-Swift metadata isn't registered, and protocol casts (including the one that
-gives `XCTSkip` its message and location) fail.
+Without gnustep-make, compile with `-parse-as-library`, link a shared library
+with `-lXCTestSwift -lXCTest`, and put it in a bundle whose
+`Resources/Info-gnustep.plist` names it as `NSExecutable`. Link through
+`swiftc`, or, with `clang`, put the toolchain's `lib/swift/linux/<arch>/swiftrt.o`
+first: without it the image's Swift metadata isn't registered, and protocol
+casts (including the one that gives `XCTSkip` its message) fail.
 
 ## Running tests
 
