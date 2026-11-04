@@ -5,6 +5,24 @@
 #include <string.h>
 #include <time.h>
 
+#if defined(_WIN32)
+#include <windows.h>
+
+// The process's CPU time, which advances in ticks of about 15.6ms.
+static double FixtureCPUTime(void)
+{
+    FILETIME creation, exit, kernel, user;
+    ULARGE_INTEGER k, u;
+
+    GetProcessTimes(GetCurrentProcess(), &creation, &exit, &kernel, &user);
+    k.LowPart = kernel.dwLowDateTime;
+    k.HighPart = kernel.dwHighDateTime;
+    u.LowPart = user.dwLowDateTime;
+    u.HighPart = user.dwHighDateTime;
+    return (double)(k.QuadPart + u.QuadPart) / 10000000.0;
+}
+#endif
+
 // A custom metric: logs its hooks and reports a count that prefers larger.
 @interface WidgetMetric : NSObject <XCTMetric> {
 @public
@@ -69,9 +87,10 @@
         // it); storage: write 100 kB; memory: touch 8 MB.
         volatile unsigned long spin = 0;
 #if defined(_WIN32)
-        // clock() is elapsed time there.
-        NSDate *until = [NSDate dateWithTimeIntervalSinceNow:0.02];
-        while ([until timeIntervalSinceNow] > 0) { spin++; }
+        // clock() is elapsed time there, and a 20ms wait can pass between
+        // two CPU time ticks, measuring 0.
+        double until = FixtureCPUTime() + 0.02;
+        while (FixtureCPUTime() < until) { spin++; }
 #else
         clock_t until = clock() + CLOCKS_PER_SEC / 50;
         while (clock() < until) { spin++; }
