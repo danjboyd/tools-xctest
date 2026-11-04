@@ -32,6 +32,8 @@ AsyncMethodFixture/AsyncStopTests/testBContinuesOnTheRunLoop
 AsyncMethodFixture/AsyncStopTests/testCRunsNext
 AsyncMethodFixture/AsyncStopTests/testDPlainTestStops
 AsyncMethodFixture/AsyncTearDownFailsTests/testBody
+AsyncMethodFixture/AsyncTeardownBlockTests/testAOrder
+AsyncMethodFixture/AsyncTeardownBlockTests/testBAsyncBlockError
 AsyncMethodFixture/AsyncTests/testAssertionFails
 AsyncMethodFixture/AsyncTests/testCompletesLater
 AsyncMethodFixture/AsyncTests/testCompletesNow
@@ -46,6 +48,7 @@ run_fixture AsyncMethodFixture -skip-testing:AsyncMethodFixture/AsyncHangTests \
   -skip-testing:AsyncMethodFixture/AsyncStopTests -skip-testing:AsyncMethodFixture/AsyncFulfillmentTests \
   -skip-testing:AsyncMethodFixture/AsyncLifecycleTests -skip-testing:AsyncMethodFixture/AsyncSetUpFailsTests \
   -skip-testing:AsyncMethodFixture/AsyncSetUpSkipsTests -skip-testing:AsyncMethodFixture/AsyncTearDownFailsTests \
+  -skip-testing:AsyncMethodFixture/AsyncTeardownBlockTests \
   -junit-report "$report"
 assert_status 1
 assert_not_contains "WithCompletionHandler"
@@ -143,5 +146,19 @@ run_fixture AsyncMethodFixture -only-testing:AsyncMethodFixture/AsyncTearDownFai
 assert_status 1
 assert_contains "fixture: AsyncTearDownFailsTests test ran"
 assert_contains "async tear down error"
+
+# Teardown blocks that finish later wait their turn in the same queue.
+run_fixture AsyncMethodFixture -only-testing:AsyncMethodFixture/AsyncTeardownBlockTests/testAOrder
+assert_status 0
+teardown=$(printf '%s\n' "$output" | grep -o 'fixture: teardown .*' | sed 's/fixture: teardown //' | tr '\n' ',')
+[ "$teardown" = "test body,last added,async block started,async block finished on the run loop,first added,tearDown," ] \
+  || fail "unexpected teardown order: $teardown"
+
+# An error from one fails the test; the rest of tear down still runs.
+run_fixture AsyncMethodFixture -only-testing:AsyncMethodFixture/AsyncTeardownBlockTests/testBAsyncBlockError
+assert_status 1
+assert_contains "async teardown block error"
+assert_contains "fixture: teardown ran after the error"
+assert_contains "fixture: teardown tearDown"
 
 echo "Async test method regressions passed."
