@@ -24,16 +24,19 @@
 import Foundation
 
 extension XCTestCase {
+    /// Runs `block` several times, measuring each of `metrics`.
     @nonobjc
     public func measure(metrics: [XCTMetric], block: @escaping () -> Void) {
         measure(withMetrics: metrics, block: block)
     }
 
+    /// Runs `block` as `options` says, measuring each of `metrics`.
     @nonobjc
     public func measure(metrics: [XCTMetric], options: XCTMeasureOptions, block: @escaping () -> Void) {
         measure(withMetrics: metrics, options: options, block: block)
     }
 
+    /// Runs `block` as `options` says, measuring the default metrics.
     @nonobjc
     public func measure(options: XCTMeasureOptions, block: @escaping () -> Void) {
         measure(with: options, block: block)
@@ -91,6 +94,7 @@ public func XCTExpectFailure(_ failureReason: String? = nil, enabled: Bool = tru
                                                                          issueMatcher: issueMatcher))
 }
 
+/// Marks failures from here to the end of the test as expected, as `options` says.
 public func XCTExpectFailure(_ failureReason: String? = nil, options: XCTExpectedFailure.Options) {
     XCTExpectFailureWithOptions(failureReason, options)
 }
@@ -107,6 +111,7 @@ public func XCTExpectFailure<Result>(_ failureReason: String? = nil, options: XC
     return result!
 }
 
+/// As above, for a block that can throw.
 public func XCTExpectFailure<Result>(_ failureReason: String? = nil, options: XCTExpectedFailure.Options,
                                      failingBlock: () throws -> Result) throws -> Result {
     var result: Swift.Result<Result, Error>?
@@ -118,6 +123,7 @@ public func XCTExpectFailure<Result>(_ failureReason: String? = nil, options: XC
     return try result!.get()
 }
 
+/// Marks failures inside `failingBlock` as expected, and returns its result.
 public func XCTExpectFailure<Result>(_ failureReason: String? = nil, enabled: Bool = true, strict: Bool = true,
                                      file: StaticString = #filePath, line: UInt = #line,
                                      failingBlock: () -> Result,
@@ -128,6 +134,7 @@ public func XCTExpectFailure<Result>(_ failureReason: String? = nil, enabled: Bo
                             failingBlock: failingBlock)
 }
 
+/// As above, for a block that can throw.
 public func XCTExpectFailure<Result>(_ failureReason: String? = nil, enabled: Bool = true, strict: Bool = true,
                                      file: StaticString = #filePath, line: UInt = #line,
                                      failingBlock: () throws -> Result,

@@ -64,12 +64,14 @@ private func _gsEvaluate(_ name: String?, _ message: () -> String,
 
 // MARK: Booleans
 
+/// Records a failure unless `expression` is true. The same as `XCTAssertTrue`.
 public func XCTAssert(_ expression: @autoclosure () throws -> Bool,
                       _ message: @autoclosure () -> String = "",
                       file: StaticString = #filePath, line: UInt = #line) {
     XCTAssertTrue(try expression(), message(), file: file, line: line)
 }
 
+/// Records a failure unless `expression` is true.
 public func XCTAssertTrue(_ expression: @autoclosure () throws -> Bool,
                           _ message: @autoclosure () -> String = "",
                           file: StaticString = #filePath, line: UInt = #line) {
@@ -78,6 +80,7 @@ public func XCTAssertTrue(_ expression: @autoclosure () throws -> Bool,
     }
 }
 
+/// Records a failure unless `expression` is false.
 public func XCTAssertFalse(_ expression: @autoclosure () throws -> Bool,
                            _ message: @autoclosure () -> String = "",
                            file: StaticString = #filePath, line: UInt = #line) {
@@ -88,6 +91,7 @@ public func XCTAssertFalse(_ expression: @autoclosure () throws -> Bool,
 
 // MARK: Nil
 
+/// Records a failure, showing the value, unless `expression` is `nil`.
 public func XCTAssertNil(_ expression: @autoclosure () throws -> Any?,
                          _ message: @autoclosure () -> String = "",
                          file: StaticString = #filePath, line: UInt = #line) {
@@ -99,6 +103,7 @@ public func XCTAssertNil(_ expression: @autoclosure () throws -> Any?,
     }
 }
 
+/// Records a failure if `expression` is `nil`.
 public func XCTAssertNotNil(_ expression: @autoclosure () throws -> Any?,
                             _ message: @autoclosure () -> String = "",
                             file: StaticString = #filePath, line: UInt = #line) {
@@ -109,6 +114,7 @@ public func XCTAssertNotNil(_ expression: @autoclosure () throws -> Any?,
 
 // MARK: Equality
 
+/// Records a failure, showing both values, unless they are equal (`==`).
 public func XCTAssertEqual<T: Equatable>(_ expression1: @autoclosure () throws -> T,
                                          _ expression2: @autoclosure () throws -> T,
                                          _ message: @autoclosure () -> String = "",
@@ -121,6 +127,7 @@ public func XCTAssertEqual<T: Equatable>(_ expression1: @autoclosure () throws -
     }
 }
 
+/// Records a failure, showing both values, if they are equal (`==`).
 public func XCTAssertNotEqual<T: Equatable>(_ expression1: @autoclosure () throws -> T,
                                             _ expression2: @autoclosure () throws -> T,
                                             _ message: @autoclosure () -> String = "",
@@ -165,6 +172,7 @@ private func _gsAssertNotEqual<T: Numeric>(_ expression1: () throws -> T, _ expr
     }
 }
 
+/// Records a failure unless the values differ by at most `accuracy`. Infinities equal themselves; NaN equals nothing.
 public func XCTAssertEqual<T: FloatingPoint>(_ expression1: @autoclosure () throws -> T,
                                              _ expression2: @autoclosure () throws -> T,
                                              accuracy: T,
@@ -173,6 +181,7 @@ public func XCTAssertEqual<T: FloatingPoint>(_ expression1: @autoclosure () thro
     _gsAssertEqual(expression1, expression2, accuracy: accuracy, message, file: file, line: line)
 }
 
+/// Records a failure unless the values differ by at most `accuracy`.
 public func XCTAssertEqual<T: Numeric>(_ expression1: @autoclosure () throws -> T,
                                        _ expression2: @autoclosure () throws -> T,
                                        accuracy: T,
@@ -181,6 +190,7 @@ public func XCTAssertEqual<T: Numeric>(_ expression1: @autoclosure () throws -> 
     _gsAssertEqual(expression1, expression2, accuracy: accuracy, message, file: file, line: line)
 }
 
+/// Records a failure if the values differ by at most `accuracy`.
 public func XCTAssertNotEqual<T: FloatingPoint>(_ expression1: @autoclosure () throws -> T,
                                                 _ expression2: @autoclosure () throws -> T,
                                                 accuracy: T,
@@ -189,6 +199,7 @@ public func XCTAssertNotEqual<T: FloatingPoint>(_ expression1: @autoclosure () t
     _gsAssertNotEqual(expression1, expression2, accuracy: accuracy, message, file: file, line: line)
 }
 
+/// Records a failure if the values differ by at most `accuracy`.
 public func XCTAssertNotEqual<T: Numeric>(_ expression1: @autoclosure () throws -> T,
                                           _ expression2: @autoclosure () throws -> T,
                                           accuracy: T,
@@ -211,6 +222,7 @@ private func _gsCompare<T: Comparable>(_ name: String, _ expression1: () throws 
     }
 }
 
+/// Records a failure unless the first value is greater than the second.
 public func XCTAssertGreaterThan<T: Comparable>(_ expression1: @autoclosure () throws -> T,
                                                 _ expression2: @autoclosure () throws -> T,
                                                 _ message: @autoclosure () -> String = "",
@@ -219,6 +231,7 @@ public func XCTAssertGreaterThan<T: Comparable>(_ expression1: @autoclosure () t
                holds: { $0 > $1 }, relation: "greater than")
 }
 
+/// Records a failure unless the first value is greater than or equal to the second.
 public func XCTAssertGreaterThanOrEqual<T: Comparable>(_ expression1: @autoclosure () throws -> T,
                                                        _ expression2: @autoclosure () throws -> T,
                                                        _ message: @autoclosure () -> String = "",
@@ -227,6 +240,7 @@ public func XCTAssertGreaterThanOrEqual<T: Comparable>(_ expression1: @autoclosu
                holds: { $0 >= $1 }, relation: "greater than or equal to")
 }
 
+/// Records a failure unless the first value is less than the second.
 public func XCTAssertLessThan<T: Comparable>(_ expression1: @autoclosure () throws -> T,
                                              _ expression2: @autoclosure () throws -> T,
                                              _ message: @autoclosure () -> String = "",
@@ -235,6 +249,7 @@ public func XCTAssertLessThan<T: Comparable>(_ expression1: @autoclosure () thro
                holds: { $0 < $1 }, relation: "less than")
 }
 
+/// Records a failure unless the first value is less than or equal to the second.
 public func XCTAssertLessThanOrEqual<T: Comparable>(_ expression1: @autoclosure () throws -> T,
                                                     _ expression2: @autoclosure () throws -> T,
                                                     _ message: @autoclosure () -> String = "",
@@ -245,6 +260,7 @@ public func XCTAssertLessThanOrEqual<T: Comparable>(_ expression1: @autoclosure 
 
 // MARK: Identity
 
+/// Records a failure unless both are the same object (`===`), or both `nil`.
 public func XCTAssertIdentical(_ expression1: @autoclosure () throws -> AnyObject?,
                                _ expression2: @autoclosure () throws -> AnyObject?,
                                _ message: @autoclosure () -> String = "",
@@ -257,6 +273,7 @@ public func XCTAssertIdentical(_ expression1: @autoclosure () throws -> AnyObjec
     }
 }
 
+/// Records a failure if both are the same object (`===`), or both `nil`.
 public func XCTAssertNotIdentical(_ expression1: @autoclosure () throws -> AnyObject?,
                                   _ expression2: @autoclosure () throws -> AnyObject?,
                                   _ message: @autoclosure () -> String = "",
@@ -271,6 +288,7 @@ public func XCTAssertNotIdentical(_ expression1: @autoclosure () throws -> AnyOb
 
 // MARK: Errors
 
+/// Records a failure unless `expression` throws; `errorHandler` gets the error.
 public func XCTAssertThrowsError<T>(_ expression: @autoclosure () throws -> T,
                                     _ message: @autoclosure () -> String = "",
                                     file: StaticString = #filePath, line: UInt = #line,
@@ -286,6 +304,7 @@ public func XCTAssertThrowsError<T>(_ expression: @autoclosure () throws -> T,
     }
 }
 
+/// Records a failure, showing the error, if `expression` throws.
 public func XCTAssertNoThrow<T>(_ expression: @autoclosure () throws -> T,
                                 _ message: @autoclosure () -> String = "",
                                 file: StaticString = #filePath, line: UInt = #line) {
@@ -301,6 +320,7 @@ public func XCTAssertNoThrow<T>(_ expression: @autoclosure () throws -> T,
 
 // MARK: Fail and unwrap
 
+/// Records a failure at the caller, unconditionally.
 public func XCTFail(_ message: String = "", file: StaticString = #filePath, line: UInt = #line) {
     _gsEvaluate(nil, { message }, file, line) {
         .expectedFailure(nil)
