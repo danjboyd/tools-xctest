@@ -79,6 +79,7 @@ jobs:
       - name: Install check
         run: |
           . "$PREFIX/System/Library/Makefiles/GNUstep.sh"
+          export OBJC=clang CC=clang
           for mode in make meson; do
             .github/scripts/check-install.sh "$mode"
             .github/scripts/check-install.sh "$mode" swift
