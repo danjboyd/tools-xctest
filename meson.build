@@ -150,6 +150,17 @@ if swiftc.found()
     install: true,
     install_dir: [get_option('libdir'), get_option('includedir'), get_option('includedir')],
     build_by_default: true)
+  # The compiler that built the module, installed beside it (see
+  # XCTest/GNUmakefile).
+  swift_version_stamp = custom_target('XCTest.swiftversion',
+    output: 'XCTest.swiftversion',
+    command: [find_program('sh'), '-c',
+              '"$1" --version 2>/dev/null | sed -n -e "s/.*Swift version /Swift version /p" -e "/^Target: /p" > "$2"; grep -q "Swift version" "$2" || { rm -f "$2"; echo "$1 --version printed no Swift version" >&2; exit 1; }',
+              'sh', swiftc, '@OUTPUT@'],
+    depends: swift_overlay,
+    install: true,
+    install_dir: get_option('includedir'),
+    build_by_default: true)
 endif
 
 pkg.generate(libraries : xctest_lib,

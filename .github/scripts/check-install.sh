@@ -39,11 +39,15 @@ done)
 [ -z "$unlisted" ] || fail "headers neither in manifest.txt nor in private-headers.txt:" "$unlisted"
 
 # A stand-in swiftc: writes the files a real one would (-o, -emit-module-path
-# and the .swiftdoc beside it).
+# and the .swiftdoc beside it), and gives a version.
 swiftc_args=()
 if [ -n "$swift" ]; then
   cat > "$work/swiftc" <<'STUB'
 #!/bin/sh
+if [ "$1" = --version ]; then
+  printf 'Swift version 0.0 (stand-in)\nTarget: stand-in-target\n'
+  exit 0
+fi
 while [ "$#" -gt 0 ]; do
   case "$1" in
     -o) shift; : > "$1" ;;
@@ -90,7 +94,7 @@ classify() {
   esac
   case "$name" in
     *.pc) echo "pkgconfig $name" ;;
-    *.swiftmodule|*.swiftdoc) echo "swiftmodule $name" ;;
+    *.swiftmodule|*.swiftdoc|*.swiftversion) echo "swiftmodule $name" ;;
     *.h|module.modulemap) echo "header $(basename "$dir")/$name" ;;
     lib*.so|lib*.so.*|lib*.dylib|lib*.a|lib*.dll.a) echo "lib ${name%%.*}" ;;
     *.dll)
@@ -125,6 +129,11 @@ if [ -n "$swift" ]; then
   module=$(cd "$destdir" && find . -name XCTest.swiftmodule)
   [ -d "$destdir/$(dirname "$module")/XCTest" ] \
     || fail "XCTest.swiftmodule isn't beside the XCTest headers: $module"
+  stamp=$(cd "$destdir" && find . -name XCTest.swiftversion)
+  [ "$(dirname "$stamp")" = "$(dirname "$module")" ] \
+    || fail "XCTest.swiftversion isn't beside XCTest.swiftmodule: $stamp"
+  [ "$(cat "$destdir/$stamp")" = "$(printf 'Swift version 0.0 (stand-in)\nTarget: stand-in-target')" ] \
+    || fail "expected XCTest.swiftversion to record the compiler's version:" "$(cat "$destdir/$stamp")"
   overlay=$(cd "$destdir" && find . -name 'libXCTestSwift*' | head -n 1)
   ls "$destdir/$(dirname "$overlay")"/libXCTest.* > /dev/null 2>&1 \
     || fail "libXCTestSwift isn't beside libXCTest: $overlay"

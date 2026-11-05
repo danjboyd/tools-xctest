@@ -55,6 +55,12 @@ Objective-C interop:
   an `NSError` in `_XCT_CONTROL_FLOW_ERROR_DOMAIN` to skip the test, or to
   end it without recording the error again (Swift's `XCTSkip` and
   `XCTUnwrap` do).
+- The Swift overlay's build records its compiler (`swiftc --version`'s
+  version and target) in `XCTest.swiftversion`, installed beside
+  `XCTest.swiftmodule`. A module loads only in the compiler that built it,
+  so `xctest.make` stops a Swift test bundle built with a different one,
+  naming both, instead of failing on an unreadable module.
+  `XCTEST_SWIFT_VERSION_CHECK=no` turns the check off.
 
 Fixed:
 

@@ -46,6 +46,8 @@
 #   XCTEST_LIBRARY_DIR, XCTEST_INCLUDE_DIR
 #                              An uninstalled tools-xctest to build against
 #                              and run with (its XCTest/obj and source root).
+#   XCTEST_SWIFT_VERSION_CHECK no: don't check a Swift bundle's compiler
+#                              against the one that built the XCTest module.
 #
 # Swift test bundles: list the sources in <Bundle>_SWIFT_FILES, as for any
 # Swift target. That needs a gnustep-make with Swift support (gnustep-swift's
@@ -93,6 +95,26 @@ include $(GNUSTEP_MAKEFILES)/bundle.make
 ifneq ($(_XCTEST_SWIFT_BUNDLES),)
   ifeq ($(origin SWIFT_RUNTIME_OBJ_FILE),undefined)
     $(error xctest.make: $(_XCTEST_SWIFT_BUNDLES) has Swift sources, but this gnustep-make ($(GNUSTEP_MAKEFILES)) can't build Swift; use gnustep-swift's tools-make)
+  endif
+  # The Swift overlay's module loads only in the compiler that built it,
+  # recorded beside it in XCTest.swiftversion: the uninstalled one in
+  # XCTEST_LIBRARY_DIR, or the first installed one on the header path. A
+  # different compiler is an error here, rather than an unreadable module
+  # in the build (but not for make clean). XCTEST_SWIFT_VERSION_CHECK=no
+  # skips the check; without the file (an older tools-xctest), there's
+  # nothing to check.
+  ifneq ($(XCTEST_SWIFT_VERSION_CHECK)$(if $(MAKECMDGOALS),$(if $(filter-out clean distclean,$(MAKECMDGOALS)),,no)),no)
+    _XCTEST_SWIFT_VERSION_FILE := $(firstword $(wildcard \
+      $(if $(XCTEST_LIBRARY_DIR),$(XCTEST_LIBRARY_DIR)/XCTest.swiftversion) \
+      $(foreach domain,USER LOCAL NETWORK SYSTEM,$(GNUSTEP_$(domain)_HEADERS)/XCTest.swiftversion)))
+    ifneq ($(_XCTEST_SWIFT_VERSION_FILE),)
+      _XCTEST_SWIFT_VERSION_BUILT := $(shell cat '$(_XCTEST_SWIFT_VERSION_FILE)')
+      _XCTEST_SWIFT_VERSION_USED := $(shell $(SWIFT_FRONTEND) --version 2>/dev/null \
+        | sed -n -e 's/.*Swift version /Swift version /p' -e '/^Target: /p')
+      ifneq ($(_XCTEST_SWIFT_VERSION_BUILT),$(_XCTEST_SWIFT_VERSION_USED))
+        $(error xctest.make: $(_XCTEST_SWIFT_BUNDLES): the XCTest Swift module was built with "$(_XCTEST_SWIFT_VERSION_BUILT)" ($(_XCTEST_SWIFT_VERSION_FILE)), but this build's compiler ($(SWIFT_FRONTEND)) is "$(_XCTEST_SWIFT_VERSION_USED)"; rebuild tools-xctest's Swift overlay with this compiler, or set XCTEST_SWIFT_VERSION_CHECK=no)
+      endif
+    endif
   endif
   # bundle.make links the Swift objects but not the libraries they list.
   ifneq ($(filter $(GNUSTEP_INSTANCE),$(_XCTEST_SWIFT_BUNDLES)),)
