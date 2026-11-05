@@ -634,6 +634,38 @@ with `-lXCTestSwift -lXCTest`, and put it in a bundle whose
 first: without it the image's Swift metadata isn't registered, and protocol
 casts (including the one that gives `XCTSkip` its message) fail.
 
+### Packaging
+
+The Swift overlay can be packaged separately from the rest of tools-xctest. A
+build with it installs the same files as one without it, plus four:
+
+| File | Installed in |
+| --- | --- |
+| `XCTest.swiftmodule`, `XCTest.swiftdoc` | beside the headers' `XCTest/` directory |
+| `XCTest.swiftversion` | the same place |
+| `libXCTestSwift` | with `libXCTest` |
+| `xctest-swift-check` | with `xctest` |
+
+`module.modulemap`, `GSXCTestSwift.h` and `GSXCTestSwiftOverlay.h` are
+installed either way, so a Swift package can depend on an Objective-C one
+built from the same source, and add only these four files.
+
+The module loads only in the Swift compiler that built it. So a Swift package
+is tied to one toolchain version, where the Objective-C one isn't.
+`XCTest.swiftversion` records that compiler (the version and target from
+`swiftc --version`). When a Swift test bundle is built with a different
+compiler, `xctest.make` stops and names both. `XCTEST_SWIFT_VERSION_CHECK=no`
+turns the check off.
+
+`xctest-swift-check` is a smoke test for an install, e.g. in a package's CI.
+It builds a small Swift test bundle with the installed `xctest.make` and
+runs it. It needs the same gnustep-make as any Swift test bundle; `--keep`
+leaves the bundle for a look.
+
+CI checks what `make install DESTDIR=...` and `meson install --destdir`
+install, with and without the overlay, against `Tests/Install/manifest.txt`
+(`.github/scripts/check-install.sh`).
+
 ## Running tests
 
 Besides `-XCTest`, the runner takes Apple's `xcodebuild` filter syntax for

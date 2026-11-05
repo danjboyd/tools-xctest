@@ -72,17 +72,20 @@ obj/libXCTestSwift$(SHARED_LIBEXT): $(XCTEST_SWIFT_SOURCES) obj/libXCTest$(SHARE
 	  -emit-library -emit-module -emit-module-path obj/XCTest.swiftmodule \
 	  $(XCTEST_SWIFT_SOURCES) -L./obj -lXCTest -o $@$(END_ECHO)
 
-# (GNUSTEP_HEADERS and GNUSTEP_LIBRARIES already include DESTDIR.)
+# With it, xctest-swift-check, a smoke test of the install. (GNUSTEP_HEADERS,
+# GNUSTEP_LIBRARIES and GNUSTEP_TOOLS already include DESTDIR.)
 after-install::
 	$(MKDIRS) $(GNUSTEP_HEADERS) $(GNUSTEP_LIBRARIES)
 	$(INSTALL_DATA) obj/XCTest.swiftmodule $(GNUSTEP_HEADERS)/XCTest.swiftmodule
 	$(INSTALL_DATA) obj/XCTest.swiftdoc $(GNUSTEP_HEADERS)/XCTest.swiftdoc
 	$(INSTALL_DATA) obj/XCTest.swiftversion $(GNUSTEP_HEADERS)/XCTest.swiftversion
+	$(MKDIRS) $(GNUSTEP_TOOLS)
+	$(INSTALL_PROGRAM) ../xctest-swift-check $(GNUSTEP_TOOLS)/xctest-swift-check
 	$(INSTALL_PROGRAM) obj/libXCTestSwift$(SHARED_LIBEXT) $(GNUSTEP_LIBRARIES)/libXCTestSwift$(SHARED_LIBEXT)
 
 after-uninstall::
 	rm -f $(GNUSTEP_HEADERS)/XCTest.swiftmodule $(GNUSTEP_HEADERS)/XCTest.swiftdoc \
-	  $(GNUSTEP_HEADERS)/XCTest.swiftversion \
+	  $(GNUSTEP_HEADERS)/XCTest.swiftversion $(GNUSTEP_TOOLS)/xctest-swift-check \
 	  $(GNUSTEP_LIBRARIES)/libXCTestSwift$(SHARED_LIBEXT)
 
 after-clean::
