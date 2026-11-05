@@ -93,7 +93,11 @@ classify() {
     *.swiftmodule|*.swiftdoc) echo "swiftmodule $name" ;;
     *.h|module.modulemap) echo "header $(basename "$dir")/$name" ;;
     lib*.so|lib*.so.*|lib*.dylib|lib*.a|lib*.dll.a) echo "lib ${name%%.*}" ;;
-    *.dll) echo "lib ${name%%.*}" ;;
+    *.dll)
+      # gnustep-make names it XCTest-0.dll (with libXCTest.dll.a to link).
+      name=${name%.dll}
+      name=${name%-[0-9]*}
+      echo "lib lib${name#lib}" ;;
     *) echo "tool ${name%.exe}" ;;
   esac
 }
