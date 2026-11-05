@@ -1,0 +1,37 @@
+# What `make install` and `meson install` put in DESTDIR, by role, whatever
+# the layout. Checked by .github/scripts/check-install.sh. A line tagged
+# "swift" is installed only with the Swift overlay (XCTEST_SWIFTC, or
+# -Dswift=enabled); "meson" only by Meson; "host" not on Windows.
+# An XCTest/*.h not listed here must be in private-headers.txt.
+header XCTest/GSXCTestRunner.h
+header XCTest/GSXCTestSwift.h
+header XCTest/GSXCTestSwiftOverlay.h
+header XCTest/module.modulemap
+header XCTest/XCAbstractTest.h
+header XCTest/XCTActivity.h
+header XCTest/XCTAttachment.h
+header XCTest/XCTContext.h
+header XCTest/XCTestAssertions.h
+header XCTest/XCTestAssertionsImpl.h
+header XCTest/XCTestCase+AsynchronousTesting.h
+header XCTest/XCTestCase.h
+header XCTest/XCTestErrors.h
+header XCTest/XCTestExpectation.h
+header XCTest/XCTest.h
+header XCTest/XCTestObservationCenter.h
+header XCTest/XCTestObservation.h
+header XCTest/XCTestRun.h
+header XCTest/XCTestSuite.h
+header XCTest/XCTExpectedFailure.h
+header XCTest/XCTIssue.h
+header XCTest/XCTMetric.h
+header XCTest/XCTWaiter.h
+lib libXCTest
+lib libXCTestHost host
+tool xctest
+tool xctest-bundle
+makefile Auxiliary/xctest.make
+pkgconfig XCTest.pc meson
+swiftmodule XCTest.swiftmodule swift
+swiftmodule XCTest.swiftdoc swift
+lib libXCTestSwift swift

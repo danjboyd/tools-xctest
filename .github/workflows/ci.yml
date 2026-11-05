@@ -74,6 +74,16 @@ jobs:
           meson compile -C build-meson
           xvfb-run -a meson test -C build-meson --print-errorlogs
 
+      # What each build system installs, with and without the Swift overlay
+      # (built by a stand-in swiftc), against Tests/Install/manifest.txt.
+      - name: Install check
+        run: |
+          . "$PREFIX/System/Library/Makefiles/GNUstep.sh"
+          for mode in make meson; do
+            .github/scripts/check-install.sh "$mode"
+            .github/scripts/check-install.sh "$mode" swift
+          done
+
   windows:
     name: Windows (MSYS2 clang64)
     runs-on: windows-latest
@@ -117,3 +127,9 @@ jobs:
           . /clang64/share/GNUstep/Makefiles/GNUstep.sh
           export ADDITIONAL_CPPFLAGS=-DHAVE_MODE_T
           make check
+
+      - name: Install check
+        run: |
+          . /clang64/share/GNUstep/Makefiles/GNUstep.sh
+          export ADDITIONAL_CPPFLAGS=-DHAVE_MODE_T
+          .github/scripts/check-install.sh make

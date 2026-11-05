@@ -1,0 +1,4 @@
+# XCTest/*.h that aren't installed (see manifest.txt).
+GSXCTStatistics.h
+GSXCTestReporting.h
+XCTestPrivate.h
