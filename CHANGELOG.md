@@ -62,6 +62,10 @@ Fixed:
   a wait no longer unwinds the callback, which left libdispatch's main queue
   stuck, so later waits on it timed out, or was swallowed by an `NSTimer`, so
   the wait itself timed out. The test now stops when the wait returns.
+- gnustep-make's `make install DESTDIR=...` put the Swift overlay
+  (`XCTest.swiftmodule`, `XCTest.swiftdoc`, `libXCTestSwift`) under DESTDIR
+  twice. CI now checks what `make install` and `meson install` install, with
+  and without the overlay, against `Tests/Install/manifest.txt`.
 
 ## 0.6.0
 
