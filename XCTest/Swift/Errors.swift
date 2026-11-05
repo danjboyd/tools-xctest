@@ -57,6 +57,7 @@ public struct XCTSkip: Error, CustomNSError {
         self.line = line
     }
 
+    /// A skip, with an optional message; throw it to skip the rest of the test.
     public init(_ message: @autoclosure () -> String? = nil,
                 file: StaticString = #filePath, line: UInt = #line) {
         self.init(explanation: nil, message: message(), file: file, line: line)
@@ -74,20 +75,25 @@ public struct XCTSkip: Error, CustomNSError {
         self.init(explanation: "threw error \"\(error)\"", message: message, file: file, line: line)
     }
 
+    /// The domain tools-xctest uses for skips and other control-flow errors.
     public static var errorDomain: String { _gsControlFlowErrorDomain }
+    /// The code for a skip in that domain.
     public var errorCode: Int { _GSControlFlowCode.skip.rawValue }
+    /// The message, file and line, under the keys the runner reads.
     public var errorUserInfo: [String: Any] {
         // The keys the runner reads for an Objective-C skip, too.
         ["message": summary, "file": file, "line": NSNumber(value: line)]
     }
 }
 
+/// Throws `XCTSkip` with `message` if `expression` is true.
 public func XCTSkipIf(_ expression: @autoclosure () throws -> Bool,
                       _ message: @autoclosure () -> String? = nil,
                       file: StaticString = #filePath, line: UInt = #line) throws {
     try _gsSkip(on: true, expression, message, file: file, line: line)
 }
 
+/// Throws `XCTSkip` with `message` unless `expression` is true.
 public func XCTSkipUnless(_ expression: @autoclosure () throws -> Bool,
                           _ message: @autoclosure () -> String? = nil,
                           file: StaticString = #filePath, line: UInt = #line) throws {

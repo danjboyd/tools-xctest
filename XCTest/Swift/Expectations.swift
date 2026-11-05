@@ -35,11 +35,13 @@
 import Foundation
 
 extension XCTestCase {
+    /// An expectation, fulfilled with `fulfill()`, for `wait(for:timeout:)` or `fulfillment(of:timeout:)` to wait on.
     @nonobjc
     public func expectation(description: String) -> XCTestExpectation {
         return expectation(withDescription: description)
     }
 
+    /// Runs the run loop until every expectation is fulfilled, or records a failure after `seconds`. Not from `async` code: use `fulfillment(of:timeout:enforceOrder:)`.
     @nonobjc
     @available(*, noasync, message: "Use await fulfillment(of:timeout:enforceOrder:) instead.")
     public func wait(for expectations: [XCTestExpectation], timeout seconds: Double,
@@ -47,6 +49,7 @@ extension XCTestCase {
         wait(forExpectations: expectations, timeout: seconds, enforceOrder: enforceOrderOfFulfillment)
     }
 
+    /// Waits, as `wait(for:timeout:)` does, on every expectation this test made.
     @nonobjc
     @available(*, noasync, message: "Use await fulfillment(of:timeout:enforceOrder:) instead.")
     public func waitForExpectations(timeout: Double, handler: XCWaitCompletionHandler? = nil) {
@@ -77,6 +80,7 @@ extension XCTestCase {
         return imported!
     }
 
+    /// An expectation fulfilled once `predicate` is true of `object`, checked while waiting.
     @nonobjc
     public func expectation(for predicate: NSPredicate, evaluatedWith object: Any? = nil,
                             handler: XCPredicateExpectationHandler? = nil) -> XCTestExpectation {
@@ -85,6 +89,7 @@ extension XCTestCase {
         return imported!
     }
 
+    /// An expectation fulfilled once `keyPath` of `objectToObserve` equals `expectedValue` (on any change, if `nil`).
     @nonobjc
     public func keyValueObservingExpectation(for objectToObserve: Any, keyPath: String,
                                              expectedValue: Any?) -> XCTestExpectation {
@@ -94,6 +99,7 @@ extension XCTestCase {
         return imported!
     }
 
+    /// An expectation fulfilled when `keyPath` of `objectToObserve` changes, if `handler` (when given) returns true.
     @nonobjc
     public func keyValueObservingExpectation(for objectToObserve: Any, keyPath: String,
                                              handler: XCKVOExpectationHandler? = nil) -> XCTestExpectation {
@@ -124,8 +130,10 @@ extension XCTestCase {
 }
 
 extension XCTWaiter {
+    /// How a wait ended: `.completed`, `.timedOut`, `.incorrectOrder`, ...
     public typealias Result = XCTWaiterResult
 
+    /// Waits as `XCTestCase.wait(for:timeout:)` does, but returns how the wait ended instead of recording a failure.
     @nonobjc
     @available(*, noasync, message: "Use await fulfillment(of:timeout:enforceOrder:) instead.")
     @discardableResult
@@ -134,6 +142,7 @@ extension XCTWaiter {
         return wait(forExpectations: expectations, timeout: seconds, enforceOrder: enforceOrderOfFulfillment)
     }
 
+    /// Waits with a new waiter; see `wait(for:timeout:enforceOrder:)`.
     @nonobjc
     @available(*, noasync, message: "Use await fulfillment(of:timeout:enforceOrder:) instead.")
     @discardableResult
@@ -154,6 +163,7 @@ extension XCTWaiter {
         }
     }
 
+    /// Waits with a new waiter; see `fulfillment(of:timeout:enforceOrder:)`.
     @nonobjc
     public class func fulfillment(of expectations: [XCTestExpectation], timeout seconds: Double = .infinity,
                                   enforceOrder enforceOrderOfFulfillment: Bool = false) async -> Result {
