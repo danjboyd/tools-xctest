@@ -55,6 +55,10 @@ mkdir -p "$tools/bin" "$tools/resource/linux/$(uname -m)" "$tools/empty"
 cat > "$tools/bin/swift-frontend" <<'EOF'
 #!/bin/sh
 # Records its arguments, then compiles the primary file as Objective-C.
+if [ "$1" = --version ]; then
+  printf 'Stand-in Swift version 1.0 (stand-in)\nTarget: stand-in-target\n'
+  exit 0
+fi
 printf '%s\n' "$*" >> "$(dirname "$0")/frontend.log"
 primary=; out=; xcc=
 while [ $# -gt 0 ]; do
@@ -128,6 +132,25 @@ touch "$fixture/obj/SwiftMakeTests.obj/FirstTests.swift.autolink"
 swift_make all
 assert_status 0
 assert_contains "-o ./SwiftMakeTests.xctest/./SwiftMakeTests"
+
+# The XCTest module's compiler (XCTest.swiftversion, beside the overlay)
+# must be this build's. A copy of the library directory gets the file.
+lib_copy="$work_dir/lib"
+cp -a "$xctest_lib_dir" "$lib_copy"
+printf 'Swift version 0.9 (older)\nTarget: stand-in-target\n' > "$lib_copy/XCTest.swiftversion"
+swift_make all XCTEST_LIBRARY_DIR="$lib_copy"
+[ "$status" -ne 0 ] || fail "expected a Swift bundle built with a different compiler from the XCTest module's to fail"
+assert_contains "xctest.make: SwiftMakeTests: the XCTest Swift module was built with \"Swift version 0.9 (older) Target: stand-in-target\" ($lib_copy/XCTest.swiftversion)"
+assert_contains "this build's compiler ($tools/bin/swift-frontend) is \"Swift version 1.0 (stand-in) Target: stand-in-target\""
+# make clean still works.
+swift_make clean XCTEST_LIBRARY_DIR="$lib_copy"
+assert_status 0
+swift_make all XCTEST_LIBRARY_DIR="$lib_copy" XCTEST_SWIFT_VERSION_CHECK=no
+assert_status 0
+"$tools/bin/swift-frontend" --version > "$lib_copy/XCTest.swiftversion"
+sed -i 's/^Stand-in //' "$lib_copy/XCTest.swiftversion"
+swift_make clean all XCTEST_LIBRARY_DIR="$lib_copy"
+assert_status 0
 
 # It loads into xctest and its tests run.
 swift_make check

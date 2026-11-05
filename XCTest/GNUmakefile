@@ -51,7 +51,18 @@ XCTEST_SWIFT_SOURCES = Swift/Bridge.swift Swift/Assertions.swift Swift/Errors.sw
 _XCTEST_SWIFT_OBJC_LIB_DIRS = $(if $(GNUSTEP_SWIFT_LIBOBJC2_LIBDIR),-L$(GNUSTEP_SWIFT_LIBOBJC2_LIBDIR)) \
   $(GNUSTEP_LIBRARIES_FLAGS)
 
-after-all:: obj/libXCTestSwift$(SHARED_LIBEXT)
+after-all:: obj/libXCTestSwift$(SHARED_LIBEXT) obj/XCTest.swiftversion
+
+# The compiler that built the module, installed beside it: a .swiftmodule
+# loads only in the same Swift compiler, and xctest.make compares this with
+# the one building a Swift test bundle.
+# Its "Swift version ..." and "Target: ..." lines (xctest.make filters the
+# same way).
+_XCTEST_SWIFT_VERSION_FILTER = sed -n -e 's/.*Swift version /Swift version /p' -e '/^Target: /p'
+obj/XCTest.swiftversion: obj/libXCTestSwift$(SHARED_LIBEXT)
+	$(ECHO_NOTHING)$(XCTEST_SWIFTC) --version 2>/dev/null | $(_XCTEST_SWIFT_VERSION_FILTER) > $@; \
+	  grep -q 'Swift version' $@ \
+	  || { rm -f $@; echo "$(XCTEST_SWIFTC) --version printed no Swift version" >&2; exit 1; }$(END_ECHO)
 
 obj/libXCTestSwift$(SHARED_LIBEXT): $(XCTEST_SWIFT_SOURCES) obj/libXCTest$(SHARED_LIBEXT) $(XCTest_HEADER_FILES)
 	$(ECHO_NOTHING)echo " Compiling the Swift overlay ..."; \
@@ -66,12 +77,14 @@ after-install::
 	$(MKDIRS) $(GNUSTEP_HEADERS) $(GNUSTEP_LIBRARIES)
 	$(INSTALL_DATA) obj/XCTest.swiftmodule $(GNUSTEP_HEADERS)/XCTest.swiftmodule
 	$(INSTALL_DATA) obj/XCTest.swiftdoc $(GNUSTEP_HEADERS)/XCTest.swiftdoc
+	$(INSTALL_DATA) obj/XCTest.swiftversion $(GNUSTEP_HEADERS)/XCTest.swiftversion
 	$(INSTALL_PROGRAM) obj/libXCTestSwift$(SHARED_LIBEXT) $(GNUSTEP_LIBRARIES)/libXCTestSwift$(SHARED_LIBEXT)
 
 after-uninstall::
 	rm -f $(GNUSTEP_HEADERS)/XCTest.swiftmodule $(GNUSTEP_HEADERS)/XCTest.swiftdoc \
+	  $(GNUSTEP_HEADERS)/XCTest.swiftversion \
 	  $(GNUSTEP_LIBRARIES)/libXCTestSwift$(SHARED_LIBEXT)
 
 after-clean::
-	rm -f obj/libXCTestSwift$(SHARED_LIBEXT) obj/XCTest.swiftmodule obj/XCTest.swiftdoc
+	rm -f obj/libXCTestSwift$(SHARED_LIBEXT) obj/XCTest.swiftmodule obj/XCTest.swiftdoc obj/XCTest.swiftversion
 endif

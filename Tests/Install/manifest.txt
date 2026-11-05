@@ -34,4 +34,5 @@ makefile Auxiliary/xctest.make
 pkgconfig XCTest.pc meson
 swiftmodule XCTest.swiftmodule swift
 swiftmodule XCTest.swiftdoc swift
+swiftmodule XCTest.swiftversion swift
 lib libXCTestSwift swift
