@@ -1,0 +1,102 @@
+#!/bin/sh
+# xctest-swift-check [--keep]
+#
+# Builds a small Swift test bundle with the installed tools-xctest (its
+# Swift overlay and xctest.make) and gnustep-make, runs it with xctest, and
+# checks its tests passed: a smoke test of a Swift-capable install, e.g.
+# for a package's own CI. It needs gnustep-swift's tools-make (with its
+# GNUSTEP_SWIFT_* profile) as GNUSTEP_MAKEFILES, or found by gnustep-config.
+#
+# --keep leaves the bundle's directory, and says where it is.
+#
+# For tools-xctest's own tests: XCTEST_SWIFT_CHECK_SOURCE names a file used
+# as the test source instead, and XCTEST_SWIFT_CHECK_TESTS the number of
+# tests it has; extra make arguments can go in XCTEST_SWIFT_CHECK_MAKEFLAGS,
+# and XCTEST_MAKE names an xctest.make to use.
+
+set -eu
+
+keep=
+case "${1:-}" in
+  --keep) keep=1 ;;
+  "") ;;
+  *) echo "usage: xctest-swift-check [--keep]" >&2; exit 2 ;;
+esac
+
+die() {
+  echo "xctest-swift-check: $*" >&2
+  exit 1
+}
+
+makefiles=${GNUSTEP_MAKEFILES:-$(gnustep-config --variable=GNUSTEP_MAKEFILES 2>/dev/null || true)}
+[ -n "$makefiles" ] || die "no gnustep-make: set GNUSTEP_MAKEFILES, or put gnustep-config on PATH"
+xctest_make=${XCTEST_MAKE:-$makefiles/Auxiliary/xctest.make}
+[ -f "$xctest_make" ] \
+  || die "no $xctest_make: is tools-xctest installed with this gnustep-make?"
+
+work=$(mktemp -d "${TMPDIR:-/tmp}/xctest-swift-check.XXXXXX")
+if [ -n "$keep" ]; then
+  trap 'echo "xctest-swift-check: left $work"' EXIT
+else
+  trap 'rm -rf "$work"' EXIT
+fi
+
+cat > "$work/GNUmakefile" <<'MAKE'
+include $(GNUSTEP_MAKEFILES)/common.make
+
+XCTEST_BUNDLE_NAME = SwiftCheck
+SwiftCheck_SWIFT_FILES = SwiftCheckTests.swift
+
+XCTEST_MAKE ?= $(GNUSTEP_MAKEFILES)/Auxiliary/xctest.make
+include $(XCTEST_MAKE)
+MAKE
+
+if [ -n "${XCTEST_SWIFT_CHECK_SOURCE:-}" ]; then
+  cp "$XCTEST_SWIFT_CHECK_SOURCE" "$work/SwiftCheckTests.swift"
+  tests=${XCTEST_SWIFT_CHECK_TESTS:?set XCTEST_SWIFT_CHECK_TESTS with XCTEST_SWIFT_CHECK_SOURCE}
+else
+  tests=4
+  cat > "$work/SwiftCheckTests.swift" <<'SWIFT'
+import XCTest
+
+final class SwiftCheckTests: XCTestCase {
+    func testAssertions() {
+        XCTAssertEqual(1 + 1, 2)
+        XCTAssertTrue([1, 2, 3].contains(2))
+        XCTAssertNil(Int("not a number"))
+    }
+
+    func testThrows() throws {
+        let value: Int? = 3
+        XCTAssertEqual(try XCTUnwrap(value), 3)
+    }
+
+    func testExpectation() {
+        let fulfilled = expectation(description: "fulfilled")
+        fulfilled.fulfill()
+        wait(for: [fulfilled], timeout: 1)
+    }
+
+    func testAsync() async {
+        let value = await Task { 21 * 2 }.value
+        XCTAssertEqual(value, 42)
+    }
+}
+SWIFT
+fi
+
+# shellcheck disable=SC2086
+if ! make -C "$work" GNUSTEP_MAKEFILES="$makefiles" XCTEST_MAKE="$xctest_make" \
+     XCTEST_FLAGS="-output-format apple" ${XCTEST_SWIFT_CHECK_MAKEFLAGS:-} check \
+     > "$work/make.log" 2>&1; then
+  cat "$work/make.log" >&2
+  die "the Swift test bundle didn't build or its tests failed (output above)"
+fi
+
+summary=$(grep -E "Executed $tests tests?, with 0 failures" "$work/make.log" | tail -n 1 || true)
+if [ -z "$summary" ]; then
+  cat "$work/make.log" >&2
+  die "expected $tests tests to run and pass (output above)"
+fi
+
+echo "xctest-swift-check: OK, $tests tests passed in a Swift test bundle."

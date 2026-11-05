@@ -36,3 +36,4 @@ swiftmodule XCTest.swiftmodule swift
 swiftmodule XCTest.swiftdoc swift
 swiftmodule XCTest.swiftversion swift
 lib libXCTestSwift swift
+tool xctest-swift-check swift

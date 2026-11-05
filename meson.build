@@ -161,6 +161,8 @@ if swiftc.found()
     install: true,
     install_dir: get_option('includedir'),
     build_by_default: true)
+  # A smoke test of the install, for a package's CI.
+  install_data('xctest-swift-check', install_dir: get_option('bindir'), install_mode: 'rwxr-xr-x')
 endif
 
 pkg.generate(libraries : xctest_lib,

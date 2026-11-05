@@ -61,6 +61,10 @@ Objective-C interop:
   so `xctest.make` stops a Swift test bundle built with a different one,
   naming both, instead of failing on an unreadable module.
   `XCTEST_SWIFT_VERSION_CHECK=no` turns the check off.
+- `xctest-swift-check`, installed with the Swift overlay, builds a small
+  Swift test bundle with the installed tools-xctest and gnustep-swift's
+  tools-make, runs it, and checks its four tests passed: a smoke test of a
+  Swift-capable install, e.g. for a package's CI. `--keep` leaves the bundle.
 
 Fixed:
 

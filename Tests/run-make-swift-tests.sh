@@ -43,7 +43,46 @@ assert_contains "can't build Swift"
 
 if [ -z "${XCTEST_SWIFT_MAKEFILES:-}" ]; then
   echo "Skipping the build with gnustep-swift's tools-make: set XCTEST_SWIFT_MAKEFILES."
-  echo "xctest.make Swift regressions passed."
+  # xctest-swift-check (the installed smoke test) builds and runs a bundle
+# through xctest.make. Here its source is the fixture's (Objective-C, for
+# the stand-in compiler).
+check_env() {
+  XCTEST_MAKE="$source_root/xctest.make" \
+  XCTEST_SWIFT_CHECK_SOURCE="$fixture/FirstTests.swift" XCTEST_SWIFT_CHECK_TESTS=1 \
+  XCTEST_SWIFT_CHECK_MAKEFLAGS="messages=yes XCTEST_LIBRARY_DIR=$xctest_lib_dir XCTEST_INCLUDE_DIR=$source_root XCTEST=$xctest_bin ADDITIONAL_LIB_DIRS=$(printf -- '-L%s ' ${runtime_lib_dirs//:/ } | sed 's/ $//')" \
+  GNUSTEP_SWIFT_SWIFT_FRONTEND="$tools/bin/swift-frontend" \
+  GNUSTEP_SWIFT_REAL_SWIFTC="$tools/bin/swiftc" \
+  GNUSTEP_SWIFT_RESOURCE_DIR="$tools/resource" \
+  GNUSTEP_SWIFT_GNUSTEP_HEADERS="$tools/empty" \
+  GNUSTEP_SWIFT_GNUSTEP_MODULEMAP="$tools/empty.modulemap" \
+  GNUSTEP_SWIFT_LIBOBJC2_SRC="$tools/empty" \
+  GNUSTEP_SWIFT_LIBOBJC2_CONFIG_INCLUDE="$tools/empty" \
+  GNUSTEP_SWIFT_LIBOBJC2_LIBDIR="$tools/empty" \
+    "$@"
+}
+set +e
+output=$(check_env env GNUSTEP_MAKEFILES="$XCTEST_SWIFT_MAKEFILES" "$source_root/xctest-swift-check" 2>&1)
+status=$?
+set -e
+assert_status 0
+assert_contains "xctest-swift-check: OK, 1 tests passed in a Swift test bundle."
+# The wrong number of tests is a failure.
+set +e
+output=$(check_env env GNUSTEP_MAKEFILES="$XCTEST_SWIFT_MAKEFILES" XCTEST_SWIFT_CHECK_TESTS=2 "$source_root/xctest-swift-check" 2>&1)
+status=$?
+set -e
+[ "$status" -ne 0 ] || fail "expected xctest-swift-check to fail when the wrong number of tests ran"
+assert_contains "xctest-swift-check: expected 2 tests to run and pass"
+# A gnustep-make without Swift support.
+set +e
+output=$(check_env env GNUSTEP_MAKEFILES="$GNUSTEP_MAKEFILES" "$source_root/xctest-swift-check" 2>&1)
+status=$?
+set -e
+[ "$status" -ne 0 ] || fail "expected xctest-swift-check to fail without Swift support"
+assert_contains "can't build Swift"
+assert_contains "xctest-swift-check: the Swift test bundle didn't build or its tests failed"
+
+echo "xctest.make Swift regressions passed."
   exit 0
 fi
 
@@ -157,5 +196,44 @@ swift_make check
 assert_status 0
 assert_contains "swift-make: FirstTests.testFirst ran"
 assert_contains "swift-make: SecondTests.testSecond ran"
+
+# xctest-swift-check (the installed smoke test) builds and runs a bundle
+# through xctest.make. Here its source is the fixture's (Objective-C, for
+# the stand-in compiler).
+check_env() {
+  XCTEST_MAKE="$source_root/xctest.make" \
+  XCTEST_SWIFT_CHECK_SOURCE="$fixture/FirstTests.swift" XCTEST_SWIFT_CHECK_TESTS=1 \
+  XCTEST_SWIFT_CHECK_MAKEFLAGS="messages=yes XCTEST_LIBRARY_DIR=$xctest_lib_dir XCTEST_INCLUDE_DIR=$source_root XCTEST=$xctest_bin ADDITIONAL_LIB_DIRS=$(printf -- '-L%s ' ${runtime_lib_dirs//:/ } | sed 's/ $//')" \
+  GNUSTEP_SWIFT_SWIFT_FRONTEND="$tools/bin/swift-frontend" \
+  GNUSTEP_SWIFT_REAL_SWIFTC="$tools/bin/swiftc" \
+  GNUSTEP_SWIFT_RESOURCE_DIR="$tools/resource" \
+  GNUSTEP_SWIFT_GNUSTEP_HEADERS="$tools/empty" \
+  GNUSTEP_SWIFT_GNUSTEP_MODULEMAP="$tools/empty.modulemap" \
+  GNUSTEP_SWIFT_LIBOBJC2_SRC="$tools/empty" \
+  GNUSTEP_SWIFT_LIBOBJC2_CONFIG_INCLUDE="$tools/empty" \
+  GNUSTEP_SWIFT_LIBOBJC2_LIBDIR="$tools/empty" \
+    "$@"
+}
+set +e
+output=$(check_env env GNUSTEP_MAKEFILES="$XCTEST_SWIFT_MAKEFILES" "$source_root/xctest-swift-check" 2>&1)
+status=$?
+set -e
+assert_status 0
+assert_contains "xctest-swift-check: OK, 1 tests passed in a Swift test bundle."
+# The wrong number of tests is a failure.
+set +e
+output=$(check_env env GNUSTEP_MAKEFILES="$XCTEST_SWIFT_MAKEFILES" XCTEST_SWIFT_CHECK_TESTS=2 "$source_root/xctest-swift-check" 2>&1)
+status=$?
+set -e
+[ "$status" -ne 0 ] || fail "expected xctest-swift-check to fail when the wrong number of tests ran"
+assert_contains "xctest-swift-check: expected 2 tests to run and pass"
+# A gnustep-make without Swift support.
+set +e
+output=$(check_env env GNUSTEP_MAKEFILES="$GNUSTEP_MAKEFILES" "$source_root/xctest-swift-check" 2>&1)
+status=$?
+set -e
+[ "$status" -ne 0 ] || fail "expected xctest-swift-check to fail without Swift support"
+assert_contains "can't build Swift"
+assert_contains "xctest-swift-check: the Swift test bundle didn't build or its tests failed"
 
 echo "xctest.make Swift regressions passed."
