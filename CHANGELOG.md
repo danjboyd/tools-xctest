@@ -3,7 +3,12 @@
 Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 `vX.Y.Z`; 0.1.x are upstream's (gnustep/tools-xctest).
 
-## Unreleased
+## 0.7.0
+
+Swift test targets: with a Swift toolchain that has GNUstep's Objective-C
+interop, Swift test classes are built with `xctest.make` and run by
+`xctest`, with an optional Swift overlay for Apple's Swift names. Without
+such a toolchain, nothing changes: the Swift parts aren't built.
 
 For Swift test targets, which need a Swift toolchain with GNUstep's
 Objective-C interop:
