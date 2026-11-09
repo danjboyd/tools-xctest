@@ -24,7 +24,9 @@
 #include <io.h>
 #else
 #include <dlfcn.h>
+#include <limits.h>
 #include <signal.h>
+#include <unistd.h>
 #endif
 #include <stdio.h>
 
@@ -73,6 +75,10 @@ static void PrintUsage(FILE *stream)
     fprintf(stream, "                              (default 600; implies -test-timeouts-enabled YES)\n");
     fprintf(stream, "  -maximum-test-execution-time-allowance <s>  Cap on any test's allowance\n");
     fprintf(stream, "                              (implies -test-timeouts-enabled YES)\n");
+    fprintf(stream, "  -enable-code-coverage YES|NO  Write a code coverage profile of the run (default NO;\n");
+    fprintf(stream, "                              build the code with -fprofile-instr-generate -fcoverage-mapping)\n");
+    fprintf(stream, "  -coverage-output <dir>      Where to write it, as <dir>/<target>.profdata (default:\n");
+    fprintf(stream, "                              coverage; implies -enable-code-coverage YES)\n");
     fprintf(stream, "  -h, --help                  Show this help message\n");
 }
 
@@ -93,6 +99,200 @@ static NSString *TargetNameForBundlePath(NSString *testBundlePath)
 {
     NSString *bundleName = [[testBundlePath lastPathComponent] stringByDeletingPathExtension];
     return [bundleName length] > 0 ? bundleName : nil;
+}
+
+// This program, to run the tests again under coverage.
+static NSString *ExecutablePath(void)
+{
+#if defined(_WIN32)
+    NSString *executable = [[NSBundle mainBundle] executablePath];
+
+    return executable != nil ? executable : [[[NSProcessInfo processInfo] arguments] objectAtIndex:0];
+#else
+    char path[PATH_MAX];
+    ssize_t length = readlink("/proc/self/exe", path, sizeof(path) - 1);
+
+    if (length <= 0) {
+        return [[[NSProcessInfo processInfo] arguments] objectAtIndex:0];
+    }
+    path[length] = '\0';
+    return [NSString stringWithUTF8String:path];
+#endif
+}
+
+// llvm-profdata: XCTEST_LLVM_PROFDATA, else the first llvm-profdata on PATH,
+// else the highest-numbered llvm-profdata-<n> (as Debian installs it).
+static NSString *ProfdataPath(void)
+{
+    const char *override = getenv("XCTEST_LLVM_PROFDATA");
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSString *searchPath = [[[NSProcessInfo processInfo] environment] objectForKey:@"PATH"];
+#if defined(_WIN32)
+    NSString *separator = @";";
+    NSString *suffix = @".exe";
+#else
+    NSString *separator = @":";
+    NSString *suffix = @"";
+#endif
+    NSString *best = nil;
+    NSInteger bestVersion = -1;
+
+    if (override != NULL && *override != '\0') {
+        return [NSString stringWithUTF8String:override];
+    }
+    for (NSString *directory in [searchPath componentsSeparatedByString:separator]) {
+        if ([directory length] == 0) {
+            continue;
+        }
+        NSString *plain = [directory stringByAppendingPathComponent:
+            [@"llvm-profdata" stringByAppendingString:suffix]];
+        if ([fileManager isExecutableFileAtPath:plain]) {
+            return plain;
+        }
+        for (NSString *name in [fileManager contentsOfDirectoryAtPath:directory error:NULL]) {
+            // (hasSuffix: is NO for an empty suffix.)
+            NSString *stem = [suffix length] == 0 ? name
+                : [name hasSuffix:suffix] ? [name substringToIndex:[name length] - [suffix length]] : nil;
+            if (stem == nil || ![stem hasPrefix:@"llvm-profdata-"]) {
+                continue;
+            }
+            NSString *number = [stem substringFromIndex:[@"llvm-profdata-" length]];
+            NSInteger version = [number integerValue];
+            if (version > bestVersion
+                && [[NSString stringWithFormat:@"%ld", (long)version] isEqualToString:number]
+                && [fileManager isExecutableFileAtPath:[directory stringByAppendingPathComponent:name]])
+            {
+                best = [directory stringByAppendingPathComponent:name];
+                bestVersion = version;
+            }
+        }
+    }
+    return best;
+}
+
+// Runs the tests again in a child xctest with LLVM_PROFILE_FILE set, so the
+// test bundle, the code it loads, parallel workers and a host application
+// each write a raw profile (%p: one per process; %m: one per instrumented
+// binary) in <outputDirectory>/profraw-<unique>. Once they have all exited,
+// merges the profiles into <outputDirectory>/<target>.profdata and removes
+// that directory; if the merge fails, it's kept. Returns the exit code for
+// xctest: the tests' result, or 1 if no profile could be written.
+static int RunTestsWithCoverage(int argc, char *argv[], NSString *outputDirectory, NSString *targetName)
+{
+    NSFileManager *fileManager = [NSFileManager defaultManager];
+    NSString *directory = [outputDirectory isAbsolutePath] ? outputDirectory
+        : [[fileManager currentDirectoryPath] stringByAppendingPathComponent:outputDirectory];
+    NSString *rawDirectory;
+    NSString *profile = [directory stringByAppendingPathComponent:
+        [(targetName ? targetName : @"xctest") stringByAppendingPathExtension:@"profdata"]];
+    NSMutableArray *arguments = [NSMutableArray array];
+    NSMutableDictionary *environment = [[[[NSProcessInfo processInfo] environment] mutableCopy] autorelease];
+    NSTask *task = [[[NSTask alloc] init] autorelease];
+    int testsExitCode;
+
+    // The child runs the same tests without the coverage options.
+    for (int i = 1; i < argc; i++) {
+        if (strcmp(argv[i], "-enable-code-coverage") == 0 || strcmp(argv[i], "-coverage-output") == 0) {
+            i++;
+            continue;
+        }
+        [arguments addObject:[NSString stringWithUTF8String:argv[i]]];
+    }
+
+    // The raw profiles go in a directory of this run's own, made new here,
+    // so nothing from an earlier or a concurrent run is merged in, and
+    // nothing but this run's directory is ever deleted.
+    BOOL isDirectory = NO;
+    // (A concurrent run may create it at the same moment.)
+    if (![fileManager createDirectoryAtPath:directory withIntermediateDirectories:YES
+                                 attributes:nil error:NULL]
+        && !([fileManager fileExistsAtPath:directory isDirectory:&isDirectory] && isDirectory))
+    {
+        fprintf(stderr, "xctest: could not create coverage directory '%s'\n", [directory UTF8String]);
+        return 1;
+    }
+    rawDirectory = [directory stringByAppendingPathComponent:
+        [@"profraw-" stringByAppendingString:[[NSProcessInfo processInfo] globallyUniqueString]]];
+    if (![fileManager createDirectoryAtPath:rawDirectory withIntermediateDirectories:NO
+                                 attributes:nil error:NULL])
+    {
+        fprintf(stderr, "xctest: could not create coverage directory '%s'\n", [rawDirectory UTF8String]);
+        return 1;
+    }
+    [environment setObject:[rawDirectory stringByAppendingPathComponent:@"%p-%m.profraw"]
+                    forKey:@"LLVM_PROFILE_FILE"];
+
+    [task setLaunchPath:ExecutablePath()];
+    [task setArguments:arguments];
+    [task setEnvironment:environment];
+    [task launch];
+    [task waitUntilExit];
+    // A child killed by a signal is reported as 1, like any failure.
+    testsExitCode = ([task terminationReason] == NSTaskTerminationReasonExit
+                     && [task terminationStatus] == 0) ? 0 : 1;
+
+    NSMutableArray *rawProfiles = [NSMutableArray array];
+    for (NSString *name in [[fileManager contentsOfDirectoryAtPath:rawDirectory error:NULL]
+                               sortedArrayUsingSelector:@selector(compare:)])
+    {
+        if ([[name pathExtension] isEqualToString:@"profraw"]) {
+            [rawProfiles addObject:[rawDirectory stringByAppendingPathComponent:name]];
+        }
+    }
+    if ([rawProfiles count] == 0) {
+        fprintf(stderr, "xctest: no code coverage was recorded; build the tests and the code under test "
+                "with -fprofile-instr-generate -fcoverage-mapping\n");
+        [fileManager removeItemAtPath:rawDirectory error:NULL];
+        return 1;
+    }
+
+    NSString *profdata = ProfdataPath();
+    if (profdata == nil) {
+        fprintf(stderr, "xctest: llvm-profdata not found (set XCTEST_LLVM_PROFDATA); the raw profiles "
+                "are in '%s'\n", [rawDirectory UTF8String]);
+        return 1;
+    }
+
+    // Merged into a file of this run's own, then renamed over the profile,
+    // so a concurrent run's profile is replaced whole, never mixed.
+    NSString *mergedProfile = [rawDirectory stringByAppendingPathComponent:@"merged.profdata"];
+    NSTask *merge = [[[NSTask alloc] init] autorelease];
+    NSMutableArray *mergeArguments = [NSMutableArray arrayWithObjects:@"merge", @"-sparse", @"-o",
+                                         mergedProfile, nil];
+    BOOL merged = NO;
+
+    [mergeArguments addObjectsFromArray:rawProfiles];
+    [merge setLaunchPath:profdata];
+    [merge setArguments:mergeArguments];
+    @try {
+        [merge launch];
+        [merge waitUntilExit];
+        merged = [merge terminationReason] == NSTaskTerminationReasonExit && [merge terminationStatus] == 0;
+    }
+    @catch (NSException *exception) {
+        fprintf(stderr, "xctest: could not run '%s': %s\n", [profdata UTF8String],
+                [[exception reason] UTF8String]);
+    }
+    if (!merged) {
+        fprintf(stderr, "xctest: '%s merge' failed; the raw profiles are in '%s'\n",
+                [profdata UTF8String], [rawDirectory UTF8String]);
+        return 1;
+    }
+#if defined(_WIN32)
+    // Windows can't rename over an existing file (and GNUstep's paths are
+    // wide there), so this replaces it in two steps.
+    [fileManager removeItemAtPath:profile error:NULL];
+    if (![fileManager moveItemAtPath:mergedProfile toPath:profile error:NULL]) {
+#else
+    if (rename([mergedProfile fileSystemRepresentation], [profile fileSystemRepresentation]) != 0) {
+#endif
+        fprintf(stderr, "xctest: could not write '%s'; the merged profile is '%s'\n",
+                [profile UTF8String], [mergedProfile UTF8String]);
+        return 1;
+    }
+    [fileManager removeItemAtPath:rawDirectory error:NULL];
+    fprintf(stderr, "xctest: code coverage written to '%s'\n", [profile UTF8String]);
+    return testsExitCode;
 }
 
 #if defined(_WIN32)
@@ -378,6 +578,9 @@ int main(int argc, char *argv[]) {
     BOOL testTimeoutsOptionGiven = NO;
     NSTimeInterval defaultAllowance = 0;
     NSTimeInterval maximumAllowance = 0;
+    BOOL codeCoverage = NO;
+    BOOL codeCoverageOptionGiven = NO;
+    NSString *coverageOutput = nil;
 
     if (argc == 1) {
         PrintUsage(stderr);
@@ -674,6 +877,31 @@ int main(int argc, char *argv[]) {
             continue;
         }
 
+        if ([argument isEqualToString:@"-enable-code-coverage"]) {
+            NSString *value = (i + 1 < argc) ? [NSString stringWithUTF8String:argv[++i]] : nil;
+            if ([value caseInsensitiveCompare:@"YES"] == NSOrderedSame) {
+                codeCoverage = YES;
+            } else if ([value caseInsensitiveCompare:@"NO"] == NSOrderedSame) {
+                codeCoverage = NO;
+            } else {
+                fprintf(stderr, "xctest: -enable-code-coverage must be YES or NO\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            codeCoverageOptionGiven = YES;
+            continue;
+        }
+
+        if ([argument isEqualToString:@"-coverage-output"]) {
+            if (i + 1 >= argc || argv[i + 1][0] == '\0') {
+                fprintf(stderr, "xctest: missing directory for -coverage-output\n");
+                PrintUsage(stderr);
+                goto cleanup;
+            }
+            coverageOutput = [NSString stringWithUTF8String:argv[++i]];
+            continue;
+        }
+
         if ([argument isEqualToString:@"-junit-report"]) {
             if (i + 1 >= argc) {
                 fprintf(stderr, "xctest: missing path for -junit-report\n");
@@ -738,6 +966,16 @@ int main(int argc, char *argv[]) {
     if (testBundlePath == nil) {
         fprintf(stderr, "xctest: missing test bundle path\n");
         PrintUsage(stderr);
+        goto cleanup;
+    }
+
+    // Giving a coverage directory turns coverage on, unless it was turned off.
+    if (!codeCoverageOptionGiven && coverageOutput != nil) {
+        codeCoverage = YES;
+    }
+    if (codeCoverage && !listTests && workerResultsPath == nil) {
+        exitCode = RunTestsWithCoverage(argc, argv, coverageOutput ? coverageOutput : @"coverage",
+                                        TargetNameForBundlePath(testBundlePath));
         goto cleanup;
     }
 

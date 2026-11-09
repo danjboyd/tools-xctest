@@ -51,7 +51,8 @@ XCTEST_TEST_SCRIPTS = cli-filter \
 	swift-overlay \
 	async-method \
 	make-swift \
-	man
+	man \
+	coverage
 # There is no -host on Windows (it needs LD_PRELOAD).
 ifneq (,$(findstring mingw,$(GNUSTEP_HOST_OS))$(findstring windows,$(GNUSTEP_HOST_OS)))
 XCTEST_TEST_SCRIPTS := $(filter-out hosted,$(XCTEST_TEST_SCRIPTS))

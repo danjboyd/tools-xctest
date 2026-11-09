@@ -746,6 +746,29 @@ must not depend on running in the same process; observers registered by the
 bundle see each worker's classes separately. It can't be combined with `-host`
 or `-update-performance-baselines`.
 
+For code coverage, build the test bundle, and the code it tests, with clang's
+`-fprofile-instr-generate -fcoverage-mapping` (in `MyTests_OBJCFLAGS`, and
+`-fprofile-instr-generate` when linking), then run with
+`-enable-code-coverage YES` or `-coverage-output <dir>`:
+
+```sh
+xctest -coverage-output coverage MyTests.xctest
+llvm-cov report MyTests.xctest/MyTests -instr-profile coverage/MyTests.profdata
+```
+
+`xctest` runs the tests in a child process with `LLVM_PROFILE_FILE` set, so the
+bundle, parallel workers and a `-host` application each write a raw profile,
+in a new `<dir>/profraw-<unique>` directory of that run's own. Once they have
+finished, it merges them with `llvm-profdata merge` into
+`<dir>/<TestTarget>.profdata` (default directory: `coverage`) and removes the
+raw profiles, or keeps them if the merge fails. Nothing else in `<dir>` is
+touched, so runs into the same directory can overlap. It finds
+`llvm-profdata` on `PATH`, or the highest-numbered `llvm-profdata-<n>` as
+Debian installs it; `XCTEST_LLVM_PROFDATA` overrides that. The run fails if
+nothing was instrumented or the merge fails; otherwise the tests decide the
+exit status. `llvm-cov show -format=html` and `llvm-cov export -format=lcov`
+turn the profile into HTML or lcov for CI services.
+
 ## Regression tests
 
 ```sh

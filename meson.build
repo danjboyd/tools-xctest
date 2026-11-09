@@ -245,6 +245,7 @@ if host_machine.system() != 'darwin'
     ['async-methods', 'run-async-method-tests.sh'],
     ['make-swift', 'run-make-swift-tests.sh'],
     ['man', 'run-man-tests.sh'],
+    ['coverage', 'run-coverage-tests.sh'],
   ]
   if host_machine.system() != 'windows'
     xctest_tests += [['hosted', 'run-hosted-tests.sh']]
