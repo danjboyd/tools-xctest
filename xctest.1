@@ -1,0 +1,357 @@
+.\" This file is part of the GNUstep XCTEST Library.
+.\"
+.\" This library is free software; you can redistribute it and/or
+.\" modify it under the terms of the GNU Lesser General Public
+.\" License as published by the Free Software Foundation; either
+.\" version 2 of the License, or (at your option) any later version.
+.\"
+.\" xctest(1). Tests/run-man-tests.sh checks that every option in
+.\" main.m's PrintUsage is described here, and nothing else.
+.TH XCTEST 1 2026-11-09 "tools-xctest" "GNUstep"
+.SH NAME
+xctest \- run the XCTest tests in a test bundle
+.SH SYNOPSIS
+.B xctest
+.RI [ options ]
+.I bundle
+.br
+.B xctest
+.B \-h
+.SH DESCRIPTION
+.B xctest
+loads
+.IR bundle ,
+a test bundle (usually
+.IR Name.xctest ),
+finds the
+.B XCTestCase
+subclasses in it, and runs their test methods.
+Results are logged as they run, followed by a summary that lists the failed
+tests.
+.PP
+The bundle's name without its extension is the
+.IR "test target" .
+Tests are named by identifiers of the form
+.IR TestTarget [/ TestClass [/ testMethod ]].
+.PP
+Options may come before or after
+.IR bundle .
+.B YES
+and
+.B NO
+may be written in any case.
+.SH OPTIONS
+.SS Selecting tests
+.TP
+.BI \-only\-testing: identifier
+Run only the tests matching
+.IR identifier ,
+which is
+.IR TestTarget ,
+.IR TestTarget/TestClass
+or
+.IR TestTarget/TestClass/testMethod .
+May be given more than once.
+.TP
+.BI \-skip\-testing: identifier
+Skip the tests matching
+.IR identifier .
+May be given more than once, and combined with
+.BR \-only\-testing .
+.TP
+.BI \-XCTest " tests"
+Apple's selection syntax:
+.B All
+for every test, or a comma-separated list of
+.IR Class ,
+.I Class/method
+or
+.IR Class.method .
+.PP
+Each selection given by
+.B \-only\-testing
+or
+.B \-XCTest
+must match at least one test, or
+.B xctest
+fails without running any; a
+.B \-skip\-testing
+that matches nothing is ignored.
+.SS Listing tests
+.TP
+.B \-list\-tests
+Print the selected tests, one identifier per line, without running them.
+.TP
+.B \-list\-tests\-json
+Print the selected tests as JSON, without running them.
+.SS Output and reports
+.TP
+.BI \-output\-format " format"
+.B classic
+(the default) logs results as
+.B XCTest:
+lines.
+.B apple
+prints them on standard output in the format of Apple's
+.BR xctest ,
+with per-test timings, for tools that parse it.
+.TP
+.BI \-junit\-report " path"
+Also write the results to
+.I path
+as JUnit XML: one
+.B <testsuite>
+per test class, with assertion failures as
+.BR <failure> ,
+uncaught exceptions as
+.B <error>
+and skipped tests as
+.BR <skipped> .
+.TP
+.BI \-attachments\-path " dir"
+Save test attachments under
+.IR dir .
+By default they are saved next to the
+.B \-junit\-report
+file, in
+.IR report \-attachments.
+.SS Hosted tests
+.TP
+.BI \-host " app"
+Run the tests inside an application,
+.I app
+being a
+.I .app
+bundle or an executable.
+.B xctest
+launches it with
+.B libXCTestHost
+preloaded, and the tests run on its main thread once it has finished
+launching.
+Not supported on Windows.
+.TP
+.BI \-host\-launch\-timeout " seconds"
+Stop the application and fail if it hasn't started the tests within
+.I seconds
+(default 60; 0 waits forever).
+The tests themselves have no time limit.
+.SS Performance tests
+.TP
+.BI \-performance\-baselines " path"
+Fail a measured test whose average is worse than its baseline in the JSON file
+.I path
+by more than the baseline's
+.B maxPercentRegression
+(default 10%).
+.TP
+.B \-update\-performance\-baselines
+Record the measured averages into the
+.B \-performance\-baselines
+file.
+.TP
+.BI \-performance\-warmup\-iterations " n"
+Unmeasured runs before each measurement.
+By default there are none for
+.BR measureBlock: ,
+and one for
+.BR measureWithMetrics: .
+.TP
+.BI \-performance\-report " path"
+Also write every measurement of the run to
+.I path
+as JSON, with its statistics, its baseline and the verdict.
+.TP
+.BI \-performance\-machine\-id " id"
+Use, and record, the baselines for machine
+.IR id .
+.B auto
+names the machine by its CPU, number of cores and architecture.
+The default is
+.BR XCTEST_MACHINE_ID .
+.TP
+.BR \-performance\-inconclusive\-fails " YES|NO"
+Fail a test whose comparison with its baseline is inconclusive.
+The default,
+.BR NO ,
+only reports it.
+.SS Repetition
+.TP
+.BI \-test\-iterations " n"
+Run each test
+.I n
+times.
+With either option below,
+.I n
+is the most times a test runs.
+.TP
+.B \-run\-tests\-until\-failure
+Repeat each test until it fails, at most 100 times unless
+.B \-test\-iterations
+says otherwise.
+.TP
+.B \-retry\-tests\-on\-failure
+Retry a failing test until it passes, at most 3 times unless
+.B \-test\-iterations
+says otherwise.
+Failed attempts followed by a pass don't count as failures.
+.PP
+Each run uses a new test case instance; a class's
+.B +setUp
+and
+.B +tearDown
+still run once.
+.SS Order
+.TP
+.BI \-test\-execution\-order " order"
+.B alphabetical
+(the default) or
+.BR random ,
+which shuffles the test classes, and the tests within each class.
+The seed is logged and recorded in the JUnit report.
+.TP
+.BI \-test\-execution\-order\-seed " n"
+Repeat the random order given by seed
+.IR n .
+Implies
+.BR "\-test\-execution\-order random" .
+.SS Parallel testing
+.TP
+.BR \-parallel\-testing\-enabled " YES|NO"
+Run each test class in a separate
+.B xctest
+worker process (default
+.BR NO ).
+Each class's output is printed as one block when it finishes.
+A worker that crashes fails only its own class's tests.
+Can't be combined with
+.BR \-host .
+.TP
+.BI \-parallel\-testing\-worker\-count " n"
+Run
+.I n
+workers at once (default: one per CPU).
+Implies
+.BR "\-parallel\-testing\-enabled YES" .
+.SS Time limits
+.TP
+.BR \-test\-timeouts\-enabled " YES|NO"
+Fail a test, including its set up and tear down, that runs longer than its
+.BR executionTimeAllowance ,
+then stop the run without running the remaining tests (default
+.BR NO ).
+.TP
+.BI \-default\-test\-execution\-time\-allowance " seconds"
+Each test's allowance, unless the test sets its own (default 600).
+Implies
+.BR "\-test\-timeouts\-enabled YES" .
+.TP
+.BI \-maximum\-test\-execution\-time\-allowance " seconds"
+The most any test's allowance may be.
+Implies
+.BR "\-test\-timeouts\-enabled YES" .
+.SS Help
+.TP
+.BR \-h ", " \-\-help
+Print a summary of the options and exit.
+.SH EXIT STATUS
+.TP
+.B 0
+At least one test ran, and every selected test succeeded; or the tests were
+listed; or help was printed.
+.TP
+.B 1
+Anything else: a test failed or raised an uncaught exception, no test ran, a
+selection matched no test, the bundle couldn't be loaded, a test ran out of
+time, or an option was unknown or invalid.
+.SH ENVIRONMENT
+.TP
+.B XCTEST_MACHINE_ID
+The machine's name for performance baselines, when
+.B \-performance\-machine\-id
+isn't given.
+.TP
+.B XCTEST_PERF_COUNTERS
+Set to
+.B 0
+to turn off the hardware performance counters (Linux only).
+.TP
+.B XCTEST_HOST_LIBRARY
+The
+.B libXCTestHost
+library that
+.B \-host
+preloads, instead of the one installed beside
+.BR libXCTest .
+.SH FILES
+.TP
+.I $GNUSTEP_MAKEFILES/Auxiliary/xctest.make
+Builds test bundles with gnustep-make.
+Name them in
+.BR XCTEST_BUNDLE_NAME ;
+.B make check
+runs them with
+.BR xctest ,
+passing it
+.BR XCTEST_FLAGS .
+See the comments at the top of the file.
+.TP
+.B xctest\-bundle
+.I Name.xctest library
+.RI [ class ]
+.br
+Wraps a shared library of tests as a bundle that
+.B xctest
+can load, for build systems other than gnustep-make, such as Meson.
+.SH EXAMPLES
+Run every test in a bundle:
+.PP
+.RS
+.EX
+xctest MyTests.xctest
+.EE
+.RE
+.PP
+Run one class, and one test of another, with Apple's selection syntax:
+.PP
+.RS
+.EX
+xctest \-XCTest FooTests,BarTests/testParse MyTests.xctest
+.EE
+.RE
+.PP
+Skip a slow class and write a JUnit report for CI:
+.PP
+.RS
+.EX
+xctest \-skip\-testing:MyTests/SlowTests \-junit\-report results.xml MyTests.xctest
+.EE
+.RE
+.PP
+Check what a filter selects, without running anything:
+.PP
+.RS
+.EX
+xctest \-list\-tests \-only\-testing:MyTests/FooTests MyTests.xctest
+.EE
+.RE
+.PP
+Look for order-dependent tests, in parallel:
+.PP
+.RS
+.EX
+xctest \-test\-execution\-order random \-parallel\-testing\-enabled YES MyTests.xctest
+.EE
+.RE
+.PP
+Run the tests inside an application, on a headless machine:
+.PP
+.RS
+.EX
+xvfb\-run \-a xctest \-host MyApp.app MyAppTests.xctest
+.EE
+.RE
+.SH SEE ALSO
+.BR make (1),
+.BR buildtool (1)
+.PP
+The README of tools-xctest describes the supported XCTest API.

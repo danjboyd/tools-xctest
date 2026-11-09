@@ -50,7 +50,8 @@ XCTEST_TEST_SCRIPTS = cli-filter \
 	control-flow \
 	swift-overlay \
 	async-method \
-	make-swift
+	make-swift \
+	man
 # There is no -host on Windows (it needs LD_PRELOAD).
 ifneq (,$(findstring mingw,$(GNUSTEP_HOST_OS))$(findstring windows,$(GNUSTEP_HOST_OS)))
 XCTEST_TEST_SCRIPTS := $(filter-out hosted,$(XCTEST_TEST_SCRIPTS))
@@ -73,6 +74,9 @@ after-install::
 	$(MKDIRS) "$(DESTDIR)$(GNUSTEP_MAKEFILES)/Auxiliary" "$(GNUSTEP_TOOLS)"
 	$(INSTALL_DATA) xctest.make "$(DESTDIR)$(GNUSTEP_MAKEFILES)/Auxiliary/xctest.make"
 	$(INSTALL_PROGRAM) xctest-bundle "$(GNUSTEP_TOOLS)/xctest-bundle"
+	$(MKDIRS) "$(GNUSTEP_DOC_MAN)/man1"
+	$(INSTALL_DATA) xctest.1 "$(GNUSTEP_DOC_MAN)/man1/xctest.1"
 
 after-uninstall::
-	rm -f "$(DESTDIR)$(GNUSTEP_MAKEFILES)/Auxiliary/xctest.make" "$(GNUSTEP_TOOLS)/xctest-bundle"
+	rm -f "$(DESTDIR)$(GNUSTEP_MAKEFILES)/Auxiliary/xctest.make" "$(GNUSTEP_TOOLS)/xctest-bundle" \
+	  "$(GNUSTEP_DOC_MAN)/man1/xctest.1"
