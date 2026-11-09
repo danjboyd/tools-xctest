@@ -769,6 +769,15 @@ nothing was instrumented or the merge fails; otherwise the tests decide the
 exit status. `llvm-cov show -format=html` and `llvm-cov export -format=lcov`
 turn the profile into HTML or lcov for CI services.
 
+With `xctest.make`, `make coverage` does all of that: it builds the bundles
+again instrumented (in `obj/xctest-coverage`, leaving the ordinary build
+alone), runs them with `-coverage-output coverage`, and writes
+`coverage/<Bundle>.txt` (also printed), `<Bundle>.lcov` and `<Bundle>-html/`,
+leaving out GNUstep's and XCTest's headers. It fails if a test fails. Code
+built outside the bundles is measured if it's built with
+`$(XCTEST_COVERAGE_FLAGS)`; list its binaries in `XCTEST_COVERAGE_OBJECTS` to
+report on them too.
+
 ## Regression tests
 
 ```sh

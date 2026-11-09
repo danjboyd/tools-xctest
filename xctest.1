@@ -337,7 +337,13 @@ Name them in
 runs them with
 .BR xctest ,
 passing it
-.BR XCTEST_FLAGS .
+.BR XCTEST_FLAGS ;
+.B make coverage
+builds them instrumented, runs them with
+.B \-coverage\-output
+and writes
+.BR llvm\-cov 's
+summary, lcov and HTML.
 See the comments at the top of the file.
 .TP
 .B xctest\-bundle
