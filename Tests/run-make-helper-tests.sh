@@ -116,6 +116,13 @@ if have_llvm_tool llvm-profdata && have_llvm_tool llvm-cov; then
   [ "$(find "$ordinary" -newermt '2000-01-02' 2>/dev/null)" = "" ] \
     || fail "expected make coverage to leave the ordinary build alone"
 
+  # Header directories given with .. in them are still left out (llvm-cov
+  # reports normalized paths).
+  make_fixture coverage XCTEST_COVERAGE_DIR="$coverage_dir" XCTEST_INCLUDE_DIR="$source_root/Tests/.."
+  assert_status 0
+  ! grep -q 'XCTestAssertionsImpl\.h' "$coverage_dir/HelperTests.txt" \
+    || fail "expected XCTest's headers to be left out when the include path has .. in it"
+
   # A failing test fails make coverage, after the reports are written.
   rm -f "$coverage_dir/HelperTests.txt"
   HELPER_FIXTURE_FAIL=1 make_fixture coverage XCTEST_COVERAGE_DIR="$coverage_dir"

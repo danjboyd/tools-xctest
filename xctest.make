@@ -91,11 +91,12 @@ NEEDS_GUI ?= $(if $(XCTEST_HOST),yes,no)
 XCTEST_COVERAGE_DIR ?= coverage
 XCTEST_COVERAGE_FLAGS = -fprofile-instr-generate -fcoverage-mapping
 # By default the reports leave out the inline functions of GNUstep's and
-# XCTest's headers.
+# XCTest's headers. llvm-cov reports normalized paths, so these are too
+# (a prefix such as .../src/../gnustep would never match).
 XCTEST_COVERAGE_REPORT_FLAGS ?= \
   $(foreach domain,SYSTEM LOCAL NETWORK USER,$(if $(GNUSTEP_$(domain)_HEADERS),\
-    -ignore-filename-regex='$(GNUSTEP_$(domain)_HEADERS)/')) \
-  $(if $(XCTEST_INCLUDE_DIR),-ignore-filename-regex='$(XCTEST_INCLUDE_DIR)/XCTest/')
+    -ignore-filename-regex='$(abspath $(GNUSTEP_$(domain)_HEADERS))/')) \
+  $(if $(XCTEST_INCLUDE_DIR),-ignore-filename-regex='$(abspath $(XCTEST_INCLUDE_DIR))/XCTest/')
 
 # In `make coverage`'s own build (below), every bundle is instrumented.
 ifeq ($(_XCTEST_COVERAGE_BUILD),yes)
