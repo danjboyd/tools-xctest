@@ -11,6 +11,8 @@ Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 - Code coverage: `xctest -enable-code-coverage YES` (or `-coverage-output
   <dir>`) merges the run's LLVM profiles, from parallel workers and hosted
   apps too, into `<dir>/<TestTarget>.profdata` for `llvm-cov`.
+- `make coverage` in `xctest.make` builds the test bundles instrumented,
+  runs them with coverage, and writes a summary, lcov and HTML per bundle.
 
 ## 0.7.0
 

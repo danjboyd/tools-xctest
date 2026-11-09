@@ -88,5 +88,51 @@ set -e
 assert_status 1
 assert_contains "no such library"
 
+# make coverage builds the bundles instrumented on the side, runs them with
+# coverage, and writes a summary, lcov and HTML for each. It needs clang's
+# llvm-profdata and llvm-cov.
+have_llvm_tool() {
+  command -v "$1" > /dev/null 2>&1 \
+    || [ -n "$(IFS=:; for d in $PATH; do ls "$d/$1"-[0-9]* 2>/dev/null || true; done)" ]
+}
+if have_llvm_tool llvm-profdata && have_llvm_tool llvm-cov; then
+  make_fixture all
+  ordinary=$(bundle_binary "$fixture/HelperTests.xctest" HelperTests)
+  touch -d '2000-01-01' "$ordinary"
+  coverage_dir="$work_dir/coverage"
+  make_fixture coverage XCTEST_COVERAGE_DIR="$coverage_dir"
+  assert_status 0
+  assert_contains "Running HelperTests.xctest for coverage..."
+  assert_contains "Running OtherTests.xctest for coverage..."
+  for bundle in HelperTests OtherTests; do
+    for report in "$bundle.profdata" "$bundle.txt" "$bundle.lcov" "$bundle-html/index.html"; do
+      [ -f "$coverage_dir/$report" ] || fail "expected make coverage to write $report"
+    done
+  done
+  grep -q 'HelperTests\.m' "$coverage_dir/HelperTests.txt" || fail "expected the summary to cover HelperTests.m"
+  grep -q '^SF:.*HelperTests\.m$' "$coverage_dir/HelperTests.lcov" || fail "expected the lcov to cover HelperTests.m"
+  ! grep -q 'Headers/Foundation' "$coverage_dir/HelperTests.txt" \
+    || fail "expected GNUstep's headers to be left out of the summary"
+  [ "$(find "$ordinary" -newermt '2000-01-02' 2>/dev/null)" = "" ] \
+    || fail "expected make coverage to leave the ordinary build alone"
+
+  # Header directories given with .. in them are still left out (llvm-cov
+  # reports normalized paths).
+  make_fixture coverage XCTEST_COVERAGE_DIR="$coverage_dir" XCTEST_INCLUDE_DIR="$source_root/Tests/.."
+  assert_status 0
+  ! grep -q 'XCTestAssertionsImpl\.h' "$coverage_dir/HelperTests.txt" \
+    || fail "expected XCTest's headers to be left out when the include path has .. in it"
+
+  # A failing test fails make coverage, after the reports are written.
+  rm -f "$coverage_dir/HelperTests.txt"
+  HELPER_FIXTURE_FAIL=1 make_fixture coverage XCTEST_COVERAGE_DIR="$coverage_dir"
+  [ "$status" -ne 0 ] || fail "expected make coverage to fail when a test fails"
+  assert_contains "asked to fail"
+  [ -f "$coverage_dir/HelperTests.txt" ] || fail "expected a report from a failing run"
+else
+  echo "Skipping make coverage: no llvm-profdata and llvm-cov."
+fi
+
 make_fixture clean
+[ ! -e "$fixture/obj/xctest-coverage" ] || fail "expected make clean to remove the coverage build"
 echo "Build-system helper tests passed."
