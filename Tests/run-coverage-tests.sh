@@ -28,6 +28,11 @@ build_fixture FilterFixture
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
+# Without coverage on, the instrumented fixture still writes a profile when
+# it's loaded; keep that out of the current directory. With coverage on,
+# xctest's own LLVM_PROFILE_FILE replaces this.
+export LLVM_PROFILE_FILE="$work/uncollected-%p.profraw"
+
 # The number of times the profile says CoverageFixtureCovered ran.
 covered_count() {
   "$profdata" show --all-functions --counts "$1" \
