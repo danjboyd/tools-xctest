@@ -31,6 +31,7 @@ lib libXCTestHost host
 tool xctest
 tool xctest-bundle
 makefile Auxiliary/xctest.make
+man man1/xctest.1
 pkgconfig XCTest.pc meson
 swiftmodule XCTest.swiftmodule swift
 swiftmodule XCTest.swiftdoc swift

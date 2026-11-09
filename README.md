@@ -37,8 +37,9 @@ make check        # optional: the regression suite
 make install
 ```
 
-This installs `libXCTest`, the headers, the `xctest` runner, `libXCTestHost`
-for hosted tests, and the `xctest.make` and `xctest-bundle` build helpers.
+This installs `libXCTest`, the headers, the `xctest` runner and its man page
+(`man xctest` lists every option), `libXCTestHost` for hosted tests, and the
+`xctest.make` and `xctest-bundle` build helpers.
 
 On Windows, in an MSYS2 CLANG64 shell:
 

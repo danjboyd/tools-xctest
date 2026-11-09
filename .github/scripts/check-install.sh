@@ -91,6 +91,7 @@ classify() {
   dir=$(dirname "$path")
   case "$path" in
     */Makefiles/*) echo "makefile ${path#*/Makefiles/}"; return ;;
+    */man1/*.1) echo "man man1/$name"; return ;;
   esac
   case "$name" in
     *.pc) echo "pkgconfig $name" ;;

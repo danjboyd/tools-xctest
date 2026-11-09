@@ -194,6 +194,7 @@ xctest_tool = executable('xctest', 'main.m', link_with: xctest_lib, install: tru
 # (see the README for using it from Meson).
 xctest_bundle_script = files('xctest-bundle')
 install_data('xctest-bundle', install_dir: get_option('bindir'), install_mode: 'rwxr-xr-x')
+install_man('xctest.1')
 
 if host_machine.system() != 'darwin'
   # For gnustep-make projects: include $(GNUSTEP_MAKEFILES)/Auxiliary/xctest.make
@@ -243,6 +244,7 @@ if host_machine.system() != 'darwin'
     ['swift-separation', 'run-swift-separation-tests.sh'],
     ['async-methods', 'run-async-method-tests.sh'],
     ['make-swift', 'run-make-swift-tests.sh'],
+    ['man', 'run-man-tests.sh'],
   ]
   if host_machine.system() != 'windows'
     xctest_tests += [['hosted', 'run-hosted-tests.sh']]

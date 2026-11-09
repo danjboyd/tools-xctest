@@ -3,6 +3,12 @@
 Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 `vX.Y.Z`; 0.1.x are upstream's (gnustep/tools-xctest).
 
+## Unreleased
+
+- An `xctest(1)` man page, installed by gnustep-make (in the domain's man
+  directory) and Meson (`mandir`). A regression check keeps its options in
+  step with `xctest -h`.
+
 ## 0.7.0
 
 Swift test targets: with a Swift toolchain that has GNUstep's Objective-C
