@@ -279,10 +279,13 @@ static int RunTestsWithCoverage(int argc, char *argv[], NSString *outputDirector
         return 1;
     }
 #if defined(_WIN32)
-    // Windows' rename doesn't replace an existing file.
+    // Windows can't rename over an existing file (and GNUstep's paths are
+    // wide there), so this replaces it in two steps.
     [fileManager removeItemAtPath:profile error:NULL];
-#endif
+    if (![fileManager moveItemAtPath:mergedProfile toPath:profile error:NULL]) {
+#else
     if (rename([mergedProfile fileSystemRepresentation], [profile fileSystemRepresentation]) != 0) {
+#endif
         fprintf(stderr, "xctest: could not write '%s'; the merged profile is '%s'\n",
                 [profile UTF8String], [mergedProfile UTF8String]);
         return 1;
