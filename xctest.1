@@ -249,6 +249,32 @@ Implies
 The most any test's allowance may be.
 Implies
 .BR "\-test\-timeouts\-enabled YES" .
+.SS Code coverage
+.TP
+.BR \-enable\-code\-coverage " YES|NO"
+Write a code coverage profile of the run (default
+.BR NO ).
+Build the tests, and the code they test, with
+.BR "\-fprofile\-instr\-generate \-fcoverage\-mapping" .
+.B xctest
+runs the tests in a child process with
+.B LLVM_PROFILE_FILE
+set, so the bundle, parallel workers and a
+.B \-host
+application each write a raw profile, then merges them with
+.BR "llvm\-profdata merge" .
+Report on it with
+.BR llvm\-cov (1).
+The run fails if nothing was instrumented or the profiles can't be merged;
+otherwise the tests decide the exit status.
+.TP
+.BI \-coverage\-output " dir"
+Write the profile to
+.IR dir / TestTarget .profdata
+(default
+.IR coverage ).
+Implies
+.BR "\-enable\-code\-coverage YES" .
 .SS Help
 .TP
 .BR \-h ", " \-\-help
@@ -282,6 +308,17 @@ library that
 .B \-host
 preloads, instead of the one installed beside
 .BR libXCTest .
+.TP
+.B XCTEST_LLVM_PROFDATA
+The
+.B llvm\-profdata
+that merges coverage profiles.
+By default it's the first
+.B llvm\-profdata
+on
+.BR PATH ,
+or else the highest-numbered
+.BR llvm\-profdata\- \fIN\fP.
 .SH FILES
 .TP
 .I $GNUSTEP_MAKEFILES/Auxiliary/xctest.make
@@ -343,6 +380,15 @@ xctest \-test\-execution\-order random \-parallel\-testing\-enabled YES MyTests.
 .EE
 .RE
 .PP
+Measure code coverage, and summarize it:
+.PP
+.RS
+.EX
+xctest \-coverage\-output coverage MyTests.xctest
+llvm\-cov report MyTests.xctest/MyTests \-instr\-profile coverage/MyTests.profdata
+.EE
+.RE
+.PP
 Run the tests inside an application, on a headless machine:
 .PP
 .RS
@@ -352,6 +398,8 @@ xvfb\-run \-a xctest \-host MyApp.app MyAppTests.xctest
 .RE
 .SH SEE ALSO
 .BR make (1),
-.BR buildtool (1)
+.BR buildtool (1),
+.BR llvm\-cov (1),
+.BR llvm\-profdata (1)
 .PP
 The README of tools-xctest describes the supported XCTest API.

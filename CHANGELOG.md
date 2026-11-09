@@ -8,6 +8,9 @@ Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 - An `xctest(1)` man page, installed by gnustep-make (in the domain's man
   directory) and Meson (`mandir`). A regression check keeps its options in
   step with `xctest -h`.
+- Code coverage: `xctest -enable-code-coverage YES` (or `-coverage-output
+  <dir>`) merges the run's LLVM profiles, from parallel workers and hosted
+  apps too, into `<dir>/<TestTarget>.profdata` for `llvm-cov`.
 
 ## 0.7.0
 

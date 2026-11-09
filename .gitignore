@@ -53,3 +53,5 @@ Tests/AsyncMethodFixture/obj
 Examples/SwiftTests/obj
 Tests/SwiftMakeFixture/SwiftMakeTests.xctest
 Tests/SwiftMakeFixture/obj
+Tests/CoverageFixture/CoverageFixture.bundle
+Tests/CoverageFixture/obj
