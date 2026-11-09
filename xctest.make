@@ -49,6 +49,25 @@
 #   XCTEST_SWIFT_VERSION_CHECK no: don't check a Swift bundle's compiler
 #                              against the one that built the XCTest module.
 #
+# Code coverage: `make coverage` builds the bundles again with clang's
+# -fprofile-instr-generate -fcoverage-mapping, in obj/xctest-coverage so
+# the ordinary build is left alone, runs them with xctest -coverage-output,
+# and writes, for each bundle, a summary (also printed), lcov and HTML:
+#   coverage/<Bundle>.profdata, <Bundle>.txt, <Bundle>.lcov, <Bundle>-html/
+# It fails if any test fails. Code outside the bundles is measured only if
+# it's built with $(XCTEST_COVERAGE_FLAGS) too; name its binaries in
+# XCTEST_COVERAGE_OBJECTS to include them in the reports.
+#   XCTEST_COVERAGE_DIR        Where the reports go (default: coverage).
+#   XCTEST_COVERAGE_OBJECTS    More instrumented binaries to report on, e.g.
+#                              the library the tests exercise.
+#   XCTEST_COVERAGE_REPORT_FLAGS  Options for llvm-cov report, export and
+#                              show (default: leave out the GNUstep and
+#                              XCTest headers), e.g. -ignore-filename-regex=Tests/.
+#   XCTEST_LLVM_COV            The llvm-cov program (default: llvm-cov on
+#                              PATH, or the highest-numbered llvm-cov-<n>).
+#   XCTEST_LLVM_PROFDATA       The llvm-profdata xctest merges with (see
+#                              xctest(1)).
+#
 # Swift test bundles: list the sources in <Bundle>_SWIFT_FILES, as for any
 # Swift target. That needs a gnustep-make with Swift support (gnustep-swift's
 # tools-make, with its GNUSTEP_SWIFT_* profile), which compiles them and
@@ -68,6 +87,23 @@ XCTEST_BUNDLE_EXTENSION ?= .xctest
 BUNDLE_EXTENSION = $(XCTEST_BUNDLE_EXTENSION)
 BUNDLE_NAME += $(XCTEST_BUNDLE_NAME)
 NEEDS_GUI ?= $(if $(XCTEST_HOST),yes,no)
+
+XCTEST_COVERAGE_DIR ?= coverage
+XCTEST_COVERAGE_FLAGS = -fprofile-instr-generate -fcoverage-mapping
+# By default the reports leave out the inline functions of GNUstep's and
+# XCTest's headers.
+XCTEST_COVERAGE_REPORT_FLAGS ?= \
+  $(foreach domain,SYSTEM LOCAL NETWORK USER,$(if $(GNUSTEP_$(domain)_HEADERS),\
+    -ignore-filename-regex='$(GNUSTEP_$(domain)_HEADERS)/')) \
+  $(if $(XCTEST_INCLUDE_DIR),-ignore-filename-regex='$(XCTEST_INCLUDE_DIR)/XCTest/')
+
+# In `make coverage`'s own build (below), every bundle is instrumented.
+ifeq ($(_XCTEST_COVERAGE_BUILD),yes)
+  $(foreach bundle,$(XCTEST_BUNDLE_NAME),\
+    $(eval $(bundle)_OBJCFLAGS += $(XCTEST_COVERAGE_FLAGS))\
+    $(eval $(bundle)_CFLAGS += $(XCTEST_COVERAGE_FLAGS))\
+    $(eval $(bundle)_BUNDLE_LIBS += -fprofile-instr-generate))
+endif
 
 $(foreach bundle,$(XCTEST_BUNDLE_NAME),\
   $(eval $(bundle)_BUNDLE_LIBS += -lXCTest)\
@@ -124,7 +160,8 @@ endif
 
 # Runs every bundle, then fails if any of them failed.
 _XCTEST_ENV = $(if $(XCTEST_LIBRARY_DIR),LD_LIBRARY_PATH="$(XCTEST_LIBRARY_DIR)$${LD_LIBRARY_PATH:+:$$LD_LIBRARY_PATH}")
-_XCTEST_RUN = $(_XCTEST_ENV) $(XCTEST_LAUNCHER) $(XCTEST) "$(GNUSTEP_BUILD_DIR)/$(1)$(BUNDLE_EXTENSION)" \
+# _XCTEST_RUN(bundle[, build directory])
+_XCTEST_RUN = $(_XCTEST_ENV) $(XCTEST_LAUNCHER) $(XCTEST) "$(or $(2),$(GNUSTEP_BUILD_DIR))/$(1)$(BUNDLE_EXTENSION)" \
   $(if $(XCTEST_HOST),-host "$(XCTEST_HOST)") $(XCTEST_FLAGS) $($(1)_XCTEST_FLAGS)
 
 after-check:: all
@@ -132,4 +169,45 @@ after-check:: all
 	$(foreach bundle,$(XCTEST_BUNDLE_NAME),\
 	  echo "Running $(bundle)$(BUNDLE_EXTENSION)..."; \
 	  $(call _XCTEST_RUN,$(bundle)) || status=1;) \
+	exit $$status
+
+# make coverage. The instrumented build goes under obj, which make clean
+# removes; the reports in XCTEST_COVERAGE_DIR are left for you.
+_XCTEST_COVERAGE_BUILD_DIR = $(CURDIR)/obj/xctest-coverage
+
+# Sets llvm_cov: XCTEST_LLVM_COV, llvm-cov, or the highest llvm-cov-<n>.
+_XCTEST_FIND_LLVM_COV = llvm_cov="$(XCTEST_LLVM_COV)"; \
+	if [ -z "$$llvm_cov" ]; then llvm_cov=$$(command -v llvm-cov 2>/dev/null || true); fi; \
+	if [ -z "$$llvm_cov" ]; then \
+	  llvm_cov=$$(IFS=:; for d in $$PATH; do ls "$$d"/llvm-cov-[0-9]* 2>/dev/null || true; done \
+	    | sed 's/.*-\([0-9]*\)\(\.exe\)\{0,1\}$$/\1 &/' | sort -n | tail -n 1 | cut -d' ' -f2-); \
+	fi; \
+	if [ -z "$$llvm_cov" ]; then echo "xctest.make: llvm-cov not found (set XCTEST_LLVM_COV)" >&2; exit 1; fi
+
+# The instrumented bundle's binary: Name, or Name.dll on Windows.
+_XCTEST_COVERAGE_BINARY = $(_XCTEST_COVERAGE_BUILD_DIR)/$(1)$(BUNDLE_EXTENSION)/$(1)
+
+coverage::
+	@$(MAKE) --no-print-directory all _XCTEST_COVERAGE_BUILD=yes \
+	  GNUSTEP_BUILD_DIR="$(_XCTEST_COVERAGE_BUILD_DIR)"
+	@$(_XCTEST_FIND_LLVM_COV); \
+	status=0; \
+	$(foreach bundle,$(XCTEST_BUNDLE_NAME),\
+	  echo "Running $(bundle)$(BUNDLE_EXTENSION) for coverage..."; \
+	  $(call _XCTEST_RUN,$(bundle),$(_XCTEST_COVERAGE_BUILD_DIR)) \
+	    -coverage-output "$(XCTEST_COVERAGE_DIR)" || status=1; \
+	  profile="$(XCTEST_COVERAGE_DIR)/$(bundle).profdata"; \
+	  binary="$(call _XCTEST_COVERAGE_BINARY,$(bundle))"; \
+	  if [ -f "$$binary.dll" ]; then binary="$$binary.dll"; fi; \
+	  if [ -f "$$profile" ]; then \
+	    set -- "$$binary" $(foreach object,$(XCTEST_COVERAGE_OBJECTS),-object "$(object)") \
+	      -instr-profile "$$profile" $(XCTEST_COVERAGE_REPORT_FLAGS); \
+	    "$$llvm_cov" report "$$@" > "$(XCTEST_COVERAGE_DIR)/$(bundle).txt" || status=1; \
+	    cat "$(XCTEST_COVERAGE_DIR)/$(bundle).txt"; \
+	    "$$llvm_cov" export -format=lcov "$$@" > "$(XCTEST_COVERAGE_DIR)/$(bundle).lcov" || status=1; \
+	    "$$llvm_cov" show -format=html -output-dir="$(XCTEST_COVERAGE_DIR)/$(bundle)-html" "$$@" || status=1; \
+	    echo "Coverage of $(bundle): $(XCTEST_COVERAGE_DIR)/$(bundle).txt, $(bundle).lcov and $(bundle)-html/"; \
+	  else \
+	    status=1; \
+	  fi;) \
 	exit $$status
