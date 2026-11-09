@@ -14,7 +14,7 @@ if [ -z "$profdata" ]; then
   profdata=$(command -v llvm-profdata 2>/dev/null || true)
 fi
 if [ -z "$profdata" ]; then
-  profdata=$(IFS=:; for d in $PATH; do ls "$d"/llvm-profdata-[0-9]* 2>/dev/null; done \
+  profdata=$(IFS=:; for d in $PATH; do ls "$d"/llvm-profdata-[0-9]* 2>/dev/null || true; done \
     | sed 's/.*-\([0-9]*\)\(\.exe\)\{0,1\}$/\1 &/' | sort -n | tail -n 1 | cut -d' ' -f2-)
 fi
 if [ -z "$profdata" ]; then
@@ -43,7 +43,9 @@ echo "Running code coverage regressions..."
 
 run_fixture CoverageFixture -coverage-output "$work/single"
 assert_status 0
-assert_contains "code coverage written to '$work/single/CoverageFixture.profdata'"
+# (On Windows the path is printed in its native form.)
+assert_contains "code coverage written to '"
+assert_contains "/single/CoverageFixture.profdata'"
 [ -f "$work/single/CoverageFixture.profdata" ] || fail "expected the merged profile"
 [ ! -e "$work/single/profraw" ] || fail "expected the raw profiles to be removed after merging"
 [ "$(covered_count "$work/single/CoverageFixture.profdata")" = 2 ] \
