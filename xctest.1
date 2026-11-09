@@ -265,8 +265,16 @@ application each write a raw profile, then merges them with
 .BR "llvm\-profdata merge" .
 Report on it with
 .BR llvm\-cov (1).
+The raw profiles go in a new
+.IR dir /profraw\- unique
+directory, removed after the merge and kept if it fails; nothing else in
+.I dir
+is touched, so runs into the same
+.I dir
+can overlap.
 The run fails if nothing was instrumented or the profiles can't be merged;
-otherwise the tests decide the exit status.
+otherwise the tests decide the exit status (1 if they were killed by a
+signal).
 .TP
 .BI \-coverage\-output " dir"
 Write the profile to

@@ -39,6 +39,14 @@ covered_count() {
     | awk '/^  CoverageFixtureCovered:/ { found = 1 } found && /Function count:/ { print $3; exit }'
 }
 
+# xctest's per-run raw profile directories under $1, and the profiles in them.
+raw_directories() {
+  find "$1" -mindepth 1 -maxdepth 1 -type d -name 'profraw-*'
+}
+raw_profiles() {
+  find "$1" -mindepth 2 -maxdepth 2 -path '*/profraw-*/*.profraw'
+}
+
 echo "Running code coverage regressions..."
 
 run_fixture CoverageFixture -coverage-output "$work/single"
@@ -47,9 +55,67 @@ assert_status 0
 assert_contains "code coverage written to '"
 assert_contains "/single/CoverageFixture.profdata'"
 [ -f "$work/single/CoverageFixture.profdata" ] || fail "expected the merged profile"
-[ ! -e "$work/single/profraw" ] || fail "expected the raw profiles to be removed after merging"
+[ -z "$(raw_directories "$work/single")" ] || fail "expected the raw profiles to be removed after merging"
 [ "$(covered_count "$work/single/CoverageFixture.profdata")" = 2 ] \
   || fail "expected CoverageFixtureCovered to be counted twice: $("$profdata" show --all-functions --counts "$work/single/CoverageFixture.profdata")"
+
+# Running again into the same directory replaces the profile: nothing
+# from the first run is counted again. Files that were already there,
+# including a directory of the caller's named profraw, are left alone.
+mkdir -p "$work/single/profraw"
+echo keep > "$work/single/profraw/keep.profraw"
+echo keep > "$work/single/notes.txt"
+run_fixture CoverageFixture -coverage-output "$work/single"
+assert_status 0
+[ "$(covered_count "$work/single/CoverageFixture.profdata")" = 2 ] \
+  || fail "expected a second run not to add to the first run's counts"
+[ -f "$work/single/profraw/keep.profraw" ] && [ -f "$work/single/notes.txt" ] \
+  || fail "expected files already in the coverage directory to be kept"
+[ -z "$(raw_directories "$work/single")" ] || fail "expected only this run's raw profiles to be removed"
+
+# Two runs at once into the same directory don't take each other's
+# profiles: each writes a whole profile, so the last one stands.
+coverage_env() {
+  env LD_LIBRARY_PATH="$xctest_lib_dir${runtime_lib_dirs:+:$runtime_lib_dirs}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" "$@"
+}
+coverage_env "$xctest_bin" "$source_root/Tests/CoverageFixture/CoverageFixture.bundle" \
+  -coverage-output "$work/concurrent" > "$work/first.log" 2>&1 &
+first=$!
+coverage_env "$xctest_bin" "$source_root/Tests/CoverageFixture/CoverageFixture.bundle" \
+  -coverage-output "$work/concurrent" > "$work/second.log" 2>&1 &
+second=$!
+wait "$first" || { output=$(cat "$work/first.log"); fail "expected the first concurrent run to pass"; }
+wait "$second" || { output=$(cat "$work/second.log"); fail "expected the second concurrent run to pass"; }
+[ "$(covered_count "$work/concurrent/CoverageFixture.profdata")" = 2 ] \
+  || fail "expected concurrent runs each to write a whole profile"
+[ -z "$(raw_directories "$work/concurrent")" ] || fail "expected both runs' raw profiles to be removed"
+
+# Without a working llvm-profdata the run fails, and keeps its raw
+# profiles: a tool that isn't there, and (where a script can be run as
+# one) a tool that fails.
+set +e
+output=$(coverage_env XCTEST_LLVM_PROFDATA="$work/no-such-llvm-profdata" "$xctest_bin" \
+  "$source_root/Tests/CoverageFixture/CoverageFixture.bundle" -coverage-output "$work/missing-tool" 2>&1)
+status=$?
+set -e
+assert_status 1
+assert_contains "merge' failed; the raw profiles are in '"
+[ -n "$(raw_profiles "$work/missing-tool")" ] || fail "expected the raw profiles to be kept when llvm-profdata is missing"
+[ ! -e "$work/missing-tool/CoverageFixture.profdata" ] || fail "expected no profile without llvm-profdata"
+
+if ! is_windows; then
+  printf '#!/bin/sh\necho "stand-in llvm-profdata failed" >&2\nexit 3\n' > "$work/failing-llvm-profdata"
+  chmod +x "$work/failing-llvm-profdata"
+  set +e
+  output=$(coverage_env XCTEST_LLVM_PROFDATA="$work/failing-llvm-profdata" "$xctest_bin" \
+    "$source_root/Tests/CoverageFixture/CoverageFixture.bundle" -coverage-output "$work/failing-tool" 2>&1)
+  status=$?
+  set -e
+  assert_status 1
+  assert_contains "stand-in llvm-profdata failed"
+  assert_contains "merge' failed; the raw profiles are in '"
+  [ -n "$(raw_profiles "$work/failing-tool")" ] || fail "expected the raw profiles to be kept when the merge fails"
+fi
 
 # Parallel workers each write a profile; together they count the same.
 run_fixture CoverageFixture -enable-code-coverage YES -coverage-output "$work/parallel" -parallel-testing-worker-count 2

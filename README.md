@@ -757,9 +757,12 @@ llvm-cov report MyTests.xctest/MyTests -instr-profile coverage/MyTests.profdata
 ```
 
 `xctest` runs the tests in a child process with `LLVM_PROFILE_FILE` set, so the
-bundle, parallel workers and a `-host` application each write a raw profile.
-Once they have finished, it merges them with `llvm-profdata merge` into
-`<dir>/<TestTarget>.profdata` (default directory: `coverage`). It finds
+bundle, parallel workers and a `-host` application each write a raw profile,
+in a new `<dir>/profraw-<unique>` directory of that run's own. Once they have
+finished, it merges them with `llvm-profdata merge` into
+`<dir>/<TestTarget>.profdata` (default directory: `coverage`) and removes the
+raw profiles, or keeps them if the merge fails. Nothing else in `<dir>` is
+touched, so runs into the same directory can overlap. It finds
 `llvm-profdata` on `PATH`, or the highest-numbered `llvm-profdata-<n>` as
 Debian installs it; `XCTEST_LLVM_PROFDATA` overrides that. The run fails if
 nothing was instrumented or the merge fails; otherwise the tests decide the

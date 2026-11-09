@@ -173,15 +173,16 @@ static NSString *ProfdataPath(void)
 // Runs the tests again in a child xctest with LLVM_PROFILE_FILE set, so the
 // test bundle, the code it loads, parallel workers and a host application
 // each write a raw profile (%p: one per process; %m: one per instrumented
-// binary). Once they have all exited, merges the profiles into
-// <outputDirectory>/<target>.profdata. Returns the exit code for xctest:
-// the tests' result, or 1 if no profile could be written.
+// binary) in <outputDirectory>/profraw-<unique>. Once they have all exited,
+// merges the profiles into <outputDirectory>/<target>.profdata and removes
+// that directory; if the merge fails, it's kept. Returns the exit code for
+// xctest: the tests' result, or 1 if no profile could be written.
 static int RunTestsWithCoverage(int argc, char *argv[], NSString *outputDirectory, NSString *targetName)
 {
     NSFileManager *fileManager = [NSFileManager defaultManager];
     NSString *directory = [outputDirectory isAbsolutePath] ? outputDirectory
         : [[fileManager currentDirectoryPath] stringByAppendingPathComponent:outputDirectory];
-    NSString *rawDirectory = [directory stringByAppendingPathComponent:@"profraw"];
+    NSString *rawDirectory;
     NSString *profile = [directory stringByAppendingPathComponent:
         [(targetName ? targetName : @"xctest") stringByAppendingPathExtension:@"profdata"]];
     NSMutableArray *arguments = [NSMutableArray array];
@@ -198,9 +199,21 @@ static int RunTestsWithCoverage(int argc, char *argv[], NSString *outputDirector
         [arguments addObject:[NSString stringWithUTF8String:argv[i]]];
     }
 
-    // Profiles from an earlier run would be merged into this one.
-    [fileManager removeItemAtPath:rawDirectory error:NULL];
-    if (![fileManager createDirectoryAtPath:rawDirectory withIntermediateDirectories:YES
+    // The raw profiles go in a directory of this run's own, made new here,
+    // so nothing from an earlier or a concurrent run is merged in, and
+    // nothing but this run's directory is ever deleted.
+    BOOL isDirectory = NO;
+    // (A concurrent run may create it at the same moment.)
+    if (![fileManager createDirectoryAtPath:directory withIntermediateDirectories:YES
+                                 attributes:nil error:NULL]
+        && !([fileManager fileExistsAtPath:directory isDirectory:&isDirectory] && isDirectory))
+    {
+        fprintf(stderr, "xctest: could not create coverage directory '%s'\n", [directory UTF8String]);
+        return 1;
+    }
+    rawDirectory = [directory stringByAppendingPathComponent:
+        [@"profraw-" stringByAppendingString:[[NSProcessInfo processInfo] globallyUniqueString]]];
+    if (![fileManager createDirectoryAtPath:rawDirectory withIntermediateDirectories:NO
                                  attributes:nil error:NULL])
     {
         fprintf(stderr, "xctest: could not create coverage directory '%s'\n", [rawDirectory UTF8String]);
@@ -214,6 +227,7 @@ static int RunTestsWithCoverage(int argc, char *argv[], NSString *outputDirector
     [task setEnvironment:environment];
     [task launch];
     [task waitUntilExit];
+    // A child killed by a signal is reported as 1, like any failure.
     testsExitCode = ([task terminationReason] == NSTaskTerminationReasonExit
                      && [task terminationStatus] == 0) ? 0 : 1;
 
@@ -239,17 +253,38 @@ static int RunTestsWithCoverage(int argc, char *argv[], NSString *outputDirector
         return 1;
     }
 
+    // Merged into a file of this run's own, then renamed over the profile,
+    // so a concurrent run's profile is replaced whole, never mixed.
+    NSString *mergedProfile = [rawDirectory stringByAppendingPathComponent:@"merged.profdata"];
     NSTask *merge = [[[NSTask alloc] init] autorelease];
-    NSMutableArray *mergeArguments = [NSMutableArray arrayWithObjects:@"merge", @"-sparse", @"-o", profile, nil];
+    NSMutableArray *mergeArguments = [NSMutableArray arrayWithObjects:@"merge", @"-sparse", @"-o",
+                                         mergedProfile, nil];
+    BOOL merged = NO;
+
     [mergeArguments addObjectsFromArray:rawProfiles];
-    [fileManager removeItemAtPath:profile error:NULL];
     [merge setLaunchPath:profdata];
     [merge setArguments:mergeArguments];
-    [merge launch];
-    [merge waitUntilExit];
-    if ([merge terminationReason] != NSTaskTerminationReasonExit || [merge terminationStatus] != 0) {
+    @try {
+        [merge launch];
+        [merge waitUntilExit];
+        merged = [merge terminationReason] == NSTaskTerminationReasonExit && [merge terminationStatus] == 0;
+    }
+    @catch (NSException *exception) {
+        fprintf(stderr, "xctest: could not run '%s': %s\n", [profdata UTF8String],
+                [[exception reason] UTF8String]);
+    }
+    if (!merged) {
         fprintf(stderr, "xctest: '%s merge' failed; the raw profiles are in '%s'\n",
                 [profdata UTF8String], [rawDirectory UTF8String]);
+        return 1;
+    }
+#if defined(_WIN32)
+    // Windows' rename doesn't replace an existing file.
+    [fileManager removeItemAtPath:profile error:NULL];
+#endif
+    if (rename([mergedProfile fileSystemRepresentation], [profile fileSystemRepresentation]) != 0) {
+        fprintf(stderr, "xctest: could not write '%s'; the merged profile is '%s'\n",
+                [profile UTF8String], [mergedProfile UTF8String]);
         return 1;
     }
     [fileManager removeItemAtPath:rawDirectory error:NULL];
