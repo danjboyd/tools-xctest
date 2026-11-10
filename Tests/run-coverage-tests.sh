@@ -90,6 +90,42 @@ wait "$second" || { output=$(cat "$work/second.log"); fail "expected the second 
   || fail "expected concurrent runs each to write a whole profile"
 [ -z "$(raw_directories "$work/concurrent")" ] || fail "expected both runs' raw profiles to be removed"
 
+# The same with their replacements at the same moment: each waits a
+# second right before replacing the profile. Replacing in one step means
+# neither finds the other's file in its way (before, Windows removed the
+# profile and then moved the new one in, and the second run could fail).
+run_concurrent_pair() {
+  coverage_env XCTEST_COVERAGE_TEST_REPLACE_DELAY=1 "$xctest_bin" \
+    "$source_root/Tests/CoverageFixture/CoverageFixture.bundle" -coverage-output "$1" > "$work/first.log" 2>&1 &
+  first=$!
+  coverage_env XCTEST_COVERAGE_TEST_REPLACE_DELAY=1 "$xctest_bin" \
+    "$source_root/Tests/CoverageFixture/CoverageFixture.bundle" -coverage-output "$1" > "$work/second.log" 2>&1 &
+  second=$!
+  wait "$first" || { output=$(cat "$work/first.log"); fail "expected the first of two simultaneous replacements to succeed"; }
+  wait "$second" || { output=$(cat "$work/second.log"); fail "expected the second of two simultaneous replacements to succeed"; }
+}
+run_concurrent_pair "$work/simultaneous"
+run_concurrent_pair "$work/simultaneous"
+[ "$(covered_count "$work/simultaneous/CoverageFixture.profdata")" = 2 ] \
+  || fail "expected simultaneous replacements to leave one whole profile"
+[ -z "$(raw_directories "$work/simultaneous")" ] || fail "expected the simultaneous runs' raw profiles to be removed"
+
+# A replacement that fails leaves the previous profile as it was, keeps
+# the new merged profile, and fails the run.
+run_fixture CoverageFixture -coverage-output "$work/replace-fail"
+assert_status 0
+set +e
+output=$(coverage_env XCTEST_COVERAGE_TEST_REPLACE_FAIL=1 "$xctest_bin" \
+  "$source_root/Tests/CoverageFixture/CoverageFixture.bundle" -coverage-output "$work/replace-fail" 2>&1)
+status=$?
+set -e
+assert_status 1
+assert_contains "/replace-fail/CoverageFixture.profdata'; the merged profile is '"
+[ "$(covered_count "$work/replace-fail/CoverageFixture.profdata")" = 2 ] \
+  || fail "expected the previous profile to be left whole when the replacement fails"
+[ -n "$(find "$work/replace-fail" -path '*/profraw-*/merged.profdata')" ] \
+  || fail "expected the new merged profile to be kept when the replacement fails"
+
 # Without a working llvm-profdata the run fails, and keeps its raw
 # profiles: a tool that isn't there, and (where a script can be run as
 # one) a tool that fails.
