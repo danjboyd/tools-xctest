@@ -77,11 +77,13 @@ signal_owned() {
   done
 }
 
-# Ends any owned process still running: TERM, then KILL after 5 s. Sets
-# $leftover to the "pid:start" entries it found, and prints each one's
-# command line first, as a receipt.
+# Ends any owned process still running: TERM, then KILL after 5 s, then
+# rescans for up to 5 s more. Sets $leftover to the "pid:start" entries it
+# found (printing each one's command line first, as a receipt) and
+# $residual to any still running at the end; returns 1 if there are any.
 end_owned_processes() {
   local entries entry
+  residual=
   leftover=$(owned_pids | tr '\n' ' ')
   [ -n "${leftover// }" ] || return 0
   for entry in $leftover; do
@@ -94,11 +96,28 @@ end_owned_processes() {
     sleep 1
   done
   signal_owned KILL $entries
+  for _ in 1 2 3 4 5; do
+    entries=$(owned_pids | tr '\n' ' ')
+    [ -n "${entries// }" ] || return 0
+    sleep 1
+  done
+  residual=$entries
+  echo "owned processes still running after KILL (pid:start): $residual"
+  return 1
 }
 
+# On every exit: end what's left. Only when nothing owned is still running
+# is the scratch directory (and its private GNUstep configuration) removed;
+# otherwise it's kept for inspection, and the script fails.
 cleanup_owned() {
-  end_owned_processes
-  rm -r "$owned_tmp" 2>/dev/null || true
+  local status=$?
+  if end_owned_processes; then
+    rm -r "$owned_tmp" 2>/dev/null || true
+  else
+    echo "Cleanup incomplete; kept $owned_tmp" >&2
+    status=1
+  fi
+  exit "$status"
 }
 trap cleanup_owned EXIT
 
@@ -149,7 +168,7 @@ run_ui() {
   set -e
   elapsed=$(( $(date +%s) - start ))
   # Nothing a finished run started may outlive it.
-  end_owned_processes
+  end_owned_processes || fail "processes the run started are still running after KILL: $residual"
   [ -z "${leftover// }" ] || echo "run_ui: ended processes the run left behind (pid:start): $leftover"
   echo "run_ui: $(cat "$owned_tmp/unreadable") other users' processes couldn't be checked for ownership"
 }
@@ -237,6 +256,20 @@ if [ ${#display_wrapper[@]} -gt 0 ]; then
   [ -n "${leftover// }" ] || fail "expected the killed run to leave processes for the harness to end"
   [ -z "$(owned_pids)" ] || fail "expected no owned processes after cleanup: $(owned_pids)"
 fi
+
+# A process that ignores TERM (the shell and its sleep both inherit the
+# ignored signal) is ended with KILL, identified by its exact pid and start
+# time, and nothing owned remains.
+env TMPDIR="$owned_tmp" setsid sh -c 'trap "" TERM; sleep 60' < /dev/null > /dev/null 2>&1 &
+stubborn=$!
+sleep 0.5
+stubborn_id="$stubborn:$(proc_start "$stubborn")"
+end_owned_processes || fail "expected the TERM-ignoring process to be ended: $residual"
+case " $leftover " in
+  *" $stubborn_id "*) ;;
+  *) fail "expected the cleanup to name the TERM-ignoring process $stubborn_id, got: $leftover" ;;
+esac
+[ -z "$(owned_pids)" ] || fail "expected no owned processes after KILL: $(owned_pids)"
 
 make -C "$source_root/Tests/UIThreadFixture" clean > /dev/null
 echo "UI test thread regressions passed."
