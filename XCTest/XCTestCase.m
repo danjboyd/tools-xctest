@@ -753,10 +753,19 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
     _GSXCTWatchdogTestWillStart(self);
 
     @autoreleasepool {
+        BOOL onTestThread = _GSXCTClassRunsOnTestThread([self class]);
+
         // invokeTest handles its own failures; this catches anything an
         // overriding invokeTest lets escape.
         @try {
-            [self invokeTest];
+            if (onTestThread && _GSXCTMainThreadIsWedged()) {
+                [self recordFailureWithDescription:@"not run: the application stopped responding in an earlier test"
+                                            inFile:nil
+                                            atLine:0
+                                          expected:NO];
+            } else {
+                [self invokeTest];
+            }
         }
         @catch (_XCTSkipFailureException *skip) {
             [self _gsRecordSkip:skip];
@@ -765,6 +774,10 @@ static __thread XCTIssue *GSLegacyRecordingIssue = nil;
         }
         @catch (NSException *exception) {
             [self _gsRecordException:exception where:@""];
+        }
+
+        if (onTestThread) {
+            _GSXCTMainThreadTestDidFinish(self);
         }
 
         @try {

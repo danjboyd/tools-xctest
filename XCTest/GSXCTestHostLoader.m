@@ -26,6 +26,7 @@
 
 #import <Foundation/Foundation.h>
 #import <XCTest/GSXCTestRunner.h>
+#import <XCTest/XCTestPrivate.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -103,6 +104,39 @@ static void GSWriteStatusFile(int exitCode)
     }
 }
 
++ (int) runTestsWithRunner: (GSXCTestRunner *)runner
+{
+    return [runner runTestsForTargetName:[GSHostConfig objectForKey:@"targetName"]
+                     onlyTestIdentifiers:[GSHostConfig objectForKey:@"only"]
+                     skipTestIdentifiers:[GSHostConfig objectForKey:@"skip"]] ? 0 : 1;
+}
+
++ (void) runTestsOnTestThread: (GSXCTestRunner *)runner
+{
+    @autoreleasepool {
+        int exitCode = [self runTestsWithRunner:runner];
+
+        GSWriteStatusFile(exitCode);
+        fflush(stdout);
+        fflush(stderr);
+        // An application that stopped responding can't run the exit on
+        // its main thread: end here, with the results already written.
+        if (_GSXCTMainThreadIsWedged()) {
+            _exit(exitCode);
+        }
+        [self performSelectorOnMainThread:@selector(exitWithCode:)
+                               withObject:[NSNumber numberWithInt:exitCode]
+                            waitUntilDone:NO
+                                    modes:[NSArray arrayWithObjects:NSDefaultRunLoopMode,
+                                              @"NSModalPanelRunLoopMode", @"NSEventTrackingRunLoopMode", nil]];
+    }
+}
+
++ (void) exitWithCode: (NSNumber *)exitCode
+{
+    exit([exitCode intValue]);
+}
+
 + (void) runTests
 {
     int exitCode = 1;
@@ -166,9 +200,18 @@ static void GSWriteStatusFile(int exitCode)
                 [runner setUpdatePerformanceBaselines:[[GSHostConfig objectForKey:@"updatePerformanceBaselines"] boolValue]];
             }
 
-            exitCode = [runner runTestsForTargetName:[GSHostConfig objectForKey:@"targetName"]
-                                 onlyTestIdentifiers:[GSHostConfig objectForKey:@"only"]
-                                 skipTestIdentifiers:[GSHostConfig objectForKey:@"skip"]] ? 0 : 1;
+            // A class that opts in to the UI test thread: run the tests
+            // on a test thread and return to the application's run loop.
+            // The test thread hands the result back when it's done.
+            if (_GSXCTAnyTestClassRunsOnTestThread()) {
+                _GSXCTMainThreadSetTestThreadActive(YES);
+                [NSThread detachNewThreadSelector:@selector(runTestsOnTestThread:)
+                                         toTarget:self
+                                       withObject:runner];
+                return;
+            }
+
+            exitCode = [self runTestsWithRunner:runner];
         }
 
         GSWriteStatusFile(exitCode);

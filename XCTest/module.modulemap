@@ -10,4 +10,10 @@ module XCTest [system] {
     header "GSXCTestRunner.h"
     export *
   }
+
+  // Hosted tests on the UI test thread: `import XCTest.GSXCTestMainThread`.
+  explicit module GSXCTestMainThread {
+    header "GSXCTestMainThread.h"
+    export *
+  }
 }

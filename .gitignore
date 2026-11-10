@@ -55,3 +55,8 @@ Tests/SwiftMakeFixture/SwiftMakeTests.xctest
 Tests/SwiftMakeFixture/obj
 Tests/CoverageFixture/CoverageFixture.bundle
 Tests/CoverageFixture/obj
+# Any fixture build output (bundles, apps and obj/ under Tests/).
+Tests/*/*.bundle
+Tests/*/*.xctest
+Tests/*/*.app
+Tests/*/obj

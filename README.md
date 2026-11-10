@@ -452,6 +452,57 @@ and fails; the tests themselves have no time limit. On a headless machine, run
 it under `xvfb-run -a`. Tests that also run without a host can skip themselves
 with `XCTSkipUnless(NSApp != nil)`.
 
+#### Driving modal windows from a test thread
+
+On the main thread, a test that opens a modal window (`-[NSAlert runModal]`,
+`runModalForWindow:`) is stuck inside the modal loop until the window
+closes, so it can never press its buttons. A hosted test class can instead
+run on a separate test thread, while the main thread keeps running the
+application. It reaches the application only through `GSXCTestMainThread`
+(`#import <XCTest/GSXCTestMainThread.h>`, a GNUstep extension):
+
+```objc
+@implementation AlertTests
++ (BOOL) runsOnUITestThread { return YES; }
+
+- (void) testCancelCloses
+{
+    GSXCTestMainThreadAction *open = [GSXCTestMainThread performAction:^id {
+        [[NSApp delegate] showDeleteConfirmation:nil];   // runs an NSAlert
+        return nil;
+    } timeout:5];
+    XCTAssertEqual([open state], GSXCTestMainThreadActionInNestedLoop);
+
+    [GSXCTestMainThread performAction:^id {
+        [cancelButtonIn([NSApp modalWindow]) performClick:nil];
+        return nil;
+    } timeout:5];
+    XCTAssertTrue([GSXCTestMainThread waitForIdleWithTimeout:5]);
+}
+@end
+```
+
+- **Queries and actions.** `performQuery:timeout:timedOut:` runs a block on
+  the main thread and returns its result. `performAction:timeout:` dispatches
+  a block and reports whether it completed, is running a nested loop (a modal
+  session), never started, or is blocked because the main thread isn't
+  servicing its run loop. Both are serviced in the default, modal-panel and
+  event-tracking run-loop modes, so they work while an alert is up. They time
+  out instead of hanging.
+- **Ordinary classes are unchanged.** Classes that don't opt in still run on
+  the main thread, in their usual order. A run with no opted-in class
+  behaves exactly as before. Without `-host`, the option has no effect.
+- **After each opted-in test**, a test that left actions running or a modal
+  session open fails, and those sessions are ended (`abortModal`) so the next
+  test starts clean.
+- **A stopped application.** If the main thread doesn't answer after a test,
+  the application is treated as stopped: the remaining tests fail without
+  running, and the run ends with the results written.
+- **Not supported yet:** sheets, menu tracking, typing, and more than three
+  nested modal sessions. There are no element queries
+  (`XCUIApplication`-style) yet either; see issue #26.
+  Linux only, as `-host` is.
+
 ## Building test bundles
 
 With gnustep-make, include the `xctest.make` that tools-xctest installs:

@@ -120,6 +120,19 @@ GSXCTestIssue *_GSXCTIssueForSkip(_XCTSkipFailureException *skip);
 // "Name", "reason" -- the way Apple's XCTest describes a caught exception.
 NSString *_GSXCTDescribeException(NSException *exception);
 
+// The UI test thread (GSXCTestMainThread.m). The host loader turns it on
+// when a test class opts in; then opted-in classes run on the test thread
+// and the others are run on the main thread.
+void _GSXCTMainThreadSetTestThreadActive(BOOL active);
+BOOL _GSXCTMainThreadIsWedged(void);
+// Whether \a testCaseClass runs on the test thread in this run.
+BOOL _GSXCTClassRunsOnTestThread(Class testCaseClass);
+// Whether any loaded test class opts in to the test thread.
+BOOL _GSXCTAnyTestClassRunsOnTestThread(void);
+// After each opted-in test: fails it for actions or modal sessions it left,
+// and ends them.
+void _GSXCTMainThreadTestDidFinish(XCTestCase *testCase);
+
 @interface XCTest (GSPrivate)
 - (void) _gsSetTestRun: (XCTestRun *)run;
 @end

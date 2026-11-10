@@ -5,6 +5,13 @@ Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 
 ## Unreleased
 
+- Hosted tests can drive modal windows: a test class whose
+  `+runsOnUITestThread` returns YES runs on a separate test thread while the
+  application's main thread keeps running, and reaches the application
+  through `GSXCTestMainThread`. It provides queries, and actions that report
+  when they're parked in a modal loop. Both have timeouts. After each test,
+  modal sessions it left are ended. Other classes, and runs with no
+  opted-in class, are unchanged.
 - An `xctest(1)` man page, installed by gnustep-make (in the domain's man
   directory) and Meson (`mandir`). A regression check keeps its options in
   step with `xctest -h`.
