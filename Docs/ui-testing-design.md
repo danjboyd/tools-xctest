@@ -119,12 +119,16 @@ fallback:
      until something ends the modal session.
    - Apple avoids this because its tests are another process.
 
-   - **(a) Recommended:** run UI tests (classes that use `XCUIApplication`,
-     or are marked to) on a separate test thread, while the main thread
-     keeps running the app normally. Every query and action hops to the
-     main thread, synchronously, in the default *and* modal run-loop modes,
-     so tests can drive alerts and modal windows. That's closest to how
-     Apple's UI tests behave.
+   - **(a) Recommended:** run UI tests (classes that opt in) on a separate
+     test thread, while the main thread keeps running the app normally.
+     Queries and actions are carried out on the main thread, in the
+     default, modal-panel and event-tracking run-loop modes, so tests can
+     drive alerts and modal windows. A *synchronous* hop isn't enough: an
+     action that opens a modal loop never returns while the loop runs, so
+     the test thread would block as it does today. Actions are therefore
+     dispatched asynchronously and complete in one of two ways; see
+     [Threading and dispatch](#threading-and-dispatch-for-1a). That's
+     closest to how Apple's UI tests behave.
      - Costs: a second threading model in the runner.
      - Costs: `XCTWaiter` and expectations must work from a non-main thread.
      - Costs: tests must not touch AppKit objects directly, only through
@@ -159,6 +163,149 @@ fallback:
      frame inside the window's content", and leave occlusion by other
      windows for later.
 
+## Threading and dispatch (for 1a)
+
+This section answers the review of the first draft: a synchronous
+main-thread dispatch of an action that enters `runModal` still blocks the
+test thread. Nothing here changes hosted tests that don't opt in.
+
+### Who runs where
+
+- **Opt-in.** A test class opts in with `+ (BOOL) runsOnUITestThread`
+  returning YES. A `libXCTestUI` base class, `XCUITestCase`, returns YES.
+  Every other class runs exactly as today: on the main thread, in order,
+  before any UI class.
+- **The test thread.** When the first opted-in class is reached, the
+  loader starts one test thread. It runs the opted-in classes in the usual
+  order, then hands the result back to the main thread, which exits as
+  today. Meanwhile the main thread returns to its run loop. **The main
+  thread never waits on the test thread.** That one rule removes the
+  deadlocks where each thread waits for the other.
+- **AppKit stays on the main thread.** Tests use the API. They don't touch
+  `NSView`s or `NSWindow`s directly. Debug builds can check this cheaply:
+  every API entry point asserts that it isn't on the main thread.
+
+### How a query is serviced
+
+A query, such as finding a button or reading a label, is a block that
+runs on the main thread and returns a value-only snapshot: no AppKit
+objects cross threads.
+- It's queued with `-performSelector:onThread:withObject:waitUntilDone:NO
+  modes:` in `NSDefaultRunLoopMode`, `NSModalPanelRunLoopMode` and
+  `NSEventTrackingRunLoopMode`.
+  - GNUstep's `runModalForWindow:` waits for events in
+    `NSModalPanelRunLoopMode` (`NSApplication.m`), so a query is serviced
+    while an alert or modal window is up.
+  - Control and scroller tracking, and other `nextEventMatchingMask:` loops,
+    wait in `NSEventTrackingRunLoopMode`.
+- The test thread waits on a condition for the result, up to the query
+  timeout (default 10 s). It doesn't pump the main thread or wait without a
+  limit.
+- If the main thread is in a nested loop running some other mode, or busy
+  and not in a loop at all, the query times out. The test then records a
+  failure naming the query and the main thread's current run-loop mode,
+  not a hang.
+
+### How an action completes
+
+An action (`click`, `typeText:`, a menu item) can run a nested loop and
+not return for as long as that loop runs. So it isn't waited on directly:
+1. The test thread queues the action block, in the same modes as a query.
+   It waits, up to the timeout, for the block to signal that it has
+   *started*.
+2. Only then does it queue a *probe* block. Queuing the probe later
+   matters: a run loop may take a batch of queued performers at once, and
+   a probe in the same batch as the action wouldn't run until the action
+   returned. Queued after the action has started, the probe runs either
+   after the action has returned, or **inside** the action's nested loop:
+   the modal loop services `NSModalPanelRunLoopMode` performers.
+3. The probe tells the test thread which case it was:
+   - **Completed.** The action returned. Its exceptions and failures go
+     back to the test thread and are recorded there.
+   - **Running in a nested loop.** The action started a modal session or a
+     tracking loop, and it's still on the stack. `click` returns, and the
+     test goes on to drive the alert. The action is recorded as
+     *outstanding* on the app object.
+4. When an outstanding action's block finally returns, for example after
+   the test clicks the alert's OK button, it marks itself completed.
+   `-[XCUIApplication waitForIdleWithTimeout:]` waits for every
+   outstanding action to complete.
+5. If the probe doesn't run within the action timeout, the action never
+   started, or it is blocked outside any run loop (a busy loop, or a lock).
+   The test records a failure saying which.
+
+Apple's `click` returns once the app is idle. Ours returns once the app
+is idle *or* parked in a nested loop, which is when a test can do anything
+useful next.
+
+### Timeouts, cancellation and teardown
+
+- **Timeouts.** Each query and action has a timeout (default 10 s). It's
+  set per call with `…WithTimeout:`, or for the class with
+  `-[XCUIApplication setDefaultTimeout:]`. The existing per-test execution
+  time allowance still applies on top and ends the run if a test overruns.
+- **Cancellation.** A block that hasn't started by its timeout is
+  cancelled: it checks a shared flag when it starts and returns at once if
+  it was cancelled. A block that has started can't be stopped from
+  another thread. Its test fails, and the app is marked *wedged*.
+- **Wedged.** Once the main thread has failed to service a probe within
+  its timeout, every later UI test fails at once with "the application
+  stopped responding in <test>". Results are still written. The loader
+  then exits through the existing termination handler, so a wedged app
+  can't hang the run. xctest's own host timeout stays as the last resort.
+- **Teardown after each test.** Before `tearDown` returns, the runner, on
+  the main thread through the same dispatch:
+  - fails the test if actions are still outstanding, or a modal session
+    the test started is still running;
+  - ends those sessions with `-[NSApp abortModal]` (queued in
+    `NSModalPanelRunLoopMode`), up to 3 nested sessions, waiting up to the
+    timeout for each to unwind;
+  - closes windows the test opened (windows not present when the test
+    started) if the class asks for that (`closesNewWindowsAfterEachTest`,
+    default YES).
+
+  If cleanup itself times out, the app is wedged, as above.
+- **End of run.** The test thread finishes, posts the result to the main
+  thread, and the main thread exits as today. The test thread never calls
+  `exit`.
+
+### Expectations
+
+- `XCTestExpectation`, `XCTWaiter` and `waitForExpectations…` already wait
+  by running the *calling* thread's run loop and are thread-safe to
+  fulfil. On the test thread they run the test thread's run loop.
+- Main-thread callbacks that fulfil an expectation (a notification, a
+  delegate method) work unchanged. `-fulfill` is thread-safe.
+- `waitForExistenceWithTimeout:` is an `XCTNSPredicateExpectation`. Its
+  predicate is evaluated on the test thread, and each evaluation is one
+  main-thread query with a short timeout.
+- **Not supported:** waiting for an expectation *on the main thread* from a
+  UI test (that would mean dispatching a wait), and a non-UI test
+  (main thread) waiting on something a UI test does.
+- The runner's existing nested-wait check applies per thread.
+
+### The spike (proof before approval)
+
+One bounded, runner-first experiment, not production code:
+- an opt-in test class on a test thread in a hosted app built in code;
+- it opens an `NSAlert` with `runModal` through an asynchronously
+  dispatched action, sees the probe report "running in a nested loop",
+  queries the alert, clicks OK, and sees the action complete;
+- a failure path: an action that blocks the main thread past its timeout
+  is reported, the app is marked wedged, and the run exits cleanly;
+- teardown with an alert left open is failed and cleaned up by
+  `abortModal`.
+
+It runs under a private Xvfb with a scratch GNUstep user configuration
+(`GNUSTEP_USER_CONFIG_FILE`, with absolute `GNUSTEP_USER_DIR` and
+`GNUSTEP_USER_DEFAULTS_DIR`) and a hard outer timeout. It must also clean
+up its own processes. The results, including any failure, are recorded
+below before the direction goes for approval.
+
+#### Results
+
+*Not yet run.*
+
 ## Testing it
 
 - A new `Tests/UIHostApp`, a small app built in code (no .gorm/.nib):
@@ -181,10 +328,12 @@ fallback:
 
 ## Phases
 
-1. Answer the decisions above.
-2. If 1(a): run a test class on a test thread inside the host, with the
-   main thread running the app. Make `XCTWaiter` and expectations work
-   there. This is runner work, with its own PR and tests.
+1. Run the spike above and record its results. Then answer the decisions
+   above.
+2. If 1(a): run opted-in test classes on a test thread inside the host,
+   with the main thread running the app. That means the dispatch, probe,
+   timeouts and teardown described above, with expectations checked on
+   that thread. This is runner work, with its own PR and tests.
 3. `libXCTestUI`:
    - queries and element types;
    - `click`, `typeText:`, menus;
