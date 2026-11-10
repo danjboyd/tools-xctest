@@ -226,7 +226,10 @@ not return for as long as that loop runs. So it isn't waited on directly:
      tracking loop, and it's still on the stack. `click` returns, and the
      test goes on to drive the alert. The action is recorded as
      *outstanding* on the app object.
-4. When an outstanding action's block finally returns, for example after
+4. After each action block, the dispatch posts an `NSApplicationDefined`
+   event. GNUstep's modal loop only notices `stopModal` or `abortModal` on
+   its next event, and a synthetic click doesn't produce one.
+   When an outstanding action's block finally returns, for example after
    the test clicks the alert's OK button, it marks itself completed.
    `-[XCUIApplication waitForIdleWithTimeout:]` waits for every
    outstanding action to complete.
@@ -257,7 +260,8 @@ useful next.
   the main thread through the same dispatch:
   - fails the test if actions are still outstanding, or a modal session
     the test started is still running;
-  - ends those sessions with `-[NSApp abortModal]` (queued in
+  - ends those sessions with `-[NSApp abortModal]` plus a wake event (see
+    the spike results) (queued in
     `NSModalPanelRunLoopMode`), up to 3 nested sessions, waiting up to the
     timeout for each to unwind;
   - closes windows the test opened (windows not present when the test
@@ -304,7 +308,51 @@ below before the direction goes for approval.
 
 #### Results
 
-*Not yet run.*
+Run on 2026-11-10 on branch `spike/ui-test-thread` (danjboyd fork), on
+Debian 13 with clang 19 and the installed gnustep-gui, with
+`Tests/run-ui-thread-spike.sh` (private `xvfb-run -a`, scratch GNUstep
+config, 90 s outer limit). The final run passed 4/4 tests in about 3.5 s
+and exited 0 by itself. No HostApp, Xvfb or scratch directory was left
+behind.
+
+- **Alert open and dismiss: works.** `runModal` dispatched as an action
+  was reported "in a nested loop". A query inside the modal loop found the
+  alert's OK button. Clicking it ended the loop, the opening action
+  completed, `runModal` returned `NSAlertFirstButtonReturn`, and no modal
+  window was left.
+- **Teardown of an alert left open: works.** `abortModal`, queued in the
+  modal mode, ended one session, and the opening action completed.
+- **Expectation on the test thread** fulfilled from a main-thread timer:
+  works.
+- **Failure path: works.** An action that blocks the main thread for 3 s
+  was reported "blocked outside a run loop" after its 1 s timeout. A query
+  meanwhile timed out at 0.5 s. Queries worked again once the main thread
+  was free. Nothing hung.
+
+What the runs found, now part of the design:
+1. **Programmatic stops need a wake event.** GNUstep's
+   `stopModalWithCode:` and `abortModal` only set the session's state, and
+   the modal loop notices on its next event. A synthetic click or
+   teardown has none, so the dispatch posts an `NSApplicationDefined` event
+   after each action. In a control run without it, the OK click left the
+   alert up, and the opening action never completed within its timeout.
+2. **A completed click may first show as "in a nested loop".** GNUstep's
+   `performClick:` runs the run loop for 0.1 s to show the highlight, and
+   the probe can run in that loop. So `click` returns either way, and
+   completion is judged by `waitForIdle`, as described above, never by the
+   probe's first answer.
+3. **Find controls in the window, not through the model.**
+   `-[NSAlert buttons]` returns templates that are never in a window; the
+   panel copies their titles and tags. Clicking a template does nothing.
+   The first run failed this way. Queries walk the real window's views,
+   which the proposed API does anyway.
+4. **A modal left over affects the next test.** In the first run, test A's
+   alert stayed up beneath test B's, and teardown ended both. That's why
+   per-test teardown has to check for and end modal sessions.
+
+Not covered by the spike: sheets, menu tracking
+(`NSEventTrackingRunLoopMode`), nested modals deeper than two, and
+`typeText:`.
 
 ## Testing it
 
