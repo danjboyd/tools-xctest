@@ -36,6 +36,7 @@ GNUSTEP_USER_DIR_LIBRARY=$work/home/GNUstep/Library
 GNUSTEP_USER_DIR_APPS=$work/home/GNUstep/Applications
 GNUSTEP_USER_DIR_TOOLS=$work/home/GNUstep/Tools
 EOF
+chmod 600 "$work/GNUstep.conf"
 mkdir -p "$work/home" "$work/defaults" "$work/run" "$work/tmp"
 chmod 700 "$work/run"
 export GNUSTEP_CONFIG_FILE="$work/GNUstep.conf" GNUSTEP_USER_CONFIG_FILE="$work/no-user.conf"
