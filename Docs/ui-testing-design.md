@@ -172,18 +172,21 @@ test thread. Nothing here changes hosted tests that don't opt in.
 ### Who runs where
 
 - **Opt-in.** A test class opts in with `+ (BOOL) runsOnUITestThread`
-  returning YES. A `libXCTestUI` base class, `XCUITestCase`, returns YES.
-  Every other class runs exactly as today: on the main thread, in order,
-  before any UI class.
-- **The test thread.** When the first opted-in class is reached, the
-  loader starts one test thread. It runs the opted-in classes in the usual
-  order, then hands the result back to the main thread, which exits as
-  today. Meanwhile the main thread returns to its run loop. **The main
-  thread never waits on the test thread.** That one rule removes the
-  deadlocks where each thread waits for the other.
+  returning YES. (A later `libXCTestUI` base class could return YES.)
+  Every other class runs exactly as today: on the main thread, in the
+  usual order.
+- **The test thread.** If a loaded class opts in, the loader runs the
+  whole run on one test thread and the main thread returns to its run
+  loop. The test thread hands each class that doesn't opt in to the main
+  thread and waits for it, so those still run on the main thread, in
+  order. When the run ends, it hands the result back to the main thread,
+  which exits as today. **The main thread never waits on the test
+  thread.** That one rule removes the deadlocks where each thread waits
+  for the other. A run where no class opts in takes the old path
+  unchanged.
 - **AppKit stays on the main thread.** Tests use the API. They don't touch
-  `NSView`s or `NSWindow`s directly. Debug builds can check this cheaply:
-  every API entry point asserts that it isn't on the main thread.
+  `NSView`s or `NSWindow`s directly. Called on the main thread, the API
+  runs blocks directly.
 
 ### How a query is serviced
 
@@ -244,18 +247,21 @@ useful next.
 ### Timeouts, cancellation and teardown
 
 - **Timeouts.** Each query and action has a timeout (default 10 s). It's
-  set per call with `…WithTimeout:`, or for the class with
-  `-[XCUIApplication setDefaultTimeout:]`. The existing per-test execution
+  set per call, and the default with
+  `+[GSXCTestMainThread setDefaultTimeout:]` (the phase 2 dispatch API). The existing per-test execution
   time allowance still applies on top and ends the run if a test overruns.
 - **Cancellation.** A block that hasn't started by its timeout is
   cancelled: it checks a shared flag when it starts and returns at once if
   it was cancelled. A block that has started can't be stopped from
-  another thread. Its test fails, and the app is marked *wedged*.
-- **Wedged.** Once the main thread has failed to service a probe within
-  its timeout, every later UI test fails at once with "the application
-  stopped responding in <test>". Results are still written. The loader
-  then exits through the existing termination handler, so a wedged app
-  can't hang the run. xctest's own host timeout stays as the last resort.
+  another thread. The action reports *blocked*, and the test decides; it
+  may well recover once the main thread is free.
+- **Wedged.** If the main thread still doesn't answer during teardown
+  (below), the app is *wedged*. That test fails, and every later test,
+  UI or not, fails without running ("the application stopped responding
+  in an earlier test"). The results are still written. The loader then
+  exits from the test thread, since the main thread can't run the exit,
+  so a wedged app can't hang the run. xctest's own host timeout stays as
+  the last resort.
 - **Teardown after each test.** Before `tearDown` returns, the runner, on
   the main thread through the same dispatch:
   - fails the test if actions are still outstanding, or a modal session
@@ -264,14 +270,15 @@ useful next.
     the spike results) (queued in
     `NSModalPanelRunLoopMode`), up to 3 nested sessions, waiting up to the
     timeout for each to unwind;
-  - closes windows the test opened (windows not present when the test
-    started) if the class asks for that (`closesNewWindowsAfterEachTest`,
-    default YES).
+  - reports an exception an action raised as a failure of the test.
+
+  Closing windows the test opened is left for later; phase 2 doesn't do
+  it.
 
   If cleanup itself times out, the app is wedged, as above.
 - **End of run.** The test thread finishes, posts the result to the main
-  thread, and the main thread exits as today. The test thread never calls
-  `exit`.
+  thread, and the main thread exits as today. Only a wedged app exits from
+  the test thread.
 
 ### Expectations
 
