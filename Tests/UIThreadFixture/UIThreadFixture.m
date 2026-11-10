@@ -227,6 +227,103 @@ static BOOL UIThreadModalWindowIsUp(void)
     NSLog(@"uithread: next test started clean");
 }
 
+// A query that enters a modal loop times out but keeps running; teardown
+// fails the test and ends the modal, and the next test starts clean.
+- (void) testCQueryEntersAModal
+{
+    BOOL timedOut = NO;
+
+    [GSXCTestMainThread performQuery:^id (void) {
+        NSAlert *alert = [[[NSAlert alloc] init] autorelease];
+
+        [alert setMessageText:@"Opened by a query"];
+        [alert addButtonWithTitle:@"OK"];
+        return [NSNumber numberWithInteger:[alert runModal]];
+    } timeout:0.5 timedOut:&timedOut];
+    XCTAssertTrue(timedOut);
+}
+
+- (void) testDStartsCleanAgain
+{
+    XCTAssertFalse(UIThreadModalWindowIsUp(), @"expected teardown to have ended the query's alert");
+    XCTAssertTrue([GSXCTestMainThread waitForIdleWithTimeout:1]);
+    NSLog(@"uithread: started clean again");
+}
+
+@end
+
+// Run on its own, with UIThreadZOrdinaryTests: the main thread stops
+// answering after this class's tests, in +tearDown, so the hand-off of the
+// next (ordinary) class to the main thread can't start. That class fails
+// without running, and the run ends without waiting.
+@interface UIThreadYBlocksBetweenClassesTests : XCTestCase
+@end
+
+@implementation UIThreadYBlocksBetweenClassesTests
+
++ (BOOL) runsOnUITestThread
+{
+    return YES;
+}
+
++ (void) setUp
+{
+    [GSXCTestMainThread setDefaultTimeout:1];
+}
+
++ (void) tearDown
+{
+    [GSXCTestMainThread performAction:^id (void) {
+        sleep(30);
+        return nil;
+    } timeout:0.1];
+}
+
+- (void) testPasses
+{
+    NSLog(@"uithread: class before the blocked hand-off ran");
+}
+
+@end
+
+// Run without -host: the opt-in has no effect, the test runs on the main
+// thread, and queries and actions run on the calling thread.
+@interface UIThreadInactiveTests : XCTestCase
+@end
+
+@implementation UIThreadInactiveTests
+
++ (BOOL) runsOnUITestThread
+{
+    return YES;
+}
+
+- (void) testRunsInlineWithoutAHost
+{
+    __block NSThread *queryThread = nil;
+    NSThread *background;
+    XCTestExpectation *done = [self expectationWithDescription:@"background query"];
+
+    XCTAssertTrue([NSThread isMainThread]);
+    XCTAssertFalse([GSXCTestMainThread isTestThreadActive]);
+    XCTAssertEqualObjects([GSXCTestMainThread performQuery:^id (void) { return @"inline"; }
+                                                   timeout:1 timedOut:NULL], @"inline");
+    XCTAssertEqual([[GSXCTestMainThread performAction:^id (void) { return nil; } timeout:1] state],
+                   GSXCTestMainThreadActionCompleted);
+
+    background = [[[NSThread alloc] initWithBlock:^{
+        [GSXCTestMainThread performQuery:^id (void) {
+            queryThread = [NSThread currentThread];
+            return nil;
+        } timeout:1 timedOut:NULL];
+        [done fulfill];
+    }] autorelease];
+    [background start];
+    [self waitForExpectationsWithTimeout:5 handler:nil];
+    XCTAssertEqual(queryThread, background, @"expected the query to run on the calling thread");
+    NSLog(@"uithread: inactive mode runs inline");
+}
+
 @end
 
 // Run on its own: the first test blocks the main thread past teardown's

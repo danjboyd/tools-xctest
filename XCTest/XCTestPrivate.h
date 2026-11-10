@@ -132,6 +132,10 @@ BOOL _GSXCTAnyTestClassRunsOnTestThread(void);
 // After each opted-in test: fails it for actions or modal sessions it left,
 // and ends them.
 void _GSXCTMainThreadTestDidFinish(XCTestCase *testCase);
+// From the test thread: runs \a block on the main thread and waits for it.
+// If the main thread doesn't start it within the default timeout, it's
+// cancelled, the application is treated as stopped, and NO is returned.
+BOOL _GSXCTRunOnMainThreadUnlessWedged(void (^block)(void));
 
 @interface XCTest (GSPrivate)
 - (void) _gsSetTestRun: (XCTestRun *)run;

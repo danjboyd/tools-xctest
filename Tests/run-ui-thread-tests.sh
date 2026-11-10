@@ -43,7 +43,8 @@ echo "Running UI test thread regressions..."
 
 # The opted-in class drives a modal alert from the test thread; the
 # ordinary classes before and after it run on the main thread, in order.
-run_ui -skip-testing:UIThreadFixture/UIThreadTeardownTests -skip-testing:UIThreadFixture/UIThreadWedgedTests
+run_ui -skip-testing:UIThreadFixture/UIThreadTeardownTests -skip-testing:UIThreadFixture/UIThreadWedgedTests \
+  -skip-testing:UIThreadFixture/UIThreadYBlocksBetweenClassesTests -skip-testing:UIThreadFixture/UIThreadInactiveTests
 assert_status 0
 assert_contains "UIThreadAOrdinaryTests: 1 tests PASSED"
 assert_contains "UIThreadDispatchTests: 4 tests PASSED"
@@ -63,13 +64,17 @@ assert_status 0
 assert_contains "UIThreadAOrdinaryTests: 1 tests PASSED"
 
 # A test that leaves an alert open fails, and teardown ends the alert so
-# the next test starts clean.
+# the next test starts clean; the same for a query that entered a modal
+# loop and timed out.
 run_ui -only-testing:UIThreadFixture/UIThreadTeardownTests
 assert_status 1
 assert_contains "the test ended with 1 action(s) still running and a modal session open; they were ended"
 assert_contains "testALeavesAnAlertOpen FAILED"
 assert_contains "uithread: next test started clean"
 assert_not_contains "testBStartsClean FAILED"
+assert_contains "testCQueryEntersAModal FAILED"
+assert_contains "uithread: started clean again"
+assert_not_contains "testDStartsCleanAgain FAILED"
 
 # An application whose main thread stops responding: the test fails, the
 # rest fail without running, and the run ends without waiting for it.
@@ -81,6 +86,23 @@ assert_contains "testBNeverRuns FAILED"
 assert_contains "testRunsOnTheMainThreadAfterTheUIClass FAILED"
 assert_not_contains "uithread: a test ran after the application stopped responding"
 [ "$elapsed" -lt 25 ] || fail "expected the run to end without waiting for the main thread (took ${elapsed}s)"
+
+# The main thread stops answering between classes: the next class's
+# hand-off to the main thread is bounded, so it fails without running and
+# the run ends without waiting.
+run_ui -only-testing:UIThreadFixture/UIThreadYBlocksBetweenClassesTests -only-testing:UIThreadFixture/UIThreadZOrdinaryTests
+assert_status 1
+assert_contains "uithread: class before the blocked hand-off ran"
+assert_contains "UIThreadYBlocksBetweenClassesTests: 1 tests PASSED"
+assert_contains "not run: the application stopped responding in an earlier test"
+assert_contains "testRunsOnTheMainThreadAfterTheUIClass FAILED"
+assert_not_contains "uithread: ordinary class after ran on the main thread"
+[ "$elapsed" -lt 25 ] || fail "expected the run to end without waiting for the main thread (took ${elapsed}s)"
+
+# Without -host, the opt-in has no effect and everything runs inline.
+run_fixture UIThreadFixture -only-testing:UIThreadFixture/UIThreadInactiveTests
+assert_status 0
+assert_contains "uithread: inactive mode runs inline"
 
 make -C "$source_root/Tests/UIThreadFixture" clean > /dev/null
 echo "UI test thread regressions passed."

@@ -282,14 +282,22 @@ static void GSWakeModalLoop(void)
     if (timedOut != NULL) {
         *timedOut = NO;
     }
-    if ([NSThread isMainThread]) {
+    if (!GSTestThreadActive || [NSThread isMainThread]) {
         return block();
     }
 
     query = [[[GSXCTestMainThreadAction alloc] _gsInitWithBlock:block] autorelease];
     [query _gsQueue];
     if (![query _gsWaitUntilStarted:YES timeout:timeout]) {
-        [query _gsCancelUnlessStarted];
+        // Not started: cancelled, it never runs. Started (it may be running
+        // a nested loop, or the main thread is blocked inside it): it's
+        // still live, so teardown waits for it and reports it, as for an
+        // action.
+        if ([query _gsCancelUnlessStarted]) {
+            @synchronized (GSActions) {
+                [GSActions addObject:query];
+            }
+        }
         if (timedOut != NULL) {
             *timedOut = YES;
         }
@@ -308,7 +316,7 @@ static void GSWakeModalLoop(void)
     GSXCTestMainThreadAction *probe;
 
     action->_wakeModalLoop = YES;
-    if ([NSThread isMainThread]) {
+    if (!GSTestThreadActive || [NSThread isMainThread]) {
         [action _gsRun];
         action->_state = GSXCTestMainThreadActionCompleted;
         return action;
@@ -414,6 +422,31 @@ BOOL _GSXCTAnyTestClassRunsOnTestThread(void)
     }
     free(classes);
     return found;
+}
+
+BOOL _GSXCTRunOnMainThreadUnlessWedged(void (^block)(void))
+{
+    GSXCTestMainThreadAction *handoff;
+
+    if (GSWedged) {
+        return NO;
+    }
+    handoff = [[[GSXCTestMainThreadAction alloc] _gsInitWithBlock:^id (void) {
+        block();
+        return nil;
+    }] autorelease];
+    [handoff _gsQueue];
+    // The start is bounded; once started, the block runs as long as it
+    // needs (its tests have their own time allowances).
+    if (![handoff _gsWaitUntilStarted:NO timeout:GSDefaultTimeout] && ![handoff _gsCancelUnlessStarted]) {
+        GSWedged = YES;
+        return NO;
+    }
+    [handoff _gsWaitUntilStarted:YES timeout:[[NSDate distantFuture] timeIntervalSinceNow]];
+    if ([handoff exception] != nil) {
+        [[handoff exception] raise];
+    }
+    return YES;
 }
 
 // Records a failure without letting continueAfterFailure = NO interrupt

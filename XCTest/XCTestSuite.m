@@ -346,29 +346,26 @@ static NSUInteger GSRepetitionIterations = 1;
     // thread waits for them; the main thread never waits for it.)
     if ([GSXCTestMainThread isTestThreadActive] && ![NSThread isMainThread]
         && !_GSXCTClassRunsOnTestThread(_testCaseClass)) {
-        if (_GSXCTMainThreadIsWedged()) {
-            GSXCTestIssue *cause = [GSXCTestIssue
-                issueWithMessage:@"not run: the application stopped responding in an earlier test"
-                        filePath:nil
-                      lineNumber:0
-                      unexpected:YES];
+        GSXCTestIssue *cause = nil;
 
-            [self _gsSetTestRun:run];
-            [run start];
-            for (XCTest *test in _tests) {
-                if ([test respondsToSelector:@selector(_gsFailWithoutRunning:)]) {
-                    [(id)test _gsFailWithoutRunning:cause];
-                    [(XCTestSuiteRun *)run addTestRun:[test testRun]];
-                }
-            }
-            [run stop];
+        // The hand-off is bounded: a main thread that doesn't take it is
+        // treated as stopped.
+        if (_GSXCTRunOnMainThreadUnlessWedged(^{ [self _gsPerformTest:run]; })) {
             return;
         }
-        [self performSelectorOnMainThread:@selector(_gsPerformTest:)
-                               withObject:run
-                            waitUntilDone:YES
-                                    modes:[NSArray arrayWithObjects:NSDefaultRunLoopMode,
-                                              @"NSModalPanelRunLoopMode", @"NSEventTrackingRunLoopMode", nil]];
+        cause = [GSXCTestIssue issueWithMessage:@"not run: the application stopped responding in an earlier test"
+                                       filePath:nil
+                                     lineNumber:0
+                                     unexpected:YES];
+        [self _gsSetTestRun:run];
+        [run start];
+        for (XCTest *test in _tests) {
+            if ([test respondsToSelector:@selector(_gsFailWithoutRunning:)]) {
+                [(id)test _gsFailWithoutRunning:cause];
+                [(XCTestSuiteRun *)run addTestRun:[test testRun]];
+            }
+        }
+        [run stop];
         return;
     }
     [self _gsPerformTest:run];

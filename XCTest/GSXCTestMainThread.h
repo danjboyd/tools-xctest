@@ -33,7 +33,8 @@
 // so they are also serviced while a modal window is up.
 //
 // Outside that mode (no -host, or no class opts in), or when called on the
-// main thread, blocks simply run on the calling thread.
+// main thread, blocks simply run on the calling thread, and an action is
+// always reported completed.
 //
 // Not supported yet: sheets, menu tracking, typing, and modal sessions
 // nested more than three deep. See issue #26.
@@ -84,8 +85,11 @@ typedef NS_ENUM(NSInteger, GSXCTestMainThreadActionState) {
 
 /// Runs \a block on the main thread and returns its result, waiting up to
 /// \a timeout seconds. If it didn't run in time, it's cancelled, nil is
-/// returned and \a timedOut (if given) is set to YES. An exception the
-/// block raises is raised again on the calling thread.
+/// returned and \a timedOut (if given) is set to YES. A query that started
+/// but didn't finish in time (it's running a nested loop, or the main
+/// thread is blocked inside it) keeps running: like an unfinished action,
+/// it fails its test at teardown and is cleaned up then. An exception the
+/// block raises in time is raised again on the calling thread.
 + (id) performQuery: (id (^)(void))block
             timeout: (NSTimeInterval)timeout
            timedOut: (BOOL *)timedOut;
