@@ -73,6 +73,9 @@ assert_contains "testALeavesAnAlertOpen FAILED"
 assert_contains "uithread: next test started clean"
 assert_not_contains "testBStartsClean FAILED"
 assert_contains "testCQueryEntersAModal FAILED"
+# The timed-out query is counted as still running, not just its modal.
+[ "$(printf '%s\n' "$output" | grep -c 'testCQueryEntersAModal: the test ended with 1 action(s) still running and a modal session open')" -ge 1 ] \
+  || fail "expected teardown to count the timed-out query as still running"
 assert_contains "uithread: started clean again"
 assert_not_contains "testDStartsCleanAgain FAILED"
 

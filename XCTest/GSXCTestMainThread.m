@@ -30,6 +30,9 @@
 
 #include <objc/runtime.h>
 #include <stdlib.h>
+#if !defined(_WIN32)
+#include <dlfcn.h>
+#endif
 
 // NSEventTypeApplicationDefined in AppKit.
 #define GSXCT_APPLICATION_DEFINED_EVENT 15
@@ -70,15 +73,18 @@ static NSArray *GSModes(void)
     return modes;
 }
 
-// The application object, if this process has one. Main thread only.
+// The application object, if this process already has one; never creates
+// one (+sharedApplication would, and would connect to the display). Main
+// thread only. There's no -host on Windows, so there's never one there.
 static id GSApplication(void)
 {
-    Class applicationClass = NSClassFromString(@"NSApplication");
+#if defined(_WIN32)
+    return nil;
+#else
+    id *application = (id *)dlsym(RTLD_DEFAULT, "NSApp");
 
-    if (applicationClass == Nil || ![applicationClass respondsToSelector:@selector(sharedApplication)]) {
-        return nil;
-    }
-    return [applicationClass performSelector:@selector(sharedApplication)];
+    return application != NULL ? *application : nil;
+#endif
 }
 
 // Main thread only.
