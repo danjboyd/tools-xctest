@@ -3,6 +3,7 @@
 # "swift" is installed only with the Swift overlay (XCTEST_SWIFTC, or
 # -Dswift=enabled); "meson" only by Meson; "host" not on Windows.
 # An XCTest/*.h not listed here must be in private-headers.txt.
+header XCTest/GSXCTestMainThread.h
 header XCTest/GSXCTestRunner.h
 header XCTest/GSXCTestSwift.h
 header XCTest/GSXCTestSwiftOverlay.h

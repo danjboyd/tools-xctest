@@ -20,6 +20,7 @@
 
 #import <XCTest/XCTestSuite.h>
 #import <XCTest/XCTestPrivate.h>
+#import <XCTest/GSXCTestMainThread.h>
 #import <XCTest/XCTestAssertionsImpl.h>
 
 #import <objc/runtime.h>
@@ -339,6 +340,38 @@ static NSUInteger GSRepetitionIterations = 1;
 }
 
 - (void) performTest: (XCTestRun *)run
+{
+    // With the UI test thread on, only opted-in classes run on it; the
+    // others run on the main thread as they would otherwise. (The test
+    // thread waits for them; the main thread never waits for it.)
+    if ([GSXCTestMainThread isTestThreadActive] && ![NSThread isMainThread]
+        && !_GSXCTClassRunsOnTestThread(_testCaseClass)) {
+        GSXCTestIssue *cause = nil;
+
+        // The hand-off is bounded: a main thread that doesn't take it is
+        // treated as stopped.
+        if (_GSXCTRunOnMainThreadUnlessWedged(^{ [self _gsPerformTest:run]; })) {
+            return;
+        }
+        cause = [GSXCTestIssue issueWithMessage:@"not run: the application stopped responding in an earlier test"
+                                       filePath:nil
+                                     lineNumber:0
+                                     unexpected:YES];
+        [self _gsSetTestRun:run];
+        [run start];
+        for (XCTest *test in _tests) {
+            if ([test respondsToSelector:@selector(_gsFailWithoutRunning:)]) {
+                [(id)test _gsFailWithoutRunning:cause];
+                [(XCTestSuiteRun *)run addTestRun:[test testRun]];
+            }
+        }
+        [run stop];
+        return;
+    }
+    [self _gsPerformTest:run];
+}
+
+- (void) _gsPerformTest: (XCTestRun *)run
 {
     GSXCTestCaseSuite *previous = GSCurrentClassSuite;
 

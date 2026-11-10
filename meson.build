@@ -72,6 +72,7 @@ source = [
 	'XCTest/XCTMetric.m',
 	'XCTest/GSXCTestParallel.m',
 	'XCTest/GSXCTStatistics.m',
+	'XCTest/GSXCTestMainThread.m',
 ]
 
 headers = [
@@ -83,6 +84,7 @@ headers = [
 	'XCTest/GSXCTestSwiftOverlay.h',
 	'XCTest/XCTestExpectation.h',
 	'XCTest/GSXCTestRunner.h',
+	'XCTest/GSXCTestMainThread.h',
 	'XCTest/XCTWaiter.h',
 	'XCTest/XCTestErrors.h',
 	'XCTest/XCTestCase+AsynchronousTesting.h',
@@ -248,7 +250,8 @@ if host_machine.system() != 'darwin'
     ['coverage', 'run-coverage-tests.sh'],
   ]
   if host_machine.system() != 'windows'
-    xctest_tests += [['hosted', 'run-hosted-tests.sh']]
+    xctest_tests += [['hosted', 'run-hosted-tests.sh'],
+                     ['ui-thread', 'run-ui-thread-tests.sh']]
   endif
 
   # The standalone regression program (Tests/Regression.m).
