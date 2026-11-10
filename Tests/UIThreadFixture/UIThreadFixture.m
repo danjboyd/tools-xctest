@@ -66,6 +66,27 @@ static BOOL UIThreadModalWindowIsUp(void)
 
 @end
 
+// The harness's guard: where this runtime actually puts the user's
+// defaults database must be under UITHREAD_DEFAULTS_ROOT (the run's scratch
+// directory), before anything that could write defaults runs.
+@interface UIThreadDefaultsRootTests : XCTestCase
+@end
+
+@implementation UIThreadDefaultsRootTests
+
+- (void) testDefaultsRootIsPrivate
+{
+    NSString *expected = [[[NSProcessInfo processInfo] environment] objectForKey:@"UITHREAD_DEFAULTS_ROOT"];
+    NSString *root = [GSDefaultsRootForUser(NSUserName()) stringByStandardizingPath];
+
+    NSLog(@"uithread: defaults root %@", root);
+    XCTAssertNotNil(expected, @"expected UITHREAD_DEFAULTS_ROOT to be set");
+    XCTAssertTrue(expected != nil && ([root isEqual:expected] || [root hasPrefix:[expected stringByAppendingString:@"/"]]),
+                  @"expected the defaults database under %@, not %@", expected, root);
+}
+
+@end
+
 @interface UIThreadDispatchTests : XCTestCase
 @end
 

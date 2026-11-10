@@ -26,17 +26,132 @@ build_fixture UIThreadFixture
 
 host_app="$source_root/Tests/HostApp/HostApp.app"
 
+# Every run gets this scratch TMPDIR, so the processes it starts can be
+# found and ended afterwards, whatever happened to the run: xvfb-run's own
+# cleanup stops its Xvfb only if it gets that far (it exits early, leaving
+# Xvfb running, when it can't remove its temporary directory, and not at
+# all when it's killed). Xvfb names a file under the TMPDIR on its command
+# line; the app and xctest inherit TMPDIR.
+owned_tmp=$(mktemp -d "${TMPDIR:-/tmp}/xctest-ui-thread.XXXXXX")
+owned_tmp=$(cd "$owned_tmp" && pwd -P)
+
+# A process's start time (clock ticks since boot), to tell it apart from a
+# later process that reuses its pid.
+proc_start() {
+  local stat fields
+  stat=$(cat "/proc/$1/stat" 2>/dev/null) || return 1
+  fields=${stat##*) }
+  set -- $fields
+  echo "${20}"
+}
+
+# "pid:start" for each process this script's runs started: an argument
+# that is $owned_tmp or under it, or TMPDIR=$owned_tmp in its environment.
+# Never the harness itself or its parent. The number of processes whose
+# environment couldn't be read (other users') goes to $owned_tmp/unreadable,
+# to be reported, not assumed absent. (It's run in $(...), so it can't set
+# a variable.)
+owned_pids() {
+  local dir pid start unreadable=0
+  for dir in /proc/[0-9]*; do
+    pid=${dir#/proc/}
+    case "$pid" in "$$"|"$BASHPID"|"$PPID") continue ;; esac
+    if { tr '\0' '\n' < "$dir/cmdline"; } 2>/dev/null \
+         | awk -v d="$owned_tmp" '$0 == d || index($0, d "/") == 1 { found = 1 } END { exit !found }' \
+       || { tr '\0' '\n' < "$dir/environ"; } 2>/dev/null | grep -qxF -- "TMPDIR=$owned_tmp"; then
+      start=$(proc_start "$pid") && echo "$pid:$start"
+    elif [ -e "$dir" ] && ! [ -r "$dir/environ" ]; then
+      unreadable=$((unreadable + 1))
+    fi
+  done
+  echo "$unreadable" > "$owned_tmp/unreadable"
+}
+
+# Sends \a signal to each listed "pid:start" still alive with that same
+# start time.
+signal_owned() {
+  local signal=$1 entry
+  shift
+  for entry in "$@"; do
+    [ "$(proc_start "${entry%%:*}")" = "${entry#*:}" ] && kill "-$signal" "${entry%%:*}" 2>/dev/null || true
+  done
+}
+
+# Ends any owned process still running: TERM, then KILL after 5 s. Sets
+# $leftover to the "pid:start" entries it found, and prints each one's
+# command line first, as a receipt.
+end_owned_processes() {
+  local entries entry
+  leftover=$(owned_pids | tr '\n' ' ')
+  [ -n "${leftover// }" ] || return 0
+  for entry in $leftover; do
+    echo "owned process ${entry%%:*} (start ${entry#*:}): $({ tr '\0' ' ' < "/proc/${entry%%:*}/cmdline"; } 2>/dev/null | cut -c1-160)"
+  done
+  signal_owned TERM $leftover
+  for _ in 1 2 3 4 5; do
+    entries=$(owned_pids | tr '\n' ' ')
+    [ -n "${entries// }" ] || return 0
+    sleep 1
+  done
+  signal_owned KILL $entries
+}
+
+cleanup_owned() {
+  end_owned_processes
+  rm -r "$owned_tmp" 2>/dev/null || true
+}
+trap cleanup_owned EXIT
+
+# A private GNUstep configuration: the one in use, with the user's
+# directories and defaults database under $owned_tmp. GNUstep ignores a
+# configuration file that group or others can write, so it's 0600.
+base_conf=${GNUSTEP_CONFIG_FILE:-$(sed -n 's/^ *GNUSTEP_CONFIG_FILE=//p' "$GNUSTEP_MAKEFILES/GNUstep.sh" 2>/dev/null | head -n 1)}
+private_conf="$owned_tmp/GNUstep.conf"
+mkdir -p "$owned_tmp/home/GNUstep/Library" "$owned_tmp/defaults"
+{
+  [ ! -r "$base_conf" ] || sed -E '/^GNUSTEP_USER_[A-Z_]*=/d' "$base_conf"
+  echo "GNUSTEP_USER_CONFIG_FILE=$owned_tmp/no-user.conf"
+  echo "GNUSTEP_USER_DIR=$owned_tmp/home/GNUstep"
+  echo "GNUSTEP_USER_DEFAULTS_DIR=$owned_tmp/defaults"
+  echo "GNUSTEP_USER_DIR_LIBRARY=$owned_tmp/home/GNUstep/Library"
+} > "$private_conf"
+chmod 600 "$private_conf"
+
+# The environment of every run below.
+run_env=(env TMPDIR="$owned_tmp" HOME="$owned_tmp/home"
+  GNUSTEP_CONFIG_FILE="$private_conf" UITHREAD_DEFAULTS_ROOT="$owned_tmp/defaults"
+  LD_LIBRARY_PATH="$xctest_lib_dir${runtime_lib_dirs:+:$runtime_lib_dirs}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}")
+
+# Before anything can write defaults: check, in this runtime, that the
+# defaults database resolves under $owned_tmp. Stop otherwise.
+set +e
+output=$("${run_env[@]}" "$xctest_bin" "$source_root/Tests/UIThreadFixture/UIThreadFixture.bundle" \
+  -only-testing:UIThreadFixture/UIThreadDefaultsRootTests 2>&1)
+status=$?
+set -e
+assert_status 0
+assert_contains "uithread: defaults root $owned_tmp/defaults"
+
 # run_ui [xctest args...] sets $output, $status and $elapsed (seconds).
+# UI_RUN_LIMIT (default 120 s) and UI_RUN_SIGNAL bound the run; normally
+# timeout signals the run's whole process group. UI_RUN_FOREGROUND=yes
+# signals only xvfb-run, as when it dies on its own.
 run_ui() {
   local start
   start=$(date +%s)
   set +e
-  output=$(LD_LIBRARY_PATH="$xctest_lib_dir${runtime_lib_dirs:+:$runtime_lib_dirs}${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" \
-    timeout -k 5 120 "${display_wrapper[@]}" "$xctest_bin" -host "$host_app" \
+  output=$("${run_env[@]}" \
+    timeout ${UI_RUN_FOREGROUND:+--foreground} -s "${UI_RUN_SIGNAL:-TERM}" -k 5 "${UI_RUN_LIMIT:-120}" \
+    "${display_wrapper[@]}" \
+    "$xctest_bin" -host "$host_app" \
     "$source_root/Tests/UIThreadFixture/UIThreadFixture.bundle" "$@" 2>&1)
   status=$?
   set -e
   elapsed=$(( $(date +%s) - start ))
+  # Nothing a finished run started may outlive it.
+  end_owned_processes
+  [ -z "${leftover// }" ] || echo "run_ui: ended processes the run left behind (pid:start): $leftover"
+  echo "run_ui: $(cat "$owned_tmp/unreadable") other users' processes couldn't be checked for ownership"
 }
 
 echo "Running UI test thread regressions..."
@@ -103,9 +218,25 @@ assert_not_contains "uithread: ordinary class after ran on the main thread"
 [ "$elapsed" -lt 25 ] || fail "expected the run to end without waiting for the main thread (took ${elapsed}s)"
 
 # Without -host, the opt-in has no effect and everything runs inline.
-run_fixture UIThreadFixture -only-testing:UIThreadFixture/UIThreadInactiveTests
+set +e
+output=$("${run_env[@]}" "$xctest_bin" "$source_root/Tests/UIThreadFixture/UIThreadFixture.bundle" \
+  -only-testing:UIThreadFixture/UIThreadInactiveTests 2>&1)
+status=$?
+set -e
 assert_status 0
 assert_contains "uithread: inactive mode runs inline"
+
+# The harness's own cleanup: xvfb-run killed outright (SIGKILL, so it
+# can't stop its Xvfb) while the app hangs. xctest gives up on the app
+# after 5 s; the orphaned Xvfb is found and ended. Nothing owned may
+# remain afterwards.
+if [ ${#display_wrapper[@]} -gt 0 ]; then
+  HOSTAPP_HANG=1 UI_RUN_LIMIT=2 UI_RUN_SIGNAL=KILL UI_RUN_FOREGROUND=yes run_ui -host-launch-timeout 5 \
+    -only-testing:UIThreadFixture/UIThreadAOrdinaryTests
+  [ "$status" -eq 137 ] || fail "expected the run to be killed at its limit (status $status)"
+  [ -n "${leftover// }" ] || fail "expected the killed run to leave processes for the harness to end"
+  [ -z "$(owned_pids)" ] || fail "expected no owned processes after cleanup: $(owned_pids)"
+fi
 
 make -C "$source_root/Tests/UIThreadFixture" clean > /dev/null
 echo "UI test thread regressions passed."
