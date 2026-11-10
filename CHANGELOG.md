@@ -5,6 +5,10 @@ Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 
 ## Unreleased
 
+- Code coverage on Windows: the merged profile replaces the previous one in
+  one step (`MoveFileExW`), as elsewhere. Before, it was removed and then
+  moved in, so two runs into the same directory could fail, and a failed
+  move lost the previous profile.
 - An `xctest(1)` man page, installed by gnustep-make (in the domain's man
   directory) and Meson (`mandir`). A regression check keeps its options in
   step with `xctest -h`.
