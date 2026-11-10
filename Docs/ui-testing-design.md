@@ -1,8 +1,13 @@
 # UI testing for hosted tests: design (issue #26)
 
-A design pass, before any code. It proposes an API for driving a GNUstep
-application's UI from hosted tests (`xctest -host`), and lists the decisions
-that need an answer first. Nothing here is built yet.
+The design for driving a GNUstep application's UI from hosted tests
+(`xctest -host`), and the decisions it needs.
+
+**Status:** phase 2 (the runner) is built in fork PR #59. It covers the
+opt-in test thread, `GSXCTestMainThread` dispatch, teardown and wedge
+handling ([Threading and dispatch](#threading-and-dispatch-for-1a)).
+The element API below (`libXCTestUI`, phases 3 and later) is still a
+proposal, and its names aren't decided.
 
 ## Where things stand
 
@@ -248,13 +253,21 @@ useful next.
 
 - **Timeouts.** Each query and action has a timeout (default 10 s). It's
   set per call, and the default with
-  `+[GSXCTestMainThread setDefaultTimeout:]` (the phase 2 dispatch API). The existing per-test execution
-  time allowance still applies on top and ends the run if a test overruns.
+  `+[GSXCTestMainThread setDefaultTimeout:]` (the phase 2 dispatch API).
+  The existing per-test execution time allowance still applies on top and
+  ends the run if a test overruns.
 - **Cancellation.** A block that hasn't started by its timeout is
   cancelled: it checks a shared flag when it starts and returns at once if
-  it was cancelled. A block that has started can't be stopped from
-  another thread. The action reports *blocked*, and the test decides; it
-  may well recover once the main thread is free.
+  it was cancelled. A query that *has* started but not finished in time
+  (in a nested loop, or with the main thread blocked inside it) keeps
+  running, and teardown tracks it as it does an unfinished action. A
+  block that has started can't be stopped from another thread. The action
+  reports *blocked*, and the test decides; it may well recover once the
+  main thread is free.
+- **Handing ordinary classes to the main thread** has a bounded start
+  (the default timeout). If the main thread doesn't take the hand-off,
+  the app is wedged and the class fails without running. Once started, a
+  class runs under its tests' usual time allowances.
 - **Wedged.** If the main thread still doesn't answer during teardown
   (below), the app is *wedged*. That test fails, and every later test,
   UI or not, fails without running ("the application stopped responding
@@ -262,7 +275,8 @@ useful next.
   exits from the test thread, since the main thread can't run the exit,
   so a wedged app can't hang the run. xctest's own host timeout stays as
   the last resort.
-- **Teardown after each test.** Before `tearDown` returns, the runner, on
+- **Teardown after each test.** After the test's `tearDown` methods have
+  run (once `invokeTest` returns), the runner, on
   the main thread through the same dispatch:
   - fails the test if actions are still outstanding, or a modal session
     the test started is still running;
