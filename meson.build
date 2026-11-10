@@ -250,8 +250,11 @@ if host_machine.system() != 'darwin'
     ['coverage', 'run-coverage-tests.sh'],
   ]
   if host_machine.system() != 'windows'
+    # The UI test thread script makes several hosted runs and waits out
+    # deliberately hung and TERM-ignoring processes: about 30 s, Meson's
+    # default limit.
     xctest_tests += [['hosted', 'run-hosted-tests.sh'],
-                     ['ui-thread', 'run-ui-thread-tests.sh']]
+                     ['ui-thread', 'run-ui-thread-tests.sh', 180]]
   endif
 
   # The standalone regression program (Tests/Regression.m).
@@ -277,6 +280,8 @@ if host_machine.system() != 'darwin'
          ],
          env: xctest_test_env,
          depends: [xctest_tool] + xctest_test_depends,
+         # An optional third element is the script's timeout (s).
+         timeout: t.length() > 2 ? t[2] : 30,
          # The scripts rebuild shared fixture bundles in the source tree.
          is_parallel: false)
   endforeach
