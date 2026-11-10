@@ -103,7 +103,43 @@ static void GSWriteStatusFile(int exitCode)
     }
 }
 
+// SPIKE (#26), not production code: with XCTEST_SPIKE_UI_TEST_THREAD set,
+// the tests run on a separate thread while the main thread goes back to
+// running the application. The main thread never waits on the test
+// thread; the test thread hands the exit code back when it's done.
 + (void) runTests
+{
+    if (getenv("XCTEST_SPIKE_UI_TEST_THREAD") != NULL) {
+        [NSThread detachNewThreadSelector:@selector(runTestsOnTestThread:)
+                                 toTarget:self
+                               withObject:nil];
+        return;
+    }
+    [self finishWithExitCode:[NSNumber numberWithInt:[self runTestsReturningExitCode]]];
+}
+
++ (void) runTestsOnTestThread: (id)unused
+{
+    @autoreleasepool {
+        NSNumber *code = [NSNumber numberWithInt:[self runTestsReturningExitCode]];
+
+        [self performSelectorOnMainThread:@selector(finishWithExitCode:)
+                               withObject:code
+                            waitUntilDone:NO
+                                    modes:[NSArray arrayWithObjects:NSDefaultRunLoopMode,
+                                              @"NSModalPanelRunLoopMode",
+                                              @"NSEventTrackingRunLoopMode", nil]];
+    }
+}
+
++ (void) finishWithExitCode: (NSNumber *)code
+{
+    fflush(stdout);
+    fflush(stderr);
+    exit([code intValue]);
+}
+
++ (int) runTestsReturningExitCode
 {
     int exitCode = 1;
 
@@ -174,9 +210,7 @@ static void GSWriteStatusFile(int exitCode)
         GSWriteStatusFile(exitCode);
     }
 
-    fflush(stdout);
-    fflush(stderr);
-    exit(exitCode);
+    return exitCode;
 }
 
 @end
