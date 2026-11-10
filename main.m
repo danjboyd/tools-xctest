@@ -30,6 +30,14 @@
 #endif
 #include <stdio.h>
 
+#if defined(_WIN32)
+// From kernel32 (declared here: <windows.h> clashes with Objective-C's BOOL).
+__declspec(dllimport) int __stdcall MoveFileExW(const unsigned short *existingFileName,
+                                                 const unsigned short *newFileName,
+                                                 unsigned long flags);
+#define GS_MOVEFILE_REPLACE_EXISTING 0x1
+#endif
+
 #import <Foundation/Foundation.h>
 #import <XCTest/GSXCTestRunner.h>
 #import <XCTest/XCTestAssertionsImpl.h>
@@ -177,6 +185,33 @@ static NSString *ProfdataPath(void)
 // merges the profiles into <outputDirectory>/<target>.profdata and removes
 // that directory; if the merge fails, it's kept. Returns the exit code for
 // xctest: the tests' result, or 1 if no profile could be written.
+// Replaces \a destination with \a source in one step, so that concurrent
+// runs never see it missing: the last run to finish wins, and if this fails
+// the previous file is left as it was. Windows' rename can't replace a file,
+// so MoveFileExW does it there (GNUstep's paths are wide on Windows).
+//
+// For the regressions: XCTEST_COVERAGE_TEST_REPLACE_DELAY waits that many
+// seconds first (so concurrent runs replace at once), and
+// XCTEST_COVERAGE_TEST_REPLACE_FAIL makes the replacement fail.
+static BOOL GSReplaceFile(NSString *source, NSString *destination)
+{
+    const char *delay = getenv("XCTEST_COVERAGE_TEST_REPLACE_DELAY");
+
+    if (delay != NULL) {
+        [NSThread sleepForTimeInterval:atof(delay)];
+    }
+    if (getenv("XCTEST_COVERAGE_TEST_REPLACE_FAIL") != NULL) {
+        return NO;
+    }
+#if defined(_WIN32)
+    return MoveFileExW((const unsigned short *)[source fileSystemRepresentation],
+                       (const unsigned short *)[destination fileSystemRepresentation],
+                       GS_MOVEFILE_REPLACE_EXISTING) != 0;
+#else
+    return rename([source fileSystemRepresentation], [destination fileSystemRepresentation]) == 0;
+#endif
+}
+
 static int RunTestsWithCoverage(int argc, char *argv[], NSString *outputDirectory, NSString *targetName)
 {
     NSFileManager *fileManager = [NSFileManager defaultManager];
@@ -278,14 +313,7 @@ static int RunTestsWithCoverage(int argc, char *argv[], NSString *outputDirector
                 [profdata UTF8String], [rawDirectory UTF8String]);
         return 1;
     }
-#if defined(_WIN32)
-    // Windows can't rename over an existing file (and GNUstep's paths are
-    // wide there), so this replaces it in two steps.
-    [fileManager removeItemAtPath:profile error:NULL];
-    if (![fileManager moveItemAtPath:mergedProfile toPath:profile error:NULL]) {
-#else
-    if (rename([mergedProfile fileSystemRepresentation], [profile fileSystemRepresentation]) != 0) {
-#endif
+    if (!GSReplaceFile(mergedProfile, profile)) {
         fprintf(stderr, "xctest: could not write '%s'; the merged profile is '%s'\n",
                 [profile UTF8String], [mergedProfile UTF8String]);
         return 1;

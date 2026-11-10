@@ -813,7 +813,9 @@ in a new `<dir>/profraw-<unique>` directory of that run's own. Once they have
 finished, it merges them with `llvm-profdata merge` into
 `<dir>/<TestTarget>.profdata` (default directory: `coverage`) and removes the
 raw profiles, or keeps them if the merge fails. Nothing else in `<dir>` is
-touched, so runs into the same directory can overlap. It finds
+touched, so runs into the same directory can overlap: each replaces the
+profile in one step with a whole profile of its own, so the last to finish
+wins, and a replacement that fails leaves the previous profile as it was. It finds
 `llvm-profdata` on `PATH`, or the highest-numbered `llvm-profdata-<n>` as
 Debian installs it; `XCTEST_LLVM_PROFDATA` overrides that. The run fails if
 nothing was instrumented or the merge fails; otherwise the tests decide the

@@ -5,6 +5,10 @@ Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 
 ## Unreleased
 
+- Code coverage on Windows: the merged profile replaces the previous one in
+  one step (`MoveFileExW`), as elsewhere. Before, it was removed and then
+  moved in, so two runs into the same directory could fail, and a failed
+  move lost the previous profile.
 - Hosted tests can drive modal windows: a test class whose
   `+runsOnUITestThread` returns YES runs on a separate test thread while the
   application's main thread keeps running, and reaches the application
