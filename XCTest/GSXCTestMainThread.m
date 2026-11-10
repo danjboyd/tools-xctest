@@ -319,6 +319,10 @@ static void GSWakeModalLoop(void)
     }
     [action _gsQueue];
     if (![action _gsWaitUntilStarted:NO timeout:timeout] && ![action _gsCancelUnlessStarted]) {
+        // Cancelled: it will never run, so nothing waits for it.
+        @synchronized (GSActions) {
+            [GSActions removeObjectIdenticalTo:action];
+        }
         action->_state = GSXCTestMainThreadActionNotStarted;
         return action;
     }

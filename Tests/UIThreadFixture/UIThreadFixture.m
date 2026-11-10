@@ -173,9 +173,19 @@ static BOOL UIThreadModalWindowIsUp(void)
         return nil;
     } timeout:0.1 timedOut:&timedOut];
     XCTAssertTrue(timedOut);
+
+    // An action that can't start while the main thread is busy is
+    // cancelled, never runs, and isn't waited for at teardown.
+    GSXCTestMainThreadAction *late = [GSXCTestMainThread performAction:^id (void) {
+        ran = YES;
+        return nil;
+    } timeout:0.1];
+    XCTAssertEqual([late state], GSXCTestMainThreadActionNotStarted);
+
     XCTAssertTrue([busy waitUntilFinishedWithTimeout:5]);
     [GSXCTestMainThread performQuery:^id (void) { return nil; } timeout:5 timedOut:NULL];
-    XCTAssertFalse(ran, @"expected a cancelled query never to run");
+    XCTAssertFalse(ran, @"expected a cancelled query or action never to run");
+    XCTAssertTrue([GSXCTestMainThread waitForIdleWithTimeout:1]);
 }
 
 @end
