@@ -8,7 +8,9 @@ set -euo pipefail
 
 PREFIX=${PREFIX:?set PREFIX to the install directory}
 SRC=${SRC:-${RUNNER_TEMP:-/tmp}/gnustep-src}
-JOBS=$(nproc)
+JOBS=$(getconf _NPROCESSORS_ONLN)
+# The libraries to build after gnustep-make: macOS builds only libs-base.
+LIBS_TO_BUILD=${LIBS_TO_BUILD:-libs-base libs-gui libs-back}
 
 LIBOBJC2_TAG=v2.3
 MAKE_TAG=make-2_9_3
@@ -16,7 +18,7 @@ BASE_TAG=base-1_31_1
 GUI_TAG=gui-0_32_0
 BACK_TAG=back-0_32_0
 
-export CC=clang CXX=clang++
+export CC=${CC:-clang} CXX=${CXX:-clang++}
 mkdir -p "$SRC"
 
 clone() {
@@ -37,8 +39,13 @@ echo "::endgroup::"
 # libobjc goes where the Debian package puts it, beside GNUstep's own
 # libraries.
 LIBS="$PREFIX/System/Library/Libraries"
-export CPPFLAGS="-I$PREFIX/include" LDFLAGS="-L$LIBS -fuse-ld=lld"
-export LD_LIBRARY_PATH="$LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export CPPFLAGS="-I$PREFIX/include${CPPFLAGS:+ $CPPFLAGS}" LDFLAGS="-L$LIBS${LDFLAGS:+ $LDFLAGS}"
+if [ "$(uname)" = Darwin ]; then
+  export DYLD_LIBRARY_PATH="$LIBS${DYLD_LIBRARY_PATH:+:$DYLD_LIBRARY_PATH}"
+else
+  LDFLAGS="$LDFLAGS -fuse-ld=lld"
+  export LD_LIBRARY_PATH="$LIBS${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+fi
 
 echo "::group::gnustep-make $MAKE_TAG"
 clone tools-make "$MAKE_TAG"
@@ -54,8 +61,16 @@ set +u
 . "$PREFIX/System/Library/Makefiles/GNUstep.sh"
 set -u
 
-for lib in "libs-base $BASE_TAG" "libs-gui $GUI_TAG" "libs-back $BACK_TAG"; do
-  set -- $lib
+tag_for() {
+  case $1 in
+    libs-base) echo "$BASE_TAG" ;;
+    libs-gui) echo "$GUI_TAG" ;;
+    libs-back) echo "$BACK_TAG" ;;
+  esac
+}
+
+for lib in $LIBS_TO_BUILD; do
+  set -- "$lib" "$(tag_for "$lib")"
   echo "::group::$1 $2"
   clone "$1" "$2"
   # Into the System domain, as the Debian packages install them.

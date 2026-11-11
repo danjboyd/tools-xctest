@@ -85,6 +85,53 @@ jobs:
             .github/scripts/check-install.sh "$mode" swift
           done
 
+  # libobjc2, gnustep-make and libs-base from source, built with Homebrew's
+  # LLVM. No libs-gui, so the hosted tests are left out (as on Windows).
+  macos:
+    name: macOS (clang, libobjc2)
+    runs-on: macos-15
+    timeout-minutes: 60
+    env:
+      PREFIX: ${{ github.workspace }}/../gnustep
+      LIBS_TO_BUILD: libs-base
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install packages
+        run: |
+          brew install llvm cmake ninja pkgconf libffi gnutls libxml2 libxslt icu4c
+          llvm=$(brew --prefix llvm)
+          echo "$llvm/bin" >> "$GITHUB_PATH"
+          pc=
+          for f in libffi libxml2 libxslt icu4c; do
+            pc="$pc${pc:+:}$(brew --prefix $f)/lib/pkgconfig"
+          done
+          echo "PKG_CONFIG_PATH=$pc" >> "$GITHUB_ENV"
+          echo "CC=$llvm/bin/clang" >> "$GITHUB_ENV"
+          echo "CXX=$llvm/bin/clang++" >> "$GITHUB_ENV"
+          echo "DYLD_LIBRARY_PATH=$PREFIX/System/Library/Libraries" >> "$GITHUB_ENV"
+
+      - name: Cache GNUstep
+        id: cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PREFIX }}
+          key: gnustep-${{ runner.os }}-macos-15-${{ hashFiles('.github/scripts/install-gnustep.sh') }}
+
+      - name: Build GNUstep
+        if: steps.cache.outputs.cache-hit != 'true'
+        run: .github/scripts/install-gnustep.sh
+
+      - name: Build
+        run: |
+          . "$PREFIX/System/Library/Makefiles/GNUstep.sh"
+          make
+
+      - name: make check
+        run: |
+          . "$PREFIX/System/Library/Makefiles/GNUstep.sh"
+          make check
+
   windows:
     name: Windows (MSYS2 clang64)
     runs-on: windows-latest
