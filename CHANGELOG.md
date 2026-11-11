@@ -3,7 +3,10 @@
 Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 `vX.Y.Z`; 0.1.x are upstream's (gnustep/tools-xctest).
 
-## Unreleased
+## 0.8.0
+
+Hosted tests that drive modal windows, an `xctest(1)` man page, and code
+coverage reports.
 
 - Code coverage on Windows: the merged profile replaces the previous one in
   one step (`MoveFileExW`), as elsewhere. Before, it was removed and then
@@ -26,6 +29,8 @@ Releases of this fork (danjboyd/tools-xctest). Versions are tagged
   runs them with coverage, and writes a summary, lcov and HTML per bundle.
 
 ## 0.7.0
+
+Not tagged on its own; these changes were first released in 0.8.0.
 
 Swift test targets: with a Swift toolchain that has GNUstep's Objective-C
 interop, Swift test classes are built with `xctest.make` and run by
