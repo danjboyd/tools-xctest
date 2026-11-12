@@ -140,6 +140,10 @@ It also builds and runs on Windows with MSYS2 (clang64) and GNUstep Make,
 except for hosted tests (`-host`), which need `LD_PRELOAD`. There, test bundles'
 executables are `<Name>.dll`.
 
+There's no macOS build: clang implements the GNUstep Objective-C runtime's
+v2 ABI (`gnustep-2.x`, which libobjc2 and xctest use) only for ELF and COFF,
+not macOS's Mach-O, so libobjc2 doesn't build there.
+
 ## Supported behavior
 
 - Discovery of `void` instance methods whose names start with `test` and which
