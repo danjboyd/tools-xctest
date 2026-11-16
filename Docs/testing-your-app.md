@@ -38,6 +38,8 @@ make install
 
 This installs the XCTest library and headers, the `xctest` runner, and
 `xctest.make`, which builds test bundles with gnustep-make.
+The runner goes in the toolchain's `Local/Tools`, which isn't on the `PATH`
+that setup printed. Loading `GNUstep.sh`, as in step 1, adds it.
 
 ## 3. Write a test
 
@@ -110,8 +112,18 @@ XCTest:   CounterTests: 3 tests PASSED
 XCTest: 1 tests PASSED
 ```
 
-It exits nonzero if any test fails, so a script or CI job stops there. Some
-useful options:
+If a test fails, the output says where and why, and `make check` exits
+nonzero, so a script or CI job stops there:
+
+```
+XCTest:     testIncrementAddsOne...
+XCTest:     Assertion FAILED at CounterTests.m:20, (([counter value]) equal to (3)) failed: ("2") is not equal to ("3")
+XCTest:     testIncrementAddsOne FAILED
+...
+XCTest:   CounterTests: 1/3 tests FAILED
+```
+
+Some useful options:
 
 - **One test:** `make -C Tests check XCTEST_FLAGS="-XCTest CounterTests.testIncrementAddsOne"`
 - **JUnit XML for CI:** `XCTEST_FLAGS="-junit-report results.xml"`
