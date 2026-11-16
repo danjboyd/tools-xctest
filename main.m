@@ -35,7 +35,10 @@
 __declspec(dllimport) int __stdcall MoveFileExW(const unsigned short *existingFileName,
                                                  const unsigned short *newFileName,
                                                  unsigned long flags);
+__declspec(dllimport) unsigned long __stdcall GetLastError(void);
 #define GS_MOVEFILE_REPLACE_EXISTING 0x1
+#define GS_ERROR_ACCESS_DENIED 5
+#define GS_ERROR_SHARING_VIOLATION 32
 #endif
 
 #import <Foundation/Foundation.h>
@@ -189,6 +192,9 @@ static NSString *ProfdataPath(void)
 // runs never see it missing: the last run to finish wins, and if this fails
 // the previous file is left as it was. Windows' rename can't replace a file,
 // so MoveFileExW does it there (GNUstep's paths are wide on Windows).
+// While another run is replacing the same file, Windows can refuse the
+// replacement for a moment (access denied or a sharing violation), so
+// those errors are retried for up to about two seconds.
 //
 // For the regressions: XCTEST_COVERAGE_TEST_REPLACE_DELAY waits that many
 // seconds first (so concurrent runs replace at once), and
@@ -204,9 +210,25 @@ static BOOL GSReplaceFile(NSString *source, NSString *destination)
         return NO;
     }
 #if defined(_WIN32)
-    return MoveFileExW((const unsigned short *)[source fileSystemRepresentation],
-                       (const unsigned short *)[destination fileSystemRepresentation],
-                       GS_MOVEFILE_REPLACE_EXISTING) != 0;
+    {
+        const unsigned short *from = (const unsigned short *)[source fileSystemRepresentation];
+        const unsigned short *to = (const unsigned short *)[destination fileSystemRepresentation];
+        int attempt;
+
+        for (attempt = 0; attempt < 20; attempt++) {
+            unsigned long error;
+
+            if (MoveFileExW(from, to, GS_MOVEFILE_REPLACE_EXISTING) != 0) {
+                return YES;
+            }
+            error = GetLastError();
+            if (error != GS_ERROR_ACCESS_DENIED && error != GS_ERROR_SHARING_VIOLATION) {
+                return NO;
+            }
+            [NSThread sleepForTimeInterval:0.1];
+        }
+        return NO;
+    }
 #else
     return rename([source fileSystemRepresentation], [destination fileSystemRepresentation]) == 0;
 #endif

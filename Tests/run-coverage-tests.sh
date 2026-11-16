@@ -110,6 +110,25 @@ run_concurrent_pair "$work/simultaneous"
   || fail "expected simultaneous replacements to leave one whole profile"
 [ -z "$(raw_directories "$work/simultaneous")" ] || fail "expected the simultaneous runs' raw profiles to be removed"
 
+# On Windows, a replacement that finds the profile held open for a moment
+# (here by PowerShell, sharing it for reading only, as a second run's
+# replacement in progress can) waits for it instead of failing the run.
+if is_windows && command -v powershell.exe > /dev/null 2>&1; then
+  mkdir -p "$work/held"
+  cp "$work/single/CoverageFixture.profdata" "$work/held/CoverageFixture.profdata"
+  held=$(cygpath -w "$work/held/CoverageFixture.profdata")
+  powershell.exe -NoProfile -Command "\$f = [System.IO.File]::Open('$held', 'Open', 'Read', 'Read'); New-Item -ItemType File '$(cygpath -w "$work/held.ready")' | Out-Null; Start-Sleep -Milliseconds 1500; \$f.Close()" &
+  holder=$!
+  for _ in $(seq 1 100); do [ -f "$work/held.ready" ] && break; sleep 0.1; done
+  [ -f "$work/held.ready" ] || fail "expected PowerShell to open the profile"
+  run_fixture CoverageFixture -coverage-output "$work/held"
+  wait "$holder"
+  assert_status 0
+  assert_contains "code coverage written to '"
+  [ "$(covered_count "$work/held/CoverageFixture.profdata")" = 2 ] \
+    || fail "expected the held profile to be replaced once it was closed"
+fi
+
 # A replacement that fails leaves the previous profile as it was, keeps
 # the new merged profile, and fails the run.
 run_fixture CoverageFixture -coverage-output "$work/replace-fail"
