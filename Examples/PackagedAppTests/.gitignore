@@ -1,0 +1,6 @@
+build/
+dist/
+obj/
+Greeter.app/
+Tests/obj/
+Tests/*.xctest/

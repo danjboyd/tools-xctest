@@ -1,0 +1,97 @@
+{
+  "$schema": "https://raw.githubusercontent.com/danjboyd/gnustep-packager/v0.1.10/schemas/gnustep-packager.schema.json",
+  "schemaVersion": 1,
+  "profiles": [
+    "gnustep-gui"
+  ],
+  "package": {
+    "id": "io.github.danjboyd.tools-xctest.Greeter",
+    "name": "Greeter",
+    "displayName": "Greeter",
+    "version": "0.1.0",
+    "manufacturer": "Daniel Boyd",
+    "summary": "Example app whose XCTest bundle runs before it's packaged.",
+    "license": "LGPL-2.1-or-later",
+    "homepage": "https://github.com/danjboyd/tools-xctest"
+  },
+  "pipeline": {
+    "workingDirectory": "..",
+    "shell": {
+      "kind": "msys2-bash",
+      "bootstrapCommands": [],
+      "environment": {}
+    },
+    "build": {
+      "command": "bash packaging/build.sh"
+    },
+    "stage": {
+      "command": "bash packaging/stage.sh dist/stage",
+      "outputRoot": "../dist/stage"
+    }
+  },
+  "payload": {
+    "layoutVersion": 1,
+    "stageRoot": "../dist/stage",
+    "appRoot": "app",
+    "runtimeRoot": "runtime",
+    "metadataRoot": "metadata"
+  },
+  "launch": {
+    "entryRelativePath": "app/Greeter.app/Greeter.exe",
+    "workingDirectory": "app/Greeter.app",
+    "arguments": [],
+    "pathPrepend": [
+      "runtime/bin"
+    ],
+    "env": {}
+  },
+  "outputs": {
+    "root": "../dist",
+    "packageRoot": "../dist/packages",
+    "logRoot": "../dist/logs",
+    "tempRoot": "../dist/tmp",
+    "validationRoot": "../dist/validation"
+  },
+  "validation": {
+    "smoke": {
+      "enabled": true,
+      "kind": "staged-layout",
+      "requiredPaths": [
+        "app/Greeter.app/Greeter.exe",
+        "runtime/bin/GNUstep.conf",
+        "runtime/System/Tools/gdnc.exe"
+      ],
+      "timeoutSeconds": 30
+    },
+    "logs": {
+      "retainOnSuccess": true
+    }
+  },
+  "integrations": {
+    "shortcutName": "Greeter",
+    "fileAssociations": []
+  },
+  "compliance": {
+    "runtimeNotices": [
+      {
+        "name": "GNUstep Runtime",
+        "license": "LGPL-2.1-or-later",
+        "stageRelativePath": "metadata/licenses/gnustep-runtime.txt"
+      }
+    ]
+  },
+  "backends": {
+    "msi": {
+      "enabled": true,
+      "upgradeCode": "12808a56-4858-4780-be59-115579c036d4",
+      "installScope": "perUser",
+      "productName": "Greeter",
+      "shortcutName": "Greeter",
+      "installDirectoryName": "Greeter",
+      "launcherFileName": "Greeter.exe"
+    },
+    "appimage": {
+      "enabled": false
+    }
+  }
+}
