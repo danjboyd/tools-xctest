@@ -23,6 +23,10 @@ uncaught exceptions return nonzero.
 
 ## Installing
 
+If you installed GNUstep with gnustep-cli,
+[Testing your app with tools-xctest](Docs/testing-your-app.md) goes step by
+step from installing tools-xctest to a passing test.
+
 Each [release](https://github.com/danjboyd/tools-xctest/releases) has a source
 archive and a Windows (MSYS2 clang64) build; unzip the Windows build into the
 MSYS2 root.

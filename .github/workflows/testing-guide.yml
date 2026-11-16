@@ -1,0 +1,74 @@
+# Follows Docs/testing-your-app.md on a clean runner: install gnustep-cli,
+# build and install tools-xctest into its toolchain, then run
+# Examples/FirstTest's tests, and check that a failing test fails `make check`.
+name: Testing guide
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - Docs/testing-your-app.md
+      - Examples/FirstTest/**
+      - .github/workflows/testing-guide.yml
+  push:
+    branches: [master]
+    paths:
+      - Docs/testing-your-app.md
+      - Examples/FirstTest/**
+      - .github/workflows/testing-guide.yml
+
+permissions:
+  contents: read
+
+jobs:
+  linux:
+    runs-on: ubuntu-24.04
+    env:
+      GNUSTEP_CLI_VERSION: 0.1.7
+      GNUSTEP_CLI_BOOTSTRAP_SHA256: 1580d5ddcf774716bc2caa614cb4c217c19ead1645f4362f58ad12277345c961
+      XCTEST_VERSION: 0.8.0
+      XCTEST_SHA256: 7623055145e4fd7067db5f3b690b7a5ca561fcb56baf8772302ca71dd6d1f27d
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install gnustep-cli (guide step 1)
+        run: |
+          cd "$RUNNER_TEMP"
+          curl -fsSLO "https://github.com/danjboyd/gnustep-cli-new/releases/download/v$GNUSTEP_CLI_VERSION/gnustep-bootstrap.sh"
+          echo "$GNUSTEP_CLI_BOOTSTRAP_SHA256  gnustep-bootstrap.sh" | sha256sum -c -
+          sh gnustep-bootstrap.sh setup --user --yes
+          root="$HOME/.local/share/gnustep-cli"
+          echo "$root/bin" >> "$GITHUB_PATH"
+          echo "$root/Tools" >> "$GITHUB_PATH"
+          echo "$root/System/Tools" >> "$GITHUB_PATH"
+
+      - name: Build and install tools-xctest (guide step 2)
+        run: |
+          . "$HOME/.local/share/gnustep-cli/System/Library/Makefiles/GNUstep.sh"
+          cd "$RUNNER_TEMP"
+          curl -fsSLO "https://github.com/danjboyd/tools-xctest/releases/download/v$XCTEST_VERSION/tools-xctest-$XCTEST_VERSION.tar.gz"
+          echo "$XCTEST_SHA256  tools-xctest-$XCTEST_VERSION.tar.gz" | sha256sum -c -
+          tar -xzf "tools-xctest-$XCTEST_VERSION.tar.gz"
+          cd "tools-xctest-$XCTEST_VERSION"
+          make
+          make install
+          command -v xctest
+          ls "$GNUSTEP_MAKEFILES/Auxiliary/xctest.make"
+
+      - name: Run the example's tests (guide steps 3 and 4)
+        run: |
+          . "$HOME/.local/share/gnustep-cli/System/Library/Makefiles/GNUstep.sh"
+          make -C Examples/FirstTest/Tests check XCTEST_FLAGS="-junit-report $RUNNER_TEMP/CounterTests.xml"
+          grep -q 'tests="3"' "$RUNNER_TEMP/CounterTests.xml"
+          grep -q 'failures="0"' "$RUNNER_TEMP/CounterTests.xml"
+
+      - name: A failing test fails make check
+        run: |
+          . "$HOME/.local/share/gnustep-cli/System/Library/Makefiles/GNUstep.sh"
+          sed -i 's/XCTAssertEqual(\[counter value\], 2);/XCTAssertEqual([counter value], 3);/' Examples/FirstTest/Tests/CounterTests.m
+          grep -q 'XCTAssertEqual(\[counter value\], 3);' Examples/FirstTest/Tests/CounterTests.m
+          if make -C Examples/FirstTest/Tests check; then
+            echo "make check passed with a failing test" >&2
+            exit 1
+          fi
+          echo "make check failed, as it should."
