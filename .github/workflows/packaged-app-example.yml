@@ -1,0 +1,28 @@
+name: Packaged app example
+
+# Examples/PackagedAppTests: gnustep-packager's reusable workflow builds the
+# example app, runs its XCTest bundle, and packages it as an MSI only if the
+# tests pass. See the example's README.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - Examples/PackagedAppTests/**
+      - .github/workflows/packaged-app-example.yml
+  push:
+    branches: [master]
+    paths:
+      - Examples/PackagedAppTests/**
+      - .github/workflows/packaged-app-example.yml
+
+jobs:
+  msi:
+    uses: danjboyd/gnustep-packager/.github/workflows/package-gnustep-app.yml@v0.1.10
+    with:
+      manifest-path: Examples/PackagedAppTests/packaging/package.manifest.json
+      backend: msi
+      package-version: 0.1.0
+      run-validation: true
+      run-smoke: true
+      artifact-name: greeter-example
+      artifact-retention-days: 7
