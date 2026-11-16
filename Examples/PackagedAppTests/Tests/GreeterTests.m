@@ -22,7 +22,7 @@
 
 - (void) testGreetsByName
 {
-  XCTAssertEqualObjects([greeter greetingForName: @"Ada"], @"Hello, Ada?"); // TEMPORARY: proves a failing test stops the MSI
+  XCTAssertEqualObjects([greeter greetingForName: @"Ada"], @"Hello, Ada!");
 }
 
 - (void) testTrimsWhitespace
