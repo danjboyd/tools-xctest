@@ -555,8 +555,8 @@ separate submodule, `XCTest.GSXCTestRunner`.
 
 To run an app's tests in CI before it's packaged, see
 [Examples/PackagedAppTests](Examples/PackagedAppTests/README.md). There,
-gnustep-packager's Windows workflow builds the app, runs its test bundle, and
-makes the MSI only if the tests pass.
+gnustep-packager's workflow builds the app, runs its test bundle, and makes the
+Windows MSI and the Linux AppImage only if the tests pass.
 
 To build and run the test targets of an Xcode project, use `buildtool test`
 from [libs-xcode](https://github.com/gnustep/libs-xcode); it runs each
