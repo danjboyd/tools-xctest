@@ -1,0 +1,129 @@
+{
+  "$schema": "https://raw.githubusercontent.com/danjboyd/gnustep-packager/v0.1.10/schemas/gnustep-packager.schema.json",
+  "schemaVersion": 1,
+  "profiles": [
+    "gnustep-gui"
+  ],
+  "package": {
+    "id": "io.github.danjboyd.tools-xctest.Greeter",
+    "name": "Greeter",
+    "displayName": "Greeter",
+    "version": "0.1.0",
+    "manufacturer": "Daniel Boyd",
+    "summary": "Example app whose XCTest bundle runs before it's packaged.",
+    "license": "LGPL-2.1-or-later",
+    "homepage": "https://github.com/danjboyd/tools-xctest"
+  },
+  "pipeline": {
+    "workingDirectory": "..",
+    "shell": {
+      "kind": "bash",
+      "bootstrapCommands": [
+        ". \"${GP_GNUSTEP_CLI_ROOT:-/usr/GNUstep}/System/Library/Makefiles/GNUstep.sh\""
+      ],
+      "environment": {}
+    },
+    "build": {
+      "command": "bash packaging/build.sh"
+    },
+    "stage": {
+      "command": "bash packaging/stage-linux.sh dist/stage",
+      "outputRoot": "../dist/stage"
+    }
+  },
+  "payload": {
+    "layoutVersion": 1,
+    "stageRoot": "../dist/stage",
+    "appRoot": "app",
+    "runtimeRoot": "runtime",
+    "metadataRoot": "metadata"
+  },
+  "launch": {
+    "entryRelativePath": "app/Greeter.app/Greeter",
+    "workingDirectory": "app/Greeter.app",
+    "arguments": [],
+    "pathPrepend": [
+      "runtime/bin",
+      "runtime/System/Tools"
+    ],
+    "env": {
+      "LD_LIBRARY_PATH": {
+        "value": "{@runtimeRoot}/lib:{@runtimeRoot}/System/Library/Libraries",
+        "policy": "prepend"
+      }
+    }
+  },
+  "outputs": {
+    "root": "../dist",
+    "packageRoot": "../dist/packages",
+    "logRoot": "../dist/logs",
+    "tempRoot": "../dist/tmp",
+    "validationRoot": "../dist/validation"
+  },
+  "validation": {
+    "smoke": {
+      "enabled": true,
+      "kind": "staged-layout",
+      "requiredPaths": [
+        "app/Greeter.app/Greeter",
+        "metadata/icons/Greeter.png"
+      ],
+      "timeoutSeconds": 30
+    },
+    "logs": {
+      "retainOnSuccess": true
+    }
+  },
+  "integrations": {
+    "shortcutName": "Greeter",
+    "fileAssociations": []
+  },
+  "compliance": {
+    "runtimeNotices": [
+      {
+        "name": "GNUstep Runtime",
+        "license": "LGPL-2.1-or-later",
+        "stageRelativePath": "metadata/licenses/gnustep-runtime.txt"
+      }
+    ]
+  },
+  "backends": {
+    "msi": {
+      "enabled": false
+    },
+    "appimage": {
+      "enabled": true,
+      "desktopEntryName": "io.github.danjboyd.tools-xctest.Greeter.desktop",
+      "iconRelativePath": "metadata/icons/Greeter.png",
+      "gnustepConfig": {
+        "systemRoot": "runtime/System"
+      },
+      "smoke": {
+        "mode": "launch-only"
+      },
+      "fonts": {
+        "bundle": [
+          {
+            "name": "DejaVu",
+            "files": [
+              "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+              "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+              "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+              "/usr/share/fonts/truetype/dejavu/DejaVuSansMono-Bold.ttf"
+            ],
+            "licenseFile": "/usr/share/doc/fonts-dejavu-core/copyright",
+            "license": "Bitstream-Vera AND LicenseRef-DejaVu-public-domain",
+            "homepage": "https://dejavu-fonts.github.io/"
+          }
+        ]
+      }
+    }
+  },
+  "hostDependencies": {
+    "linux": {
+      "aptPackages": [
+        "fonts-dejavu-core"
+      ]
+    }
+  }
+}

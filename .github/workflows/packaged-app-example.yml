@@ -1,8 +1,8 @@
 name: Packaged app example
 
 # Examples/PackagedAppTests: gnustep-packager's reusable workflow builds the
-# example app, runs its XCTest bundle, and packages it as an MSI only if the
-# tests pass. See the example's README.
+# example app, runs its XCTest bundle, and packages it (an MSI and an AppImage)
+# only if the tests pass. See the example's README.
 on:
   workflow_dispatch:
   pull_request:
@@ -25,4 +25,21 @@ jobs:
       run-validation: true
       run-smoke: true
       artifact-name: greeter-example
+      artifact-retention-days: 7
+
+  appimage:
+    uses: danjboyd/gnustep-packager/.github/workflows/package-gnustep-app.yml@v0.1.10
+    with:
+      manifest-path: Examples/PackagedAppTests/packaging/package.appimage.json
+      backend: appimage
+      package-version: 0.1.0
+      run-validation: true
+      run-smoke: true
+      # The smoke test launches the app, which needs a display.
+      preflight-shell: bash
+      preflight-command: |
+        sudo apt-get install -y xvfb
+        nohup Xvfb :99 -screen 0 1280x800x24 >/dev/null 2>&1 &
+        echo "DISPLAY=:99" >> "$GITHUB_ENV"
+      artifact-name: greeter-example-appimage
       artifact-retention-days: 7
