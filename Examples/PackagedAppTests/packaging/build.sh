@@ -12,8 +12,8 @@
 # stage, which only gets the app (packaging/stage.sh).
 set -euo pipefail
 
-XCTEST_VERSION=0.8.0
-XCTEST_SHA256=7623055145e4fd7067db5f3b690b7a5ca561fcb56baf8772302ca71dd6d1f27d
+XCTEST_VERSION=0.8.1
+XCTEST_SHA256=f02333c61c02533ea1d96c5072608bdbde345f9d0167305100832b6f1b12e189
 XCTEST_URL=https://github.com/danjboyd/tools-xctest/releases/download/v$XCTEST_VERSION/tools-xctest-$XCTEST_VERSION.tar.gz
 
 root=$(pwd)

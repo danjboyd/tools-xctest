@@ -26,8 +26,8 @@ jobs:
     env:
       GNUSTEP_CLI_VERSION: 0.1.7
       GNUSTEP_CLI_BOOTSTRAP_SHA256: 1580d5ddcf774716bc2caa614cb4c217c19ead1645f4362f58ad12277345c961
-      XCTEST_VERSION: 0.8.0
-      XCTEST_SHA256: 7623055145e4fd7067db5f3b690b7a5ca561fcb56baf8772302ca71dd6d1f27d
+      XCTEST_VERSION: 0.8.1
+      XCTEST_SHA256: f02333c61c02533ea1d96c5072608bdbde345f9d0167305100832b6f1b12e189
     steps:
       - uses: actions/checkout@v4
 
@@ -80,8 +80,8 @@ jobs:
     env:
       GNUSTEP_CLI_VERSION: 0.1.7
       GNUSTEP_CLI_BOOTSTRAP_PS1_SHA256: 867308a2c1c3febd9a7800564eb131a899db67c2ccc9c5d03d4b921c4b387420
-      XCTEST_VERSION: 0.8.0
-      XCTEST_SHA256: 7623055145e4fd7067db5f3b690b7a5ca561fcb56baf8772302ca71dd6d1f27d
+      XCTEST_VERSION: 0.8.1
+      XCTEST_SHA256: f02333c61c02533ea1d96c5072608bdbde345f9d0167305100832b6f1b12e189
     defaults:
       run:
         # The managed toolchain's own bash (setup installs it under
