@@ -502,6 +502,10 @@ static NSImage *GSXCUIImageOfView(NSView *view)
     if (NSIsEmptyRect(bounds)) {
         return nil;
     }
+    // GNUstep's -cacheDisplayInRect:toBitmapImageRep: copies the window's
+    // backing store rather than drawing, so first draw whatever has changed
+    // since the window was last displayed (a label's new text, say).
+    [[view window] displayIfNeeded];
     bitmap = [view bitmapImageRepForCachingDisplayInRect:bounds];
     if (bitmap == nil) {
         return nil;
