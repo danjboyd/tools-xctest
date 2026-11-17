@@ -214,6 +214,25 @@ static BOOL UIIsPNG(NSData *data)
     XCTAssertTrue(UIIsPNG([shot PNGRepresentation]));
 }
 
+// A screenshot is of what's drawn now: the same state gives the same
+// image, and a change shows.
+- (void) testAScreenshotShowsTheCurrentState
+{
+    XCUIApplication *app = [XCUIApplication currentApplication];
+    XCUIElement *label = app.staticTexts[@"countLabel"];
+    NSData *before = [[label screenshot] PNGRepresentation];
+    NSData *again = [[label screenshot] PNGRepresentation];
+    NSData *after;
+
+    XCTAssertNotNil(before);
+    XCTAssertEqualObjects(before, again);
+    [app.buttons[@"Increment"] click];
+    XCTAssertEqualObjects([label value], @"Count: 1");
+    after = [[label screenshot] PNGRepresentation];
+    XCTAssertNotNil(after);
+    XCTAssertNotEqualObjects(before, after);
+}
+
 - (void) testTheApplicationsScreenshotIsOfItsWindow
 {
     XCUIScreenshot *shot = [[XCUIApplication currentApplication] screenshot];
@@ -250,6 +269,15 @@ static BOOL UIIsPNG(NSData *data)
     [[XCUIApplication currentApplication].buttons[@"Twin"] click];
 }
 
+- (void) testClickingADisabledMenuItemFails
+{
+    XCUIApplication *app = [XCUIApplication currentApplication];
+
+    [app.menuItems[@"Unavailable"] click];
+    XCTAssertNotEqualObjects([app.staticTexts[@"alertLabel"] value], @"Unavailable ran",
+                             @"the disabled menu item's action ran");
+}
+
 - (void) testAMenuItemHasNoScreenshot
 {
     XCTAssertNil([[XCUIApplication currentApplication].menuItems[@"Reset"] screenshot]);
@@ -280,6 +308,18 @@ static BOOL UIIsPNG(NSData *data)
     [app.buttons[@"Cancel"] click];
     XCTAssertTrue([app.staticTexts[@"Alert: Cancel"] waitForExistenceWithTimeout:5]);
     XCTAssertFalse([app.buttons[@"OK"] exists]);
+}
+
+// Waiting from the test thread lets the main thread run the delayed
+// action, rather than the wait spinning the main run loop itself.
+- (void) testWaitingForAWindowFromTheTestThread
+{
+    XCUIApplication *app = [XCUIApplication currentApplication];
+
+    [app.buttons[@"Open Later"] click];
+    XCTAssertTrue([app.windows[@"Second"] waitForExistenceWithTimeout:5]);
+    [app.menuItems[@"Reset"] click];
+    XCTAssertTrue([app.windows[@"Second"] waitForNonExistenceWithTimeout:5]);
 }
 
 - (void) testQueriesFromTheTestThread

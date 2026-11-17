@@ -104,8 +104,11 @@ static NSTextField *UIHostLabel(NSView *parent, NSString *text, NSString *identi
     [_second orderOut:nil];
 }
 
+// Never sent: the menu item is disabled. If it ever is, the alert label
+// says so, and the failure test that clicks it checks the label.
 - (void) unavailable: (id)sender
 {
+    [_alertLabel setStringValue:@"Unavailable ran"];
 }
 
 - (BOOL) validateMenuItem: (NSMenuItem *)item
