@@ -28,7 +28,7 @@ app.
 
 The build step (`packaging/build.sh`):
 
-1. Downloads the tools-xctest 0.8.0 release archive, checks its SHA-256 and
+1. Downloads the tools-xctest 0.8.1 release archive, checks its SHA-256 and
    builds it in `build/`. The toolchain doesn't include tools-xctest yet, so
    it's used from there, uninstalled. Nothing is installed into the
    toolchain, which the later steps still use, or into the stage.

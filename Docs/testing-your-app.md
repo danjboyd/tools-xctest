@@ -56,10 +56,10 @@ release archive and install it into the toolchain. That needs no `sudo`,
 because a `--user` toolchain belongs to you:
 
 ```sh
-curl -fsSLO https://github.com/danjboyd/tools-xctest/releases/download/v0.8.0/tools-xctest-0.8.0.tar.gz
-echo "7623055145e4fd7067db5f3b690b7a5ca561fcb56baf8772302ca71dd6d1f27d  tools-xctest-0.8.0.tar.gz" | sha256sum -c -
-tar -xzf tools-xctest-0.8.0.tar.gz
-cd tools-xctest-0.8.0
+curl -fsSLO https://github.com/danjboyd/tools-xctest/releases/download/v0.8.1/tools-xctest-0.8.1.tar.gz
+echo "f02333c61c02533ea1d96c5072608bdbde345f9d0167305100832b6f1b12e189  tools-xctest-0.8.1.tar.gz" | sha256sum -c -
+tar -xzf tools-xctest-0.8.1.tar.gz
+cd tools-xctest-0.8.1
 make
 make install
 ```
