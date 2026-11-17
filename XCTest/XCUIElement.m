@@ -413,6 +413,105 @@ static BOOL GSXCUIIsHittable(id object)
 
 @end
 
+#pragma mark - Screenshots
+
+@interface XCUIScreenshot (GSXCUIPrivate)
+- (id) _gsInitWithImage: (NSImage *)image;
+@end
+
+@implementation XCUIScreenshot
+
+- (id) _gsInitWithImage: (NSImage *)image
+{
+    if ((self = [super init]) != nil) {
+        _image = [image retain];
+    }
+    return self;
+}
+
+- (void) dealloc
+{
+    [_image release];
+    [super dealloc];
+}
+
+- (NSImage *) image
+{
+    return _image;
+}
+
+- (NSData *) PNGRepresentation
+{
+    NSBitmapImageRep *bitmap = nil;
+
+    for (NSImageRep *rep in [_image representations]) {
+        if ([rep isKindOfClass:[NSBitmapImageRep class]]) {
+            bitmap = (NSBitmapImageRep *)rep;
+            break;
+        }
+    }
+    if (bitmap == nil) {
+        bitmap = [NSBitmapImageRep imageRepWithData:[_image TIFFRepresentation]];
+    }
+    return [bitmap representationUsingType:NSPNGFileType properties:[NSDictionary dictionary]];
+}
+
+@end
+
+@implementation XCTAttachment (XCUIScreenshot)
+
++ (instancetype) attachmentWithScreenshot: (XCUIScreenshot *)screenshot
+{
+    return [self attachmentWithScreenshot:screenshot quality:XCTImageQualityOriginal];
+}
+
++ (instancetype) attachmentWithScreenshot: (XCUIScreenshot *)screenshot quality: (XCTImageQuality)quality
+{
+    return [self attachmentWithImage:[screenshot image] quality:quality];
+}
+
+@end
+
+// The window an application's screenshot shows. Main thread only.
+static NSWindow *GSXCUIApplicationWindow(void)
+{
+    NSWindow *window = [NSApp keyWindow];
+
+    if (window == nil || !GSXCUIIsUserWindow(window)) {
+        window = [NSApp mainWindow];
+    }
+    if (window == nil || !GSXCUIIsUserWindow(window)) {
+        window = nil;
+        for (NSWindow *candidate in [NSApp orderedWindows]) {
+            if (GSXCUIIsUserWindow(candidate)) {
+                window = candidate;
+                break;
+            }
+        }
+    }
+    return window;
+}
+
+// An image of \a view as it's drawn now. Main thread only.
+static NSImage *GSXCUIImageOfView(NSView *view)
+{
+    NSRect bounds = [view bounds];
+    NSBitmapImageRep *bitmap;
+    NSImage *image;
+
+    if (NSIsEmptyRect(bounds)) {
+        return nil;
+    }
+    bitmap = [view bitmapImageRepForCachingDisplayInRect:bounds];
+    if (bitmap == nil) {
+        return nil;
+    }
+    [view cacheDisplayInRect:bounds toBitmapImageRep:bitmap];
+    image = [[[NSImage alloc] initWithSize:bounds.size] autorelease];
+    [image addRepresentation:bitmap];
+    return image;
+}
+
 #pragma mark - Queries
 
 @interface XCUIElementQuery (GSXCUIPrivate)
@@ -924,6 +1023,47 @@ static void GSXCUISendKey(NSWindow *window, NSString *characters)
             GSXCUISendKey(window, characters);
         }
     }];
+}
+
+- (XCUIScreenshot *) screenshot
+{
+    NSArray *result = GSXCUIOnMainThread(^id (void) {
+        NSString *problem = nil;
+        id object = [self _gsResolve:&problem];
+        NSImage *image = nil;
+
+        if (object == NSApp) {
+            object = GSXCUIApplicationWindow();
+            if (object == nil) {
+                return [NSArray arrayWithObject:@"couldn't take a screenshot of the application: it has no window on screen"];
+            }
+        }
+        if (object == nil) {
+            return [NSArray arrayWithObject:[NSString stringWithFormat:@"couldn't take a screenshot of %@: %@",
+                [self description], problem]];
+        }
+        if ([object isKindOfClass:[NSWindow class]]) {
+            NSView *content = [object contentView];
+
+            image = GSXCUIImageOfView([content superview] != nil ? [content superview] : content);
+        } else if ([object isKindOfClass:[NSView class]] && [object window] != nil) {
+            image = GSXCUIImageOfView(object);
+        }
+        if (image == nil) {
+            return [NSArray arrayWithObject:[NSString stringWithFormat:
+                @"couldn't take a screenshot of %@: it isn't drawn in a window", [self description]]];
+        }
+        return [NSArray arrayWithObjects:@"", image, nil];
+    });
+
+    if ([result count] == 1) {
+        GSXCUIFail([result objectAtIndex:0]);
+        return nil;
+    }
+    if ([result count] < 2) {
+        return nil;
+    }
+    return [[[XCUIScreenshot alloc] _gsInitWithImage:[result objectAtIndex:1]] autorelease];
 }
 
 - (XCUIElementQuery *) descendantsMatchingType: (XCUIElementType)type

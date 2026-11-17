@@ -53,21 +53,26 @@ echo "Running UI test regressions..."
 
 # Queries, attributes and actions from the main thread, and an alert
 # driven from the UI test thread.
-run_ui -skip-testing:UIFixture/UIFailureTests
+run_ui -skip-testing:UIFixture/UIFailureTests -attachments-path "$work/attachments"
 assert_status 0
 assert_contains "uihostapp: launched"
 assert_contains "UIElementTests: 6 tests PASSED"
 assert_contains "UIActionTests: 5 tests PASSED"
 assert_contains "UIAlertTests: 2 tests PASSED"
+assert_contains "UIScreenshotTests: 3 tests PASSED"
+# A screenshot attachment is saved as PNG.
+[ "$(head -c 8 "$work/attachments/UIScreenshotTests/testAnElementsScreenshotIsItsSize/increment.png" | od -An -tx1 | tr -d ' \n')" = "89504e470d0a1a0a" ] \
+  || fail "expected the screenshot attachment to be saved as PNG"
 
 # Actions a user couldn't perform, and queries that don't find exactly one
 # element, fail the test with a message saying why.
 run_ui -only-testing:UIFixture/UIFailureTests
 assert_status 1
-assert_contains "UIFailureTests: 4/4 tests FAILED"
+assert_contains "UIFailureTests: 5/5 tests FAILED"
 assert_contains "couldn't click buttons \"Disabled\": it isn't hittable (it's disabled)"
 assert_contains "couldn't click buttons \"Hidden\": it isn't hittable (it's hidden, off screen or outside its window)"
 assert_contains "no matches found for buttons \"Nope\""
+assert_contains "couldn't take a screenshot of menu items \"Reset\": it isn't drawn in a window"
 assert_contains "couldn't click buttons \"Twin\": 2 matches found for buttons \"Twin\": button \"Twin\", button \"Twin\""
 
 make -C "$source_root/Tests/UIHostApp" clean > /dev/null

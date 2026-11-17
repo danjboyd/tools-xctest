@@ -10,8 +10,10 @@ The element API below (`libXCTestUI`, phase 3) was approved on
 2026-11-17 with Apple's names, a separate optional library, and the
 first-cut hittability rule (decisions 2 to 4). Its first part (queries,
 attributes, `click`, `typeText:`, menu items and waiting, with
-`Tests/UIHostApp` and `Tests/run-ui-tests.sh`) is built; screenshots are
-next. Where it differs from the proposal below:
+`Tests/UIHostApp` and `Tests/run-ui-tests.sh`) is built, and so are
+screenshots (`XCUIScreenshot`, `-screenshot`,
+`+[XCTAttachment attachmentWithScreenshot:]`). Where it differs from the
+proposal below:
 
 - Queries use Apple's spellings: a subscript (`app.buttons[@"OK"]`, by
   identifier, title or label), `matchingIdentifier:`, `matchingPredicate:`,
