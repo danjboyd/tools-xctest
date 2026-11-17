@@ -3,6 +3,20 @@
 Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 `vX.Y.Z`; 0.1.x are upstream's (gnustep/tools-xctest).
 
+## 0.8.1
+
+A fix for code coverage on Windows, and a guide for testing an app.
+
+- Code coverage on Windows: when another process briefly has the profile
+  open, or is replacing it at the same moment, `xctest` now retries the
+  replacement for up to about 2 seconds instead of failing with "could not
+  write". Two runs writing into the same directory both succeed.
+- Docs: [Testing your app with tools-xctest](Docs/testing-your-app.md) goes
+  from a gnustep-cli install to a passing test, with the example in
+  `Examples/FirstTest`. CI follows it on a clean install.
+- Examples: `Examples/PackagedAppTests` runs an app's tests before
+  gnustep-packager builds its MSI or Linux AppImage.
+
 ## 0.8.0
 
 Hosted tests that drive modal windows, an `xctest(1)` man page, and code
