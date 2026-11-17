@@ -563,12 +563,16 @@ With xctest.make, set `MyTests_XCTEST_UI = yes` to link it (along with
   of being acted on. Occlusion by other windows isn't checked yet.
 - **Waiting.** `waitForExistenceWithTimeout:` and
   `waitForNonExistenceWithTimeout:`.
+- **Screenshots.** `[element screenshot]` draws a view or window as it is
+  now (the application's is of its key window); keep it with
+  `[self addAttachment:[XCTAttachment attachmentWithScreenshot:shot]]`, or
+  read `image` / `PNGRepresentation`.
 - **Threads.** It works from main-thread tests, and from a class that runs
   on the UI test thread (above), where a click that opens an alert returns
   while the alert is up and the test can then press its buttons:
   `[app.buttons[@"Cancel"] click]`.
-- **Not yet:** screenshots, sheets, tables, double clicks, and keys other
-  than typed text. See issue #26.
+- **Not yet:** sheets, tables, double clicks, and keys other than typed
+  text. See issue #26.
 
 ## Building test bundles
 

@@ -40,14 +40,31 @@
 // that a user couldn't perform (the element doesn't exist, is disabled,
 // hidden, or outside its window) fail the test instead of acting.
 //
-// Not supported yet: screenshots, sheets, tables, key presses other than
-// typing text, double clicks, and occlusion by other windows. See issue
-// #26.
+// Not supported yet: sheets, tables, key presses other than typing text,
+// double clicks, and occlusion by other windows. See issue #26.
 
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
 
 @class XCUIElementQuery;
+@class NSImage;
+
+/// An image of part of the application's UI.
+@interface XCUIScreenshot : NSObject
+{
+    NSImage *_image;
+}
+- (NSImage *) image;
+/// The image as PNG data.
+- (NSData *) PNGRepresentation;
+@end
+
+/// Something that can be pictured.
+@protocol XCUIScreenshotProviding
+/// An image of it as it's drawn now. Fails the test, and returns nil, if
+/// it can't be found or isn't drawn in a window (a menu item, say).
+- (XCUIScreenshot *) screenshot;
+@end
 
 /// The kinds of element. The values are Apple's; only these are found.
 typedef NS_ENUM(NSUInteger, XCUIElementType) {
@@ -114,7 +131,7 @@ typedef NS_ENUM(NSUInteger, XCUIElementType) {
 @end
 
 /// An element of the application's UI: a lazy query for exactly one.
-@interface XCUIElement : NSObject <XCUIElementAttributes, XCUIElementTypeQueryProvider>
+@interface XCUIElement : NSObject <XCUIElementAttributes, XCUIElementTypeQueryProvider, XCUIScreenshotProviding>
 {
     XCUIElementQuery *_query;
     NSInteger _index;
@@ -159,6 +176,14 @@ typedef NS_ENUM(NSUInteger, XCUIElementType) {
 + (XCUIApplication *) currentApplication;
 /// The same as +currentApplication.
 - (id) init;
+// Its -screenshot is of its key window, or else its main window, or else
+// its frontmost one.
+@end
+
+/// Screenshots as attachments (PNG, or JPEG for lower qualities).
+@interface XCTAttachment (XCUIScreenshot)
++ (instancetype) attachmentWithScreenshot: (XCUIScreenshot *)screenshot;
++ (instancetype) attachmentWithScreenshot: (XCUIScreenshot *)screenshot quality: (XCTImageQuality)quality;
 @end
 
 /// A search for elements, below an element, by kind and attributes.

@@ -175,6 +175,55 @@
 
 @end
 
+@interface UIScreenshotTests : UIFixtureCase
+@end
+
+@implementation UIScreenshotTests
+
+static BOOL UIIsPNG(NSData *data)
+{
+    static const unsigned char magic[8] = { 0x89, 'P', 'N', 'G', '\r', '\n', 0x1a, '\n' };
+
+    return [data length] > 8 && memcmp([data bytes], magic, 8) == 0;
+}
+
+- (void) testAnElementsScreenshotIsItsSize
+{
+    XCUIApplication *app = [XCUIApplication currentApplication];
+    XCUIScreenshot *shot = [app.buttons[@"Increment"] screenshot];
+    XCTAttachment *attachment;
+
+    XCTAssertNotNil(shot);
+    XCTAssertEqual([[shot image] size].width, 100.0);
+    XCTAssertEqual([[shot image] size].height, 24.0);
+    XCTAssertTrue(UIIsPNG([shot PNGRepresentation]));
+    attachment = [XCTAttachment attachmentWithScreenshot:shot];
+    [attachment setName:@"increment"];
+    [attachment setLifetime:XCTAttachmentLifetimeKeepAlways];
+    [self addAttachment:attachment];
+}
+
+- (void) testAWindowsScreenshotCoversItsContent
+{
+    XCUIApplication *app = [XCUIApplication currentApplication];
+    XCUIScreenshot *shot = [app.windows[@"Main"] screenshot];
+
+    XCTAssertNotNil(shot);
+    XCTAssertGreaterThanOrEqual([[shot image] size].width, 400.0);
+    XCTAssertGreaterThanOrEqual([[shot image] size].height, 330.0);
+    XCTAssertTrue(UIIsPNG([shot PNGRepresentation]));
+}
+
+- (void) testTheApplicationsScreenshotIsOfItsWindow
+{
+    XCUIScreenshot *shot = [[XCUIApplication currentApplication] screenshot];
+
+    XCTAssertNotNil(shot);
+    XCTAssertGreaterThanOrEqual([[shot image] size].width, 400.0);
+}
+
+@end
+
 // Each test fails, with the message the script checks.
 @interface UIFailureTests : UIFixtureCase
 @end
@@ -199,6 +248,11 @@
 - (void) testAnAmbiguousQueryFails
 {
     [[XCUIApplication currentApplication].buttons[@"Twin"] click];
+}
+
+- (void) testAMenuItemHasNoScreenshot
+{
+    XCTAssertNil([[XCUIApplication currentApplication].menuItems[@"Reset"] screenshot]);
 }
 
 @end
