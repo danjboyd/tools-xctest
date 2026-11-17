@@ -8,3 +8,7 @@ option('swiftc', type: 'string', value: 'swiftc',
        description: 'swiftc with GNUstep Objective-C interop, for the Swift overlay')
 option('xctest_swift_flags', type: 'array', value: [],
        description: 'Extra swiftc driver flags for the Swift overlay (toolchain resource dir, -gnustep-objc-interop, ...; frontend-only flags as -Xfrontend <flag>)')
+# UI testing for hosted tests (libXCTestUI, XCTest/XCUI.h). Needs gnustep-gui;
+# by default it's built when AppKit's headers are found.
+option('ui', type: 'feature', value: 'auto',
+       description: 'Build libXCTestUI (needs gnustep-gui)')

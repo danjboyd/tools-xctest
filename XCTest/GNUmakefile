@@ -6,6 +6,13 @@ LIBRARY_NAME = XCTest
 # libXCTestHost works through LD_PRELOAD, so there is no -host on Windows.
 ifeq (,$(findstring mingw,$(GNUSTEP_HOST_OS))$(findstring windows,$(GNUSTEP_HOST_OS)))
 LIBRARY_NAME += XCTestHost
+# UI testing for hosted tests (XCTest/XCUI.h) needs gnustep-gui. Built when
+# its headers are found; XCTEST_UI=no leaves it out.
+XCTEST_UI ?= $(if $(wildcard $(addsuffix /AppKit/AppKit.h,$(GNUSTEP_SYSTEM_HEADERS) $(GNUSTEP_NETWORK_HEADERS) \
+  $(GNUSTEP_LOCAL_HEADERS) $(GNUSTEP_USER_HEADERS))),yes,no)
+ifeq ($(XCTEST_UI),yes)
+LIBRARY_NAME += XCTestUI
+endif
 endif
 XCTest_HEADER_FILES = XCTest.h XCTestAssertions.h XCTestAssertionsImpl.h XCTestCase.h \
 	XCTestExpectation.h XCTWaiter.h XCTestErrors.h XCTestCase+AsynchronousTesting.h \
@@ -25,6 +32,15 @@ XCTest_INCLUDE_DIRS = -I../
 XCTestHost_OBJC_FILES = GSXCTestHostLoader.m
 XCTestHost_INCLUDE_DIRS = -I../
 XCTestHost_LIBRARIES_DEPEND_UPON = -L./obj -lXCTest $(FND_LIBS) $(OBJC_LIBS) $(SYSTEM_LIBS)
+
+# Linked into hosted test bundles that use XCTest/XCUI.h (xctest.make:
+# <Bundle>_XCTEST_UI = yes). Its header goes beside XCTest's.
+XCTestUI_NEEDS_GUI = yes
+XCTestUI_OBJC_FILES = XCUIElement.m
+XCTestUI_HEADER_FILES = XCUI.h
+XCTestUI_HEADER_FILES_INSTALL_DIR = XCTest
+XCTestUI_INCLUDE_DIRS = -I../
+XCTestUI_LIBRARIES_DEPEND_UPON = -L./obj -lXCTest $(GUI_LIBS) $(FND_LIBS) $(OBJC_LIBS) $(SYSTEM_LIBS)
 
 -include GNUmakefile.preamble
 include $(GNUSTEP_MAKEFILES)/library.make

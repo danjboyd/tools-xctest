@@ -6,8 +6,25 @@ The design for driving a GNUstep application's UI from hosted tests
 **Status:** phase 2 (the runner) is built in fork PR #59. It covers the
 opt-in test thread, `GSXCTestMainThread` dispatch, teardown and wedge
 handling ([Threading and dispatch](#threading-and-dispatch-for-1a)).
-The element API below (`libXCTestUI`, phases 3 and later) is still a
-proposal, and its names aren't decided.
+The element API below (`libXCTestUI`, phase 3) was approved on
+2026-11-17 with Apple's names, a separate optional library, and the
+first-cut hittability rule (decisions 2 to 4). Its first part (queries,
+attributes, `click`, `typeText:`, menu items and waiting, with
+`Tests/UIHostApp` and `Tests/run-ui-tests.sh`) is built; screenshots are
+next. Where it differs from the proposal below:
+
+- Queries use Apple's spellings: a subscript (`app.buttons[@"OK"]`, by
+  identifier, title or label), `matchingIdentifier:`, `matchingPredicate:`,
+  `matchingType:identifier:` and `element`, not `elementMatchingTitle:`.
+- Menus are `menuBarItems` (the main menu's items) and `menuItems`, as in
+  Apple's; there's no `elementMatchingPath:`. `click` performs a menu item.
+- xctest.make links `libXCTestUI` only for bundles that set
+  `<Bundle>_XCTEST_UI = yes`, not whenever `XCTEST_HOST` is set, so a
+  hosted bundle doesn't start needing a library that a tools-xctest built
+  without gnustep-gui lacks.
+- An action that enters a nested run loop is given 0.5 s to finish (a
+  clicked button's highlight) before it's taken to be a modal loop.
+- `frame` is in GNUstep's screen coordinates (origin at the bottom left).
 
 ## Where things stand
 

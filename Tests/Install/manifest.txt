@@ -1,7 +1,9 @@
 # What `make install` and `meson install` put in DESTDIR, by role, whatever
 # the layout. Checked by .github/scripts/check-install.sh. A line tagged
 # "swift" is installed only with the Swift overlay (XCTEST_SWIFTC, or
-# -Dswift=enabled); "meson" only by Meson; "host" not on Windows.
+# -Dswift=enabled); "meson" only by Meson; "host" not on Windows. (The
+# "ui" lines are libXCTestUI's, built only with gnustep-gui, which the CI
+# builds have wherever "host" applies.)
 # An XCTest/*.h not listed here must be in private-headers.txt.
 header XCTest/GSXCTestMainThread.h
 header XCTest/GSXCTestRunner.h
@@ -27,8 +29,10 @@ header XCTest/XCTExpectedFailure.h
 header XCTest/XCTIssue.h
 header XCTest/XCTMetric.h
 header XCTest/XCTWaiter.h
+header XCTest/XCUI.h host ui
 lib libXCTest
 lib libXCTestHost host
+lib libXCTestUI host ui
 tool xctest
 tool xctest-bundle
 makefile Auxiliary/xctest.make

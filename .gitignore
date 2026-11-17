@@ -14,6 +14,10 @@ Tests/HostedFixture/HostedFixture.bundle
 Tests/HostedFixture/obj
 Tests/HostApp/HostApp.app
 Tests/HostApp/obj
+Tests/UIHostApp/UIHostApp.app
+Tests/UIHostApp/obj
+Tests/UIFixture/UIFixture.bundle
+Tests/UIFixture/obj
 Tests/ExpectedFailureFixture/ExpectedFailureFixture.bundle
 Tests/ExpectedFailureFixture/obj
 Tests/PerformanceFixture/PerformanceFixture.bundle

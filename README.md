@@ -506,10 +506,69 @@ application. It reaches the application only through `GSXCTestMainThread`
 - **A stopped application.** If the main thread doesn't answer after a test,
   the application is treated as stopped: the remaining tests fail without
   running, and the run ends with the results written.
-- **Not supported yet:** sheets, menu tracking, typing, and more than three
-  nested modal sessions. There are no element queries
-  (`XCUIApplication`-style) yet either; see issue #26.
-  Linux only, as `-host` is.
+- **Not supported yet:** sheets, menu tracking, and more than three nested
+  modal sessions. For finding controls, clicking and typing, see the next
+  section. Linux only, as `-host` is.
+
+#### Finding and driving controls (XCUIApplication)
+
+`libXCTestUI` (`#import <XCTest/XCUI.h>`) finds an application's windows,
+controls and menu items, acts on them the way a user would, and waits for
+the UI to change. The names are Apple's (`XCUIApplication`, `XCUIElement`,
+`XCUIElementQuery`), so tests read like Xcode UI tests:
+
+```objc
+#import <XCTest/XCUI.h>
+
+- (void) testGreeting
+{
+    XCUIApplication *app = [XCUIApplication currentApplication];
+    XCUIElement *name = app.textFields[@"nameField"];   // identifier, title or label
+
+    [name click];
+    [name typeText:@"Ada\n"];
+    XCTAssertEqualObjects([app.staticTexts[@"greetingLabel"] value], @"Hello, Ada");
+
+    [app.menuItems[@"Reset"] click];
+    [app.buttons[@"Open Later"] click];
+    XCTAssertTrue([app.windows[@"Second"] waitForExistenceWithTimeout:5]);
+}
+```
+
+With xctest.make, set `MyTests_XCTEST_UI = yes` to link it (along with
+`XCTEST_HOST`). It's built with tools-xctest when gnustep-gui is installed
+(`-Dui=enabled|disabled` with Meson, `XCTEST_UI=no` with gnustep-make).
+
+- **It isn't XCUITest.** The tests run inside the application, which
+  `xctest -host` launches: there's no `-launch` or `-terminate`, and no other
+  application can be queried. Elements are found by walking AppKit's
+  windows, views and menus, not through accessibility, and `frame` is in
+  GNUstep's screen coordinates (origin at the bottom left).
+- **Queries.** `windows`, `buttons`, `checkBoxes`, `radioButtons`,
+  `popUpButtons`, `textFields`, `secureTextFields`, `staticTexts`,
+  `textViews`, `menuBarItems` (the main menu's items), `menuItems` and
+  `otherElements`, from the application or any element, or
+  `descendantsMatchingType:` / `childrenMatchingType:`. Narrow them with a
+  subscript, `matchingIdentifier:`, `matchingPredicate:` (keys
+  `identifier`, `title`, `label`, `value`, `placeholderValue`,
+  `elementType`, `enabled`, `selected`, `hasFocus`) or
+  `matchingType:identifier:`, and pick with `element`, `firstMatch`,
+  `elementBoundByIndex:` or `count`. An element is resolved again each time
+  it's used.
+- **Actions.** `click` sends a control's action (`performClick:`), focuses a
+  text field, performs a menu item or makes a window key; `typeText:` sends
+  key events through the window, so field editors and delegates see them
+  (`"\n"` is Return). An element that doesn't exist, isn't unique, or isn't
+  hittable (disabled, hidden, or outside its window) fails the test instead
+  of being acted on. Occlusion by other windows isn't checked yet.
+- **Waiting.** `waitForExistenceWithTimeout:` and
+  `waitForNonExistenceWithTimeout:`.
+- **Threads.** It works from main-thread tests, and from a class that runs
+  on the UI test thread (above), where a click that opens an alert returns
+  while the alert is up and the test can then press its buttons:
+  `[app.buttons[@"Cancel"] click]`.
+- **Not yet:** screenshots, sheets, tables, double clicks, and keys other
+  than typed text. See issue #26.
 
 ## Building test bundles
 
