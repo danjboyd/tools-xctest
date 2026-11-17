@@ -53,10 +53,11 @@ XCTEST_TEST_SCRIPTS = cli-filter \
 	make-swift \
 	man \
 	coverage \
-	ui-thread
+	ui-thread \
+	ui
 # There is no -host on Windows (it needs LD_PRELOAD).
 ifneq (,$(findstring mingw,$(GNUSTEP_HOST_OS))$(findstring windows,$(GNUSTEP_HOST_OS)))
-XCTEST_TEST_SCRIPTS := $(filter-out hosted ui-thread,$(XCTEST_TEST_SCRIPTS))
+XCTEST_TEST_SCRIPTS := $(filter-out hosted ui-thread ui,$(XCTEST_TEST_SCRIPTS))
 endif
 
 after-check:: all

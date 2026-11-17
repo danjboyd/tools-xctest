@@ -39,6 +39,9 @@
 #   <Bundle>_XCTEST_FLAGS      Options for one bundle's run.
 #   XCTEST_HOST                An application to run the tests in (xctest -host);
 #                              also makes the bundles link the GUI.
+#   <Bundle>_XCTEST_UI         yes: link libXCTestUI, for hosted tests that
+#                              drive the app's UI (#import <XCTest/XCUI.h>);
+#                              also makes the bundle link the GUI.
 #   XCTEST_LAUNCHER            A command to run xctest under, e.g. "xvfb-run -a".
 #   XCTEST                     The xctest program (default: xctest, from PATH).
 #   XCTEST_BUNDLE_EXTENSION    Default .xctest. Note that it applies to every
@@ -87,6 +90,11 @@ XCTEST_BUNDLE_EXTENSION ?= .xctest
 BUNDLE_EXTENSION = $(XCTEST_BUNDLE_EXTENSION)
 BUNDLE_NAME += $(XCTEST_BUNDLE_NAME)
 NEEDS_GUI ?= $(if $(XCTEST_HOST),yes,no)
+
+# Bundles that use XCTest/XCUI.h link libXCTestUI, ahead of libXCTest.
+$(foreach bundle,$(XCTEST_BUNDLE_NAME),$(if $(filter yes,$($(bundle)_XCTEST_UI)),\
+  $(eval $(bundle)_BUNDLE_LIBS += -lXCTestUI)\
+  $(eval $(bundle)_NEEDS_GUI = yes)))
 
 XCTEST_COVERAGE_DIR ?= coverage
 XCTEST_COVERAGE_FLAGS = -fprofile-instr-generate -fcoverage-mapping

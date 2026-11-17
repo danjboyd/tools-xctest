@@ -187,6 +187,28 @@ if host_machine.system() != 'windows'
     install: true,
   )
   xctest_test_depends += xctest_host_lib
+
+  # UI testing for hosted tests (XCTest/XCUI.h). It needs gnustep-gui, and
+  # isn't built without it (see meson_options.txt).
+  ui_option = get_option('ui')
+  has_appkit = not ui_option.disabled() and objc_compiler.has_header('AppKit/AppKit.h', args: objc_flags)
+  if ui_option.enabled() and not has_appkit
+    error('-Dui=enabled needs gnustep-gui (AppKit/AppKit.h wasn\'t found)')
+  endif
+  if has_appkit
+    xctest_ui_lib = library(
+      'XCTestUI',
+      'XCTest/XCUIElement.m',
+      dependencies: dependencies_to_link,
+      include_directories: include_dirs,
+      link_with: xctest_lib,
+      link_args: ['-lgnustep-gui'],
+      install: true,
+    )
+    install_headers('XCTest/XCUI.h',
+                    install_dir: join_paths(get_option('prefix'), get_option('includedir'), 'XCTest'))
+    xctest_test_depends += xctest_ui_lib
+  endif
 endif
 
 # Build XCTest tool
@@ -254,7 +276,8 @@ if host_machine.system() != 'darwin'
     # deliberately hung and TERM-ignoring processes: about 30 s, Meson's
     # default limit.
     xctest_tests += [['hosted', 'run-hosted-tests.sh'],
-                     ['ui-thread', 'run-ui-thread-tests.sh', 180]]
+                     ['ui-thread', 'run-ui-thread-tests.sh', 180],
+                     ['ui', 'run-ui-tests.sh', 120]]
   endif
 
   # The standalone regression program (Tests/Regression.m).

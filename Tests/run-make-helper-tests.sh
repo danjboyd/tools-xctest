@@ -57,6 +57,19 @@ make_fixture check XCTEST_HOST=/opt/Example.app XCTEST_LAUNCHER=echo
 assert_status 0
 assert_contains "$xctest_bin ./HelperTests.xctest -host /opt/Example.app"
 
+# <Bundle>_XCTEST_UI = yes links that bundle, and only that one, with
+# libXCTestUI (when it was built: it needs gnustep-gui).
+if [ -e "$xctest_lib_dir/libXCTestUI.so" ]; then
+  make_fixture clean all HelperTests_XCTEST_UI=yes
+  assert_status 0
+  objdump -p "$(bundle_binary "$fixture/HelperTests.xctest" HelperTests)" | grep -q 'NEEDED.*libXCTestUI' \
+    || fail "expected HelperTests to link libXCTestUI"
+  ! objdump -p "$(bundle_binary "$fixture/OtherTests.xctest" OtherTests)" | grep -q 'NEEDED.*libXCTestUI' \
+    || fail "expected OtherTests not to link libXCTestUI"
+  make_fixture clean all
+  assert_status 0
+fi
+
 # Test bundles are never installed.
 make_fixture install DESTDIR="$work_dir/destdir"
 assert_status 0
