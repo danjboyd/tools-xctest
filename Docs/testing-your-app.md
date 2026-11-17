@@ -6,8 +6,8 @@ test their code with XCTest. It goes from a fresh install to a passing test,
 then shows how to make CI refuse to package an app whose tests fail.
 
 The [Testing guide workflow](../.github/workflows/testing-guide.yml) runs these
-steps on a clean Ubuntu 24.04 runner for every change to this guide or its
-example.
+steps on clean Ubuntu 24.04 and Windows Server 2022 runners for every change
+to this guide or its example.
 
 ## 1. Install gnustep-cli
 
@@ -20,6 +20,34 @@ then load its GNUstep environment in every shell you build in:
 ```sh
 . ~/.local/share/gnustep-cli/System/Library/Makefiles/GNUstep.sh
 ```
+
+### On Windows
+
+gnustep-cli's PowerShell installer puts an MSYS2 `clang64` toolchain, with its
+own `bash` and `make`, in `%LOCALAPPDATA%\gnustep-cli`. In PowerShell, check
+the installer against its published digest before running it:
+
+```powershell
+Invoke-WebRequest -Uri https://github.com/danjboyd/gnustep-cli-new/releases/download/v0.1.7/gnustep-bootstrap.ps1 -OutFile gnustep-bootstrap.ps1
+(Get-FileHash -Algorithm SHA256 gnustep-bootstrap.ps1).Hash   # 867308A2C1C3FEBD9A7800564EB131A899DB67C2CCC9C5D03D4B921C4B387420
+.\gnustep-bootstrap.ps1 setup --user
+```
+
+Do the rest of this guide in the toolchain's `bash`, with its environment
+loaded:
+
+```powershell
+& "$env:LOCALAPPDATA\gnustep-cli\usr\bin\bash.exe" --noprofile --norc
+```
+
+```sh
+export MSYSTEM=CLANG64 PATH="/clang64/bin:/usr/bin:$PATH"
+. /clang64/share/GNUstep/Makefiles/GNUstep.sh
+```
+
+That's the shell the CI job uses. `gnustep shell` opens gnustep-cli's own
+shell on the same toolchain. Steps 2 to 4 are then the same as on Linux,
+except that `make install` puts `xctest` in `/clang64/bin`.
 
 ## 2. Install tools-xctest
 
@@ -148,9 +176,10 @@ contains it.
 
 ## Limits
 
-- **Linux only, as tested:** the steps above are checked on Ubuntu 24.04. On
-  Windows, gnustep-cli's installer is in preview. The Windows build in
-  [Examples/PackagedAppTests](../Examples/PackagedAppTests) shows the
-  differences, such as `-DHAVE_MODE_T` and putting the XCTest DLL on `PATH`.
+- **Checked on Ubuntu 24.04 and Windows Server 2022,** with gnustep-cli 0.1.7.
+  On Windows, gnustep-cli's installer is in preview. With MSYS2's own
+  packages instead of gnustep-cli's toolchain, building tools-xctest needs
+  `-DHAVE_MODE_T`, as the Windows build in
+  [Examples/PackagedAppTests](../Examples/PackagedAppTests) shows.
 - **Once gnustep-cli packages tools-xctest,** step 2 becomes one
   `gnustep install` command, and this guide will say so.

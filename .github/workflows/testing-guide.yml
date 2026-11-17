@@ -1,4 +1,4 @@
-# Follows Docs/testing-your-app.md on a clean runner: install gnustep-cli,
+# Follows Docs/testing-your-app.md on clean Linux and Windows runners: install gnustep-cli,
 # build and install tools-xctest into its toolchain, then run
 # Examples/FirstTest's tests, and check that a failing test fails `make check`.
 name: Testing guide
@@ -65,6 +65,71 @@ jobs:
       - name: A failing test fails make check
         run: |
           . "$HOME/.local/share/gnustep-cli/System/Library/Makefiles/GNUstep.sh"
+          sed -i 's/XCTAssertEqual(\[counter value\], 2);/XCTAssertEqual([counter value], 3);/' Examples/FirstTest/Tests/CounterTests.m
+          grep -q 'XCTAssertEqual(\[counter value\], 3);' Examples/FirstTest/Tests/CounterTests.m
+          if make -C Examples/FirstTest/Tests check; then
+            echo "make check passed with a failing test" >&2
+            exit 1
+          fi
+          echo "make check failed, as it should."
+
+  # The same steps on Windows, with gnustep-cli's PowerShell bootstrap and
+  # its managed MSYS2 clang64 toolchain (bash and make come with it).
+  windows:
+    runs-on: windows-2022
+    env:
+      GNUSTEP_CLI_VERSION: 0.1.7
+      GNUSTEP_CLI_BOOTSTRAP_PS1_SHA256: 867308a2c1c3febd9a7800564eb131a899db67c2ccc9c5d03d4b921c4b387420
+      XCTEST_VERSION: 0.8.0
+      XCTEST_SHA256: 7623055145e4fd7067db5f3b690b7a5ca561fcb56baf8772302ca71dd6d1f27d
+    defaults:
+      run:
+        # The managed toolchain's own bash (setup installs it under
+        # %LOCALAPPDATA%\gnustep-cli; the first step checks that's here).
+        shell: C:\Users\runneradmin\AppData\Local\gnustep-cli\usr\bin\bash.exe --noprofile --norc -eo pipefail {0}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install gnustep-cli (guide step 1)
+        shell: pwsh
+        run: |
+          Set-Location $env:RUNNER_TEMP
+          Invoke-WebRequest -Uri "https://github.com/danjboyd/gnustep-cli-new/releases/download/v$env:GNUSTEP_CLI_VERSION/gnustep-bootstrap.ps1" -OutFile gnustep-bootstrap.ps1
+          $hash = (Get-FileHash -Algorithm SHA256 gnustep-bootstrap.ps1).Hash.ToLower()
+          if ($hash -ne $env:GNUSTEP_CLI_BOOTSTRAP_PS1_SHA256) { throw "gnustep-bootstrap.ps1 digest $hash" }
+          ./gnustep-bootstrap.ps1 setup --user --yes
+          $root = Join-Path $env:LOCALAPPDATA "gnustep-cli"
+          if ($root -ne "C:\Users\runneradmin\AppData\Local\gnustep-cli") { throw "unexpected install root $root" }
+          Get-ChildItem $root
+          & "$root\bin\gnustep.exe" --version
+
+      - name: Build and install tools-xctest (guide step 2)
+        run: |
+          export MSYSTEM=CLANG64 PATH="/clang64/bin:/usr/bin:$PATH"
+          . /clang64/share/GNUstep/Makefiles/GNUstep.sh
+          cd "$(cygpath -u "$RUNNER_TEMP")"
+          curl -fsSLO "https://github.com/danjboyd/tools-xctest/releases/download/v$XCTEST_VERSION/tools-xctest-$XCTEST_VERSION.tar.gz"
+          echo "$XCTEST_SHA256  tools-xctest-$XCTEST_VERSION.tar.gz" | sha256sum -c -
+          tar -xzf "tools-xctest-$XCTEST_VERSION.tar.gz"
+          cd "tools-xctest-$XCTEST_VERSION"
+          make
+          make install
+          command -v xctest
+          ls "$GNUSTEP_MAKEFILES/Auxiliary/xctest.make"
+
+      - name: Run the example's tests (guide steps 3 and 4)
+        run: |
+          export MSYSTEM=CLANG64 PATH="/clang64/bin:/usr/bin:$PATH"
+          . /clang64/share/GNUstep/Makefiles/GNUstep.sh
+          report="$(cygpath -m "$RUNNER_TEMP")/CounterTests.xml"
+          make -C Examples/FirstTest/Tests check XCTEST_FLAGS="-junit-report $report"
+          grep -q 'tests="3"' "$report"
+          grep -q 'failures="0"' "$report"
+
+      - name: A failing test fails make check
+        run: |
+          export MSYSTEM=CLANG64 PATH="/clang64/bin:/usr/bin:$PATH"
+          . /clang64/share/GNUstep/Makefiles/GNUstep.sh
           sed -i 's/XCTAssertEqual(\[counter value\], 2);/XCTAssertEqual([counter value], 3);/' Examples/FirstTest/Tests/CounterTests.m
           grep -q 'XCTAssertEqual(\[counter value\], 3);' Examples/FirstTest/Tests/CounterTests.m
           if make -C Examples/FirstTest/Tests check; then
