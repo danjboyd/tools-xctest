@@ -35,6 +35,17 @@ host_app="$source_root/Tests/HostApp/HostApp.app"
 owned_tmp=$(mktemp -d "${TMPDIR:-/tmp}/xctest-ui-thread.XXXXXX")
 owned_tmp=$(cd "$owned_tmp" && pwd -P)
 
+# xvfb-run gets its X authority file here, under $owned_tmp, so it never
+# makes a temporary directory of its own. Removing that directory is the
+# last thing xvfb-run does, before it stops Xvfb; when the removal fails,
+# xvfb-run exits 5 instead of with the run's status, and leaves Xvfb
+# running (seen once in CI, 2026-11-17). This script removes $owned_tmp
+# itself, once nothing it started is still running.
+if [ "${display_wrapper[0]:-}" = xvfb-run ]; then
+  : > "$owned_tmp/Xauthority"
+  display_wrapper+=(-f "$owned_tmp/Xauthority")
+fi
+
 # A process's start time (clock ticks since boot), to tell it apart from a
 # later process that reuses its pid.
 proc_start() {
