@@ -119,8 +119,13 @@ if is_windows && command -v powershell.exe > /dev/null 2>&1; then
   held=$(cygpath -w "$work/held/CoverageFixture.profdata")
   powershell.exe -NoProfile -Command "\$f = [System.IO.File]::Open('$held', 'Open', 'Read', 'Read'); New-Item -ItemType File '$(cygpath -w "$work/held.ready")' | Out-Null; Start-Sleep -Milliseconds 1500; \$f.Close()" &
   holder=$!
-  for _ in $(seq 1 100); do [ -f "$work/held.ready" ] && break; sleep 0.1; done
-  [ -f "$work/held.ready" ] || fail "expected PowerShell to open the profile"
+  # PowerShell can take well over 10 s to start on a busy runner.
+  for _ in $(seq 1 600); do [ -f "$work/held.ready" ] && break; sleep 0.1; done
+  if [ ! -f "$work/held.ready" ]; then
+    kill "$holder" 2> /dev/null || true
+    wait "$holder" 2> /dev/null || true
+    fail "expected PowerShell to open the profile within 60 s"
+  fi
   run_fixture CoverageFixture -coverage-output "$work/held"
   wait "$holder"
   assert_status 0
