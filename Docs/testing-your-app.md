@@ -28,8 +28,8 @@ own `bash` and `make`, in `%LOCALAPPDATA%\gnustep-cli`. In PowerShell, check
 the installer against its published digest before running it:
 
 ```powershell
-Invoke-WebRequest -Uri https://github.com/danjboyd/gnustep-cli-new/releases/download/v0.1.7/gnustep-bootstrap.ps1 -OutFile gnustep-bootstrap.ps1
-(Get-FileHash -Algorithm SHA256 gnustep-bootstrap.ps1).Hash   # 867308A2C1C3FEBD9A7800564EB131A899DB67C2CCC9C5D03D4B921C4B387420
+Invoke-WebRequest -Uri https://github.com/danjboyd/gnustep-cli-new/releases/download/v0.1.9/gnustep-bootstrap.ps1 -OutFile gnustep-bootstrap.ps1
+(Get-FileHash -Algorithm SHA256 gnustep-bootstrap.ps1).Hash   # TODO-V019-PS1-SHA256
 .\gnustep-bootstrap.ps1 setup --user
 ```
 
@@ -46,14 +46,28 @@ export MSYSTEM=CLANG64 PATH="/clang64/bin:/usr/bin:$PATH"
 ```
 
 That's the shell the CI job uses. `gnustep shell` opens gnustep-cli's own
-shell on the same toolchain. Steps 2 to 4 are then the same as on Linux,
-except that `make install` puts `xctest` in `/clang64/bin`.
+shell on the same toolchain. Steps 2 to 4 are then the same as on Linux.
 
 ## 2. Install tools-xctest
 
-gnustep-cli doesn't offer tools-xctest as a package yet, so build it from its
-release archive and install it into the toolchain. That needs no `sudo`,
-because a `--user` toolchain belongs to you:
+```sh
+gnustep install tools-xctest
+```
+
+This installs the XCTest library and headers, the `xctest` runner, and
+`xctest.make`, which builds test bundles with gnustep-make. The runner goes
+on the `PATH` that setup printed, and `xctest.make` is available as
+`$(GNUSTEP_MAKEFILES)/Auxiliary/xctest.make`.
+
+If you followed an earlier version of this guide and installed tools-xctest
+with `make install` from its source, `gnustep install` refuses to replace
+that `xctest.make`. Run `make uninstall` in the source tree first, with
+`GNUstep.sh` loaded, then install the package.
+
+### Without gnustep-cli's package
+
+On a toolchain gnustep-cli doesn't manage, build tools-xctest from its
+release archive and install it into the toolchain:
 
 ```sh
 curl -fsSLO https://github.com/danjboyd/tools-xctest/releases/download/v0.8.1/tools-xctest-0.8.1.tar.gz
@@ -64,10 +78,8 @@ make
 make install
 ```
 
-This installs the XCTest library and headers, the `xctest` runner, and
-`xctest.make`, which builds test bundles with gnustep-make.
-The runner goes in the toolchain's `Local/Tools`, which isn't on the `PATH`
-that setup printed. Loading `GNUstep.sh`, as in step 1, adds it.
+`make install` puts the runner in the toolchain's `Local/Tools` (on Windows,
+`/clang64/bin`); loading `GNUstep.sh` puts it on `PATH`.
 
 ## 3. Write a test
 
@@ -176,10 +188,8 @@ contains it.
 
 ## Limits
 
-- **Checked on Ubuntu 24.04 and Windows Server 2022,** with gnustep-cli 0.1.7.
+- **Checked on Ubuntu 24.04 and Windows Server 2022,** with gnustep-cli 0.1.9.
   On Windows, gnustep-cli's installer is in preview. With MSYS2's own
   packages instead of gnustep-cli's toolchain, building tools-xctest needs
   `-DHAVE_MODE_T`, as the Windows build in
   [Examples/PackagedAppTests](../Examples/PackagedAppTests) shows.
-- **Once gnustep-cli packages tools-xctest,** step 2 becomes one
-  `gnustep install` command, and this guide will say so.
