@@ -128,6 +128,11 @@ launches it with
 .B libXCTestHost
 preloaded, and the tests run on its main thread once it has finished
 launching.
+Tests can find and drive its windows, controls and menus with
+.B libXCTestUI
+.RI ( XCTest/XCUI.h :
+.BR XCUIApplication ,
+.BR XCUIElement ).
 Not supported on Windows.
 .TP
 .BI \-host\-launch\-timeout " seconds"
