@@ -72,7 +72,7 @@
     XCTAssertEqual([app.menuBarItems[@"Actions"] elementType], XCUIElementTypeMenuBarItem);
     XCTAssertEqual([app.menuItems[@"Reset"] elementType], XCUIElementTypeMenuItem);
     XCTAssertEqual([app.textFields count], (NSUInteger)1);
-    XCTAssertEqual([[app.windows[@"Main"] childrenMatchingType:XCUIElementTypeButton] count], (NSUInteger)8);
+    XCTAssertEqual([[app.windows[@"Main"] childrenMatchingType:XCUIElementTypeButton] count], (NSUInteger)9);
 }
 
 - (void) testValues
@@ -328,6 +328,50 @@ static BOOL UIIsPNG(NSData *data)
 
     [app.buttons[@"Increment"] click];
     XCTAssertEqualObjects([app.staticTexts[@"countLabel"] value], @"Count: 1");
+}
+
+@end
+
+// A sheet runs as a modal session, so it's answered from the UI test thread.
+@interface UISheetTests : UIFixtureCase
+@end
+
+@implementation UISheetTests
+
++ (BOOL) runsOnUITestThread
+{
+    return YES;
+}
+
+- (void) testAnsweringASheet
+{
+    XCUIApplication *app = [XCUIApplication currentApplication];
+    XCUIElement *sheet = [app.windows[@"Main"].sheets firstMatch];
+
+    XCTAssertFalse([sheet exists]);
+    [app.buttons[@"Show Sheet"] click];
+    XCTAssertTrue([sheet waitForExistenceWithTimeout:5]);
+    XCTAssertEqual([sheet elementType], XCUIElementTypeSheet);
+    XCTAssertEqualObjects([sheet title], @"Changes");
+    XCTAssertTrue([sheet.staticTexts[@"Save changes?"] exists]);
+    // It's a child of its window, not one of the application's windows.
+    XCTAssertEqual([app.windows count], (NSUInteger)1);
+    XCTAssertEqual([app.sheets count], (NSUInteger)1);
+    XCTAssertEqual([[app.windows[@"Main"] childrenMatchingType:XCUIElementTypeSheet] count], (NSUInteger)1);
+    [sheet.buttons[@"Done"] click];
+    XCTAssertTrue([sheet waitForNonExistenceWithTimeout:5]);
+    XCTAssertTrue([app.staticTexts[@"Sheet: Done"] waitForExistenceWithTimeout:5]);
+}
+
+- (void) testDismissingASheetWithItsOtherButton
+{
+    XCUIApplication *app = [XCUIApplication currentApplication];
+
+    [app.buttons[@"Show Sheet"] click];
+    XCTAssertTrue([app.sheets[@"Changes"] waitForExistenceWithTimeout:5]);
+    [app.sheets[@"Changes"].buttons[@"Discard"] click];
+    XCTAssertTrue([app.sheets[@"Changes"] waitForNonExistenceWithTimeout:5]);
+    XCTAssertTrue([app.staticTexts[@"Sheet: Discard"] waitForExistenceWithTimeout:5]);
 }
 
 @end

@@ -508,8 +508,8 @@ application. It reaches the application only through `GSXCTestMainThread`
 - **A stopped application.** If the main thread doesn't answer after a test,
   the application is treated as stopped: the remaining tests fail without
   running, and the run ends with the results written.
-- **Not supported yet:** sheets, menu tracking, and more than three nested
-  modal sessions. For finding controls, clicking and typing, see the next
+- **Not supported yet:** menu tracking, and more than three nested modal
+  sessions (a sheet is one, as GNUstep runs it modally). For finding controls, clicking and typing, see the next
   section. Linux only, as `-host` is.
 
 #### Finding and driving controls (XCUIApplication)
@@ -546,7 +546,8 @@ With xctest.make, set `MyTests_XCTEST_UI = yes` to link it (along with
   application can be queried. Elements are found by walking AppKit's
   windows, views and menus, not through accessibility, and `frame` is in
   GNUstep's screen coordinates (origin at the bottom left).
-- **Queries.** `windows`, `buttons`, `checkBoxes`, `radioButtons`,
+- **Queries.** `windows`, `sheets` (found under the window they're attached
+  to, not among the application's windows), `buttons`, `checkBoxes`, `radioButtons`,
   `popUpButtons`, `textFields`, `secureTextFields`, `staticTexts`,
   `textViews`, `menuBarItems` (the main menu's items), `menuItems` and
   `otherElements`, from the application or any element, or
@@ -572,9 +573,10 @@ With xctest.make, set `MyTests_XCTEST_UI = yes` to link it (along with
 - **Threads.** It works from main-thread tests, and from a class that runs
   on the UI test thread (above), where a click that opens an alert returns
   while the alert is up and the test can then press its buttons:
-  `[app.buttons[@"Cancel"] click]`.
-- **Not yet:** sheets, tables, double clicks, and keys other than typed
-  text. See issue #26.
+  `[app.buttons[@"Cancel"] click]`. A sheet is answered the same way:
+  `[app.windows[@"Main"].sheets.firstMatch.buttons[@"Done"] click]`.
+- **Not yet:** tables, double clicks, and keys other than typed text. See
+  issue #26.
 
 ## Building test bundles
 

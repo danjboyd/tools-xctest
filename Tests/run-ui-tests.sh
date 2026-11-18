@@ -60,6 +60,7 @@ assert_contains "UIElementTests: 6 tests PASSED"
 assert_contains "UIActionTests: 5 tests PASSED"
 assert_contains "UIAlertTests: 3 tests PASSED"
 assert_contains "UIScreenshotTests: 4 tests PASSED"
+assert_contains "UISheetTests: 2 tests PASSED"
 # A screenshot attachment is saved as PNG.
 [ "$(head -c 8 "$work/attachments/UIScreenshotTests/testAnElementsScreenshotIsItsSize/increment.png" | od -An -tx1 | tr -d ' \n')" = "89504e470d0a1a0a" ] \
   || fail "expected the screenshot attachment to be saved as PNG"
