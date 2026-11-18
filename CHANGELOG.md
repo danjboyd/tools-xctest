@@ -3,6 +3,22 @@
 Releases of this fork (danjboyd/tools-xctest). Versions are tagged
 `vX.Y.Z`; 0.1.x are upstream's (gnustep/tools-xctest).
 
+## Unreleased
+
+UI testing for hosted tests (issue #26).
+
+- `libXCTestUI` (`#import <XCTest/XCUI.h>`): Apple's `XCUIApplication`,
+  `XCUIElement` and `XCUIElementQuery` names for finding an application's
+  windows, controls and menu items, clicking them, typing into them and
+  waiting for the UI to change, from main-thread tests or from the UI test
+  thread. An action a user couldn't perform (a disabled, hidden or
+  ambiguous element) fails the test. With xctest.make, set
+  `<Bundle>_XCTEST_UI = yes`; it's built when gnustep-gui is installed.
+  Linux only, as `-host` is.
+- Screenshots of elements, windows and the application, as attachments.
+  A screenshot includes changes that haven't been drawn yet.
+- Not yet: sheets, tables, double clicks, and keys other than typed text.
+
 ## 0.8.1
 
 A fix for code coverage on Windows, and a guide for testing an app.

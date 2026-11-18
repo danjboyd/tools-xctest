@@ -206,8 +206,10 @@ callback during another wait. Fulfilling an expectation again after its wait
 has completed is reported when `assertForOverFulfill` is set.
 
 This is a subset of XCTest, not full Apple XCTest compatibility. UI testing
-(`XCUIApplication`) is not implemented, and the CPU metric doesn't report
-Apple's cycle and instruction counts.
+(`XCUIApplication`) runs inside the application rather than driving it from
+outside, and covers part of XCUITest (see
+[Finding and driving controls](#finding-and-driving-controls-xcuiapplication)).
+The CPU metric doesn't report Apple's cycle and instruction counts.
 
 The sections below describe these in more detail.
 
