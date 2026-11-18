@@ -57,7 +57,10 @@ gnustep install tools-xctest
 This installs the XCTest library and headers, the `xctest` runner, and
 `xctest.make`, which builds test bundles with gnustep-make. The runner goes
 on the `PATH` that setup printed, and `xctest.make` is available as
-`$(GNUSTEP_MAKEFILES)/Auxiliary/xctest.make`.
+`$(GNUSTEP_MAKEFILES)/Auxiliary/xctest.make`. On Windows, the runner on
+`PATH` is `xctest.cmd`, for PowerShell and `cmd`; the toolchain's `bash`
+doesn't see it, and doesn't need to, because `make check` runs the
+package's `xctest.exe` itself.
 
 If you followed an earlier version of this guide and installed tools-xctest
 with `make install` from its source, `gnustep install` refuses to replace

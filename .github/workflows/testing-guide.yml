@@ -97,8 +97,11 @@ jobs:
         run: |
           export MSYSTEM=CLANG64 PATH="/clang64/bin:/usr/bin:$PATH"
           . /clang64/share/GNUstep/Makefiles/GNUstep.sh
-          "$(cygpath -u "$LOCALAPPDATA")/gnustep-cli/bin/gnustep.exe" install tools-xctest
-          command -v xctest
+          root="$(cygpath -u "$LOCALAPPDATA")/gnustep-cli"
+          "$root/bin/gnustep.exe" install tools-xctest
+          # On Windows the runner on PATH is a .cmd launcher, for PowerShell
+          # and cmd; make check runs the package's xctest.exe directly.
+          ls "$root/bin/xctest.cmd"
           ls "$GNUSTEP_MAKEFILES/Auxiliary/xctest.make"
 
       - name: Run the example's tests (guide steps 3 and 4)
