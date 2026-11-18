@@ -6,6 +6,7 @@
 @interface UIHostAppDelegate : NSObject {
     NSWindow *_window;
     NSWindow *_second;
+    NSWindow *_sheet;
     NSInteger _count;
     NSTextField *_countLabel;
     NSTextField *_nameField;
@@ -70,6 +71,43 @@ static NSTextField *UIHostLabel(NSView *parent, NSString *text, NSString *identi
     [alert addButtonWithTitle:@"Cancel"];
     result = [alert runModal];
     [_alertLabel setStringValue:result == NSAlertFirstButtonReturn ? @"Alert: OK" : @"Alert: Cancel"];
+}
+
+- (void) endSheet: (id)sender
+{
+    [NSApp endSheet:_sheet returnCode:[sender tag]];
+}
+
+- (void) sheetDidEnd: (NSWindow *)sheet returnCode: (NSInteger)code contextInfo: (void *)context
+{
+    [_alertLabel setStringValue:code == 1 ? @"Sheet: Done" : @"Sheet: Discard"];
+}
+
+// A sheet on the main window, with a message and two buttons. GNUstep runs
+// it as a modal session, as it does an alert.
+- (void) showSheet: (id)sender
+{
+    if (_sheet == nil) {
+        NSView *content;
+
+        _sheet = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, 220, 90)
+                                             styleMask:NSTitledWindowMask
+                                               backing:NSBackingStoreBuffered
+                                                 defer:NO];
+        [_sheet setTitle:@"Changes"];
+        [_sheet setReleasedWhenClosed:NO];
+        content = [_sheet contentView];
+        UIHostLabel(content, @"Save changes?", @"sheetMessage", NSMakeRect(10, 55, 200, 24));
+        [UIHostButton(content, @"Done", @"sheetDoneButton", NSMakeRect(10, 15, 90, 24), self, @selector(endSheet:))
+            setTag:1];
+        [UIHostButton(content, @"Discard", @"sheetDiscardButton", NSMakeRect(110, 15, 90, 24), self, @selector(endSheet:))
+            setTag:0];
+    }
+    [NSApp beginSheet:_sheet
+       modalForWindow:_window
+        modalDelegate:self
+       didEndSelector:@selector(sheetDidEnd:returnCode:contextInfo:)
+          contextInfo:NULL];
 }
 
 - (void) openSecondWindow
@@ -182,6 +220,7 @@ static NSTextField *UIHostLabel(NSView *parent, NSString *text, NSString *identi
 
     UIHostButton(content, @"Show Alert", @"alertButton", NSMakeRect(10, 45, 100, 24), self, @selector(showAlert:));
     _alertLabel = UIHostLabel(content, @"", @"alertLabel", NSMakeRect(120, 45, 150, 24));
+    UIHostButton(content, @"Show Sheet", @"sheetButton", NSMakeRect(280, 45, 100, 24), self, @selector(showSheet:));
 
     [_window makeKeyAndOrderFront:nil];
     NSLog(@"uihostapp: launched");

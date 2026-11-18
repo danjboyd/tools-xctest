@@ -40,8 +40,8 @@
 // that a user couldn't perform (the element doesn't exist, is disabled,
 // hidden, or outside its window) fail the test instead of acting.
 //
-// Not supported yet: sheets, tables, key presses other than typing text,
-// double clicks, and occlusion by other windows. See issue #26.
+// Not supported yet: tables, key presses other than typing text, double
+// clicks, and occlusion by other windows. See issue #26.
 
 #import <Foundation/Foundation.h>
 #import <XCTest/XCTest.h>
@@ -74,6 +74,9 @@ typedef NS_ENUM(NSUInteger, XCUIElementType) {
     XCUIElementTypeOther = 1,
     XCUIElementTypeApplication = 2,
     XCUIElementTypeWindow = 4,
+    /// A window attached to another as a sheet; it's found as a child of
+    /// that window, not of the application.
+    XCUIElementTypeSheet = 5,
     XCUIElementTypeButton = 9,
     XCUIElementTypeRadioButton = 10,
     XCUIElementTypeCheckBox = 12,
@@ -117,6 +120,7 @@ typedef NS_ENUM(NSUInteger, XCUIElementType) {
 /// Elements found by a query.
 @protocol XCUIElementTypeQueryProvider
 - (XCUIElementQuery *) windows;
+- (XCUIElementQuery *) sheets;
 - (XCUIElementQuery *) buttons;
 - (XCUIElementQuery *) radioButtons;
 - (XCUIElementQuery *) checkBoxes;

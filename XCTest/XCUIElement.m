@@ -38,6 +38,7 @@ static NSString *GSXCUITypeName(XCUIElementType type)
     case XCUIElementTypeOther: return @"other element";
     case XCUIElementTypeApplication: return @"application";
     case XCUIElementTypeWindow: return @"window";
+    case XCUIElementTypeSheet: return @"sheet";
     case XCUIElementTypeButton: return @"button";
     case XCUIElementTypeRadioButton: return @"radio button";
     case XCUIElementTypeCheckBox: return @"check box";
@@ -101,6 +102,13 @@ static BOOL GSXCUIIsUserWindow(NSWindow *window)
         && [name rangeOfString:@"Icon"].location == NSNotFound;
 }
 
+// GNUstep's -sheetParent is always nil, but -beginSheet:... sets the
+// parent's -attachedSheet and the sheet's -parentWindow.
+static BOOL GSXCUIIsSheet(NSWindow *window)
+{
+    return [[window parentWindow] attachedSheet] == window;
+}
+
 static BOOL GSXCUIIsFieldEditor(NSView *view)
 {
     return [view isKindOfClass:[NSText class]] && [(NSText *)view isFieldEditor];
@@ -114,7 +122,7 @@ static NSArray *GSXCUIChildren(id object)
         NSMenu *mainMenu = [object mainMenu];
 
         for (NSWindow *window in [object windows]) {
-            if (GSXCUIIsUserWindow(window)) {
+            if (GSXCUIIsUserWindow(window) && !GSXCUIIsSheet(window)) {
                 [children addObject:window];
             }
         }
@@ -125,6 +133,7 @@ static NSArray *GSXCUIChildren(id object)
         }
     } else if ([object isKindOfClass:[NSWindow class]]) {
         NSView *content = [object contentView];
+        NSWindow *sheet = [object attachedSheet];
 
         if (content != nil) {
             for (NSView *view in [content subviews]) {
@@ -132,6 +141,9 @@ static NSArray *GSXCUIChildren(id object)
                     [children addObject:view];
                 }
             }
+        }
+        if (sheet != nil && GSXCUIIsUserWindow(sheet)) {
+            [children addObject:sheet];
         }
     } else if ([object isKindOfClass:[NSMenuItem class]]) {
         for (NSMenuItem *item in [[object submenu] itemArray]) {
@@ -186,7 +198,7 @@ static XCUIElementType GSXCUITypeOf(id object)
         return XCUIElementTypeApplication;
     }
     if ([object isKindOfClass:[NSWindow class]]) {
-        return XCUIElementTypeWindow;
+        return GSXCUIIsSheet(object) ? XCUIElementTypeSheet : XCUIElementTypeWindow;
     }
     if ([object isKindOfClass:[NSMenuItem class]]) {
         return [object menu] == [NSApp mainMenu] ? XCUIElementTypeMenuBarItem : XCUIElementTypeMenuItem;
@@ -717,6 +729,7 @@ static NSPredicate *GSXCUIKeyPredicate(NSString *key)
 }
 
 - (XCUIElementQuery *) windows { return [self descendantsMatchingType:XCUIElementTypeWindow]; }
+- (XCUIElementQuery *) sheets { return [self descendantsMatchingType:XCUIElementTypeSheet]; }
 - (XCUIElementQuery *) buttons { return [self descendantsMatchingType:XCUIElementTypeButton]; }
 - (XCUIElementQuery *) radioButtons { return [self descendantsMatchingType:XCUIElementTypeRadioButton]; }
 - (XCUIElementQuery *) checkBoxes { return [self descendantsMatchingType:XCUIElementTypeCheckBox]; }
@@ -1083,6 +1096,7 @@ static void GSXCUISendKey(NSWindow *window, NSString *characters)
 }
 
 - (XCUIElementQuery *) windows { return [self descendantsMatchingType:XCUIElementTypeWindow]; }
+- (XCUIElementQuery *) sheets { return [self descendantsMatchingType:XCUIElementTypeSheet]; }
 - (XCUIElementQuery *) buttons { return [self descendantsMatchingType:XCUIElementTypeButton]; }
 - (XCUIElementQuery *) radioButtons { return [self descendantsMatchingType:XCUIElementTypeRadioButton]; }
 - (XCUIElementQuery *) checkBoxes { return [self descendantsMatchingType:XCUIElementTypeCheckBox]; }

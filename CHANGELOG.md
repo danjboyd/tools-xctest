@@ -17,7 +17,10 @@ UI testing for hosted tests (issue #26).
   Linux only, as `-host` is.
 - Screenshots of elements, windows and the application, as attachments.
   A screenshot includes changes that haven't been drawn yet.
-- Not yet: sheets, tables, double clicks, and keys other than typed text.
+- Sheets: `sheets` finds a window's attached sheet (XCUIElementTypeSheet),
+  under that window rather than among the application's windows. GNUstep
+  runs a sheet modally, so tests answer it from the UI test thread.
+- Not yet: tables, double clicks, and keys other than typed text.
 
 ## 0.8.1
 
