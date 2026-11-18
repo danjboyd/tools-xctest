@@ -29,7 +29,7 @@ the installer against its published digest before running it:
 
 ```powershell
 Invoke-WebRequest -Uri https://github.com/danjboyd/gnustep-cli-new/releases/download/v0.1.9/gnustep-bootstrap.ps1 -OutFile gnustep-bootstrap.ps1
-(Get-FileHash -Algorithm SHA256 gnustep-bootstrap.ps1).Hash   # TODO-V019-PS1-SHA256
+(Get-FileHash -Algorithm SHA256 gnustep-bootstrap.ps1).Hash   # 4D39C0E45C618DD38DAD533BDC6DECD9A4B4CBD92B913084B1D75043298E7BF7
 .\gnustep-bootstrap.ps1 setup --user
 ```
 
