@@ -1,5 +1,5 @@
 # Follows Docs/testing-your-app.md on clean Linux and Windows runners: install gnustep-cli,
-# build and install tools-xctest into its toolchain, then run
+# install tools-xctest with `gnustep install`, then run
 # Examples/FirstTest's tests, and check that a failing test fails `make check`.
 name: Testing guide
 
@@ -24,10 +24,8 @@ jobs:
   linux:
     runs-on: ubuntu-24.04
     env:
-      GNUSTEP_CLI_VERSION: 0.1.7
-      GNUSTEP_CLI_BOOTSTRAP_SHA256: 1580d5ddcf774716bc2caa614cb4c217c19ead1645f4362f58ad12277345c961
-      XCTEST_VERSION: 0.8.1
-      XCTEST_SHA256: f02333c61c02533ea1d96c5072608bdbde345f9d0167305100832b6f1b12e189
+      GNUSTEP_CLI_VERSION: 0.1.9
+      GNUSTEP_CLI_BOOTSTRAP_SHA256: 3fca82d1b20f58af3bd97ef84c7991e8d0061be80eddc613d3b3b47c6e6a6895
     steps:
       - uses: actions/checkout@v4
 
@@ -42,16 +40,10 @@ jobs:
           echo "$root/Tools" >> "$GITHUB_PATH"
           echo "$root/System/Tools" >> "$GITHUB_PATH"
 
-      - name: Build and install tools-xctest (guide step 2)
+      - name: Install tools-xctest (guide step 2)
         run: |
           . "$HOME/.local/share/gnustep-cli/System/Library/Makefiles/GNUstep.sh"
-          cd "$RUNNER_TEMP"
-          curl -fsSLO "https://github.com/danjboyd/tools-xctest/releases/download/v$XCTEST_VERSION/tools-xctest-$XCTEST_VERSION.tar.gz"
-          echo "$XCTEST_SHA256  tools-xctest-$XCTEST_VERSION.tar.gz" | sha256sum -c -
-          tar -xzf "tools-xctest-$XCTEST_VERSION.tar.gz"
-          cd "tools-xctest-$XCTEST_VERSION"
-          make
-          make install
+          gnustep install tools-xctest
           command -v xctest
           ls "$GNUSTEP_MAKEFILES/Auxiliary/xctest.make"
 
@@ -78,10 +70,8 @@ jobs:
   windows:
     runs-on: windows-2022
     env:
-      GNUSTEP_CLI_VERSION: 0.1.7
-      GNUSTEP_CLI_BOOTSTRAP_PS1_SHA256: 867308a2c1c3febd9a7800564eb131a899db67c2ccc9c5d03d4b921c4b387420
-      XCTEST_VERSION: 0.8.1
-      XCTEST_SHA256: f02333c61c02533ea1d96c5072608bdbde345f9d0167305100832b6f1b12e189
+      GNUSTEP_CLI_VERSION: 0.1.9
+      GNUSTEP_CLI_BOOTSTRAP_PS1_SHA256: 4d39c0e45c618dd38dad533bdc6decd9a4b4cbd92b913084b1d75043298e7bf7
     defaults:
       run:
         # The managed toolchain's own bash (setup installs it under
@@ -103,18 +93,15 @@ jobs:
           Get-ChildItem $root
           & "$root\bin\gnustep.exe" --version
 
-      - name: Build and install tools-xctest (guide step 2)
+      - name: Install tools-xctest (guide step 2)
         run: |
           export MSYSTEM=CLANG64 PATH="/clang64/bin:/usr/bin:$PATH"
           . /clang64/share/GNUstep/Makefiles/GNUstep.sh
-          cd "$(cygpath -u "$RUNNER_TEMP")"
-          curl -fsSLO "https://github.com/danjboyd/tools-xctest/releases/download/v$XCTEST_VERSION/tools-xctest-$XCTEST_VERSION.tar.gz"
-          echo "$XCTEST_SHA256  tools-xctest-$XCTEST_VERSION.tar.gz" | sha256sum -c -
-          tar -xzf "tools-xctest-$XCTEST_VERSION.tar.gz"
-          cd "tools-xctest-$XCTEST_VERSION"
-          make
-          make install
-          command -v xctest
+          root="$(cygpath -u "$LOCALAPPDATA")/gnustep-cli"
+          "$root/bin/gnustep.exe" install tools-xctest
+          # On Windows the runner on PATH is a .cmd launcher, for PowerShell
+          # and cmd; make check runs the package's xctest.exe directly.
+          ls "$root/bin/xctest.cmd"
           ls "$GNUSTEP_MAKEFILES/Auxiliary/xctest.make"
 
       - name: Run the example's tests (guide steps 3 and 4)
