@@ -431,6 +431,61 @@ Not covered by the spike: sheets, menu tracking
 4. Modal windows and alerts (with 1a), sheets, tables.
 5. Docs: a README section and the man page's `-host` entry.
 
+## What's left after sheets
+
+Built on master: phases 2 and 3, alerts and modal windows from the test
+thread, and sheets (#78). Three pieces from the proposal above aren't built.
+They don't depend on each other and can come in any order, one PR each.
+
+**`typeKey:modifierFlags:`** (smallest).
+- *What:* one key press, with modifiers, sent to the key window or the
+  element: Return, Escape, Tab, arrows, Delete, and shortcuts such as
+  Command-S. Apple's `XCUIKeyboardKey` constants name the special keys.
+- *How:* `typeText:` already sends key-down and key-up events through
+  `-[NSWindow sendEvent:]` (`GSXCUISendKey`). Add the modifier flags and
+  map each key to the function-key character AppKit expects
+  (`NSUpArrowFunctionKey` and so on). The key-down goes through
+  `-[NSApplication sendEvent:]`, the way a real one does: in GNUstep that
+  tries the key window's and then the main menu's key equivalents before
+  handing the event to the window, so a shortcut reaches the main menu.
+  (`typeText:` goes straight to the window, so typed text never triggers
+  a shortcut.)
+- *Tests:* in UIHostApp, Return activates the default button, Escape
+  cancels a sheet, Tab moves focus, and Command plus a key runs a menu item.
+- *Risks:* with no key window, a key that isn't a shortcut has nowhere to
+  go. It should fail the test with a message, not drop the key silently.
+
+**`doubleClick`** (small).
+- *What:* two clicks with click counts 1 and 2, as a user's double click.
+- *How:* a control's `performClick:` has no click count, so a double click
+  is always synthesized mouse events at the element's centre, the path
+  `click` already uses for views that aren't controls. `NSTableView` uses
+  it through `doubleAction`, and text views use it to select a word.
+- *Tests:* a view in UIHostApp that counts clicks, and a table's
+  `doubleAction` once tables exist.
+- *Risks:* views that track the mouse in a nested loop on mouse-down. The
+  queued mouse-up that `click` relies on covers that.
+
+**Tables** (largest).
+- *What:* `tables` and `cells` queries, `XCUIElementTypeTable` and
+  `XCUIElementTypeCell`, a cell's `value`, and `click` to select a row.
+- *How:* GNUstep's `NSTableView` has no row views, so a cell is a
+  (row, column) pair, not a subview. A cell element resolves through the
+  data source, or the cell from `preparedCellAtColumn:row:`, for its value,
+  and through `frameOfCellAtColumn:row:` for its frame and hittability.
+  Clicking selects the row with `selectRowIndexes:byExtendingSelection:`
+  and sends the table's action, as a mouse click would. Rows outside the
+  visible rect aren't hittable until the test scrolls them in with
+  `scrollRowToVisible:`.
+- *Tests:* a table in UIHostApp with a few rows: count, find a cell by its
+  value, select it, scroll to a row off screen, and double-click it.
+- *Risks:* view-based tables (`viewForTableColumn:row:`), which GNUstep
+  supports in part, aren't covered. An outline view is a table whose rows
+  can be expanded; that comes later.
+
+Suggested order: `typeKey:modifierFlags:`, then `doubleClick`, then
+tables. Each step makes the next one's tests easier to write.
+
 ## Not covered
 
 - Launching or terminating the app from a test (`-[XCUIApplication launch]`):
